@@ -778,6 +778,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         const classStudents = await getDocs(query(collection(db, 'students'), where('teacherId', '==', user.uid)));
         const studentDocs = classStudents.docs.filter((record) => record.data().classId === id);
         await deleteDependentRecords('classId', id);
+        // Include historical records if a student was previously moved between classes.
+        for (const studentDoc of studentDocs) await deleteDependentRecords('studentId', studentDoc.id);
         for (let index = 0; index < studentDocs.length; index += 400) {
           const batch = writeBatch(db);
           studentDocs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
