@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../../lib/secureAiFetch';
 import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -136,7 +137,7 @@ export function LiteratureModule() {
     setAiError('');
     try {
       const summary = `${algoReport.lineCount} dize, ${algoReport.meterLabel}, kafiye düzeni: ${algoReport.rhymeScheme} (${algoReport.rhymePatternName})`;
-      const response = await fetch('/api/ai/poem-analysis', {
+      const response = await secureAiFetch('/api/ai/poem-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ title, genre, content, algorithmicSummary: summary }),
@@ -159,7 +160,7 @@ export function LiteratureModule() {
     setGenLoading(true);
     setGenError('');
     try {
-      const response = await fetch('/api/ai/poem-generate', {
+      const response = await secureAiFetch('/api/ai/poem-generate', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
