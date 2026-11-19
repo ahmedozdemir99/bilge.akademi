@@ -64,7 +64,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
-  const currentNav = NAV_ITEMS.find((item) => item.id === activeModule) ?? NAV_ITEMS[0];
+  const visibleNavItems = NAV_ITEMS.filter((item) => workspaceView === 'teacher' || item.id !== 'reports');
+  const currentNav = visibleNavItems.find((item) => item.id === activeModule) ?? visibleNavItems[0];
 
   const handleSelect = (id: ModuleId) => {
     setActiveModule(id);
@@ -107,7 +108,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+          {visibleNavItems.map((item) => {
             const Icon = item.icon;
             const isActive = activeModule === item.id;
             return (
@@ -203,7 +204,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-              {NAV_ITEMS.map((item) => {
+              {visibleNavItems.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeModule === item.id;
                 return (

@@ -40,44 +40,38 @@ type MathTab = 'proofs' | 'game' | 'encyclopedia' | 'tests' | 'solver' | 'graphs
 type GraphMode = 'geometry' | 'linear' | 'coordinate';
 
 function buildExerciseMcqOptions(acceptedAnswers: string[]): string[] {
-  const correct = (acceptedAnswers[0] ?? '0').trim();
-  const numMatch = correct.replace(',', '.').match(/^-?\d+(\.\d+)?$/);
+  const correct = (acceptedAnswers.find((answer) => answer.trim() && checkMathAnswer(answer.trim(), acceptedAnswers)) ?? '').trim();
+  if (!correct) return [];
   const candidates = new Set<string>([correct]);
-
-  if (numMatch) {
-    const base = Number(numMatch[0]);
-    const isInt = Number.isInteger(base);
-    const deltas =
-      Math.abs(base) >= 30 ? [-12, -6, 6, 12, -4, 4] : [-3, -2, -1, 1, 2, 3, 4];
-    for (const d of deltas) {
-      if (candidates.size >= 4) break;
-      const val = isInt ? base + d : Number((base + d * 0.5).toFixed(2));
-      if (base >= 0 && val < 0) continue;
-      candidates.add(String(val));
+  const weekdays = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+  const dayIndex = weekdays.findIndex((day) => day.toLocaleLowerCase('tr') === correct.toLocaleLowerCase('tr'));
+  if (dayIndex >= 0) {
+    for (const offset of [-2, -1, 1, 2]) candidates.add(weekdays[(dayIndex + offset + 7) % 7]);
+  } else if (/^-?\d+(?:[.,]\d+)?$/.test(correct)) {
+    const base = Number(correct.replace(',', '.'));
+    const isInteger = Number.isInteger(base);
+    const step = isInteger ? (Math.abs(base) >= 100 ? 10 : Math.abs(base) >= 20 ? 2 : 1) : 0.5;
+    for (const offset of [-2, -1, 1, 2, -3, 3]) {
+      const value = Number((base + offset * step).toFixed(2));
+      if (base >= 0 && value < 0) continue;
+      candidates.add(String(value));
     }
-  } else if (/^\d+\/\d+$/.test(correct)) {
+  } else if (/^-?\d+\/\d+$/.test(correct)) {
     const [n, d] = correct.split('/').map(Number);
-    for (const alt of [`${n + 1}/${d}`, `${Math.max(1, n - 1)}/${d}`, `${n}/${d + 1}`, `${n}/${d + 2}`]) {
-      if (candidates.size >= 4) break;
-      candidates.add(alt);
-    }
-  } else {
-    for (const fallback of ['2x + 1', 'x - 3', '3x + 2', 'x + 4']) {
-      if (candidates.size >= 4) break;
-      candidates.add(fallback);
+    for (const alt of [`${n + 1}/${d}`, `${Math.max(1, n - 1)}/${d}`, `${n}/${d + 1}`, `${n}/${d + 2}`]) candidates.add(alt);
+  } else if (/^[a-zA-Z]\s*[+-]\s*\d+$/.test(correct)) {
+    const match = correct.match(/^([a-zA-Z])\s*([+-])\s*(\d+)$/)!;
+    const variable = match[1], signed = Number(match[3]) * (match[2] === '-' ? -1 : 1);
+    for (const delta of [-2, -1, 1, 2]) {
+      const value = signed + delta;
+      candidates.add(`${variable} ${value < 0 ? '-' : '+'} ${Math.abs(value)}`);
     }
   }
-
-  let pad = 1;
-  while (candidates.size < 4) {
-    candidates.add(String(pad * 5));
-    pad += 1;
-  }
-
-  // Deterministic order based on answer string hash so options don't jump on re-render
-  const arr = Array.from(candidates);
-  const seed = correct.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
-  const shift = seed % arr.length;
+  // Never display unrelated fallback answers. Require four plausible options.
+  if (candidates.size < 4) return [];
+  const arr = [...candidates].slice(0, 4);
+  if (!arr.some((option) => checkMathAnswer(option, acceptedAnswers))) return [];
+  const shift = [...correct].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
   return [...arr.slice(shift), ...arr.slice(0, shift)];
 }
 
@@ -135,6 +129,24 @@ export function MathTutorModule() {
   const [hintsShown, setHintsShown] = useState(0);
   const [attemptStatus, setAttemptStatus] = useState<'idle' | 'correct' | 'wrong' | 'revealed'>('idle');
   const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
+
+  const validateExercise = (item: MathExerciseItem): string | null => {
+    if (!item.questionText?.trim() || !item.acceptedAnswers?.[0]?.trim()) return 'Soru veya cevap eksik.';
+    if (!checkMathAnswer(item.acceptedAnswers[0], item.acceptedAnswers)) return 'Cevap doğrulanamıyor.';
+    const q = item.questionText.toLocaleLowerCase('tr');
+    const answer = item.acceptedAnswers[0].trim();
+    const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    if ((q.includes('hangi günü') || q.includes('hangi günüdür')) && !days.some((day) => day.toLocaleLowerCase('tr') === answer.toLocaleLowerCase('tr'))) return 'Gün sorusunun cevabı gün adı olmalı.';
+    const intervals = [...q.matchAll(/her\s+(\d+)\s+dakikada/g)].map((m) => Number(m[1]));
+    const times = [...q.matchAll(/(\d{1,2})[.:](\d{2})/g)].map((m) => Number(m[1]) * 60 + Number(m[2]));
+    if (intervals.length === 2 && times.length >= 2 && q.includes('aynı anda') && q.includes('kaç kez')) {
+      const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
+      const period = intervals[0] * intervals[1] / gcd(intervals[0], intervals[1]);
+      const expected = Math.floor((times[1] - times[0]) / period) + 1;
+      if (times[1] > times[0] && Number(answer) !== expected) return `Doğru cevap ${expected} olmalı (ilk hareket dahil).`;
+    }
+    return null;
+  };
 
   const exerciseMcqOptions = useMemo(
     () => buildExerciseMcqOptions(exercise.acceptedAnswers),
@@ -211,11 +223,18 @@ export function MathTutorModule() {
         handleNewDeterministicExercise();
         return;
       }
-      setExercise({
+      const nextExercise = {
         topic: exTopic,
         difficulty: exDifficulty,
         ...(data.exercise as Omit<MathExerciseItem, 'topic' | 'difficulty'>),
-      });
+      } as MathExerciseItem;
+      const validationError = validateExercise(nextExercise);
+      if (validationError) {
+        notify('error', 'Soru doğrulanamadı', validationError + ' Doğrulanmış yerel soruya geçildi.');
+        handleNewDeterministicExercise();
+        return;
+      }
+      setExercise(nextExercise);
       setUserAnswer('');
       setHintsShown(0);
       setAttemptStatus('idle');
@@ -242,9 +261,8 @@ export function MathTutorModule() {
       });
       notify('success', 'Tebrikler, doğru cevap!', `${exercise.topic} alıştırması kaydedildi.`);
     } else {
-      const nextHint = Math.min(exercise.hints.length, hintsShown + 1);
-      setHintsShown(nextHint);
       setAttemptStatus('wrong');
+      notify('info', 'Tekrar dene', 'Cevabını yeniden değerlendir. İpucu gösterilmiyor.');
     }
   };
 
@@ -255,7 +273,6 @@ export function MathTutorModule() {
 
   const handleRevealSolution = async () => {
     setAttemptStatus('revealed');
-    setHintsShown(exercise.hints.length);
     setSessionScore((s) => ({ ...s, total: s.total + 1 }));
     await recordMathAttempt({
       topic: exercise.topic,
@@ -1016,16 +1033,20 @@ export function MathTutorModule() {
               <h3 className="mt-2 text-lg font-semibold text-navy-900 dark:text-white">
                 {exercise.questionText}
               </h3>
-              <div className="mt-4 p-5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 overflow-x-auto text-center text-lg">
-                <MathFormula latex={exercise.expressionLatex} display />
-              </div>
+              {(attemptStatus === 'correct' || attemptStatus === 'revealed') && exercise.expressionLatex && (
+                <div className="mt-4 p-5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 overflow-x-auto text-center text-lg">
+                  <MathFormula latex={exercise.expressionLatex} display />
+                </div>
+              )}
             </div>
 
+            {exerciseMcqOptions.length < 4 && <p className="text-xs text-slate-600 dark:text-slate-300">Bu soru için güvenilir dört çeldirici üretilemediğinden klasik cevap alanı kullanılır.</p>}
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div className="inline-flex p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
                 <button
                   type="button"
                   onClick={() => setExerciseInputMode('mcq')}
+                  disabled={exerciseMcqOptions.length < 4}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer whitespace-nowrap ${
                     exerciseInputMode === 'mcq'
                       ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
@@ -1057,7 +1078,7 @@ export function MathTutorModule() {
               )}
             </div>
 
-            {exerciseInputMode === 'mcq' ? (
+            {exerciseInputMode === 'mcq' && exerciseMcqOptions.length === 4 && exerciseMcqOptions.some((option) => checkMathAnswer(option, exercise.acceptedAnswers)) ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {exerciseMcqOptions.map((opt, idx) => {
                   const letters = ['A', 'B', 'C', 'D'];
@@ -1109,27 +1130,6 @@ export function MathTutorModule() {
               </form>
             )}
 
-            {/* Progressive Hints (Tutor Mode) */}
-            {hintsShown > 0 && attemptStatus !== 'correct' && (
-              <div className="space-y-2.5">
-                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
-                  <Lightbulb className="w-4 h-4" />
-                  <span>
-                    Öğretici İpuçları ({hintsShown}/{exercise.hints.length}) — Doğru cevabı bulmak
-                    için tekrar deneyin!
-                  </span>
-                </div>
-                {exercise.hints.slice(0, hintsShown).map((hint, idx) => (
-                  <div
-                    key={idx}
-                    className="p-3.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-950 dark:text-amber-200"
-                  >
-                    <strong>{idx + 1}. İpucu:</strong> {hint}
-                  </div>
-                ))}
-              </div>
-            )}
-
             {/* Correct or Revealed Solution */}
             {(attemptStatus === 'correct' || attemptStatus === 'revealed') && (
               <div className="p-5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 space-y-2">
@@ -1142,9 +1142,14 @@ export function MathTutorModule() {
                 <div className="text-sm text-slate-900 dark:text-white">
                   Sonuç: <MathFormula latex={exercise.answerDisplayLatex} />
                 </div>
-                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {exercise.fullSolution}
-                </p>
+                <div className="space-y-3 text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
+                  {['Soruyu anlama', 'Verilenleri belirleme', 'İstenen sonucu belirleme', 'Yöntemi seçme', 'İşlemleri uygulama', 'Sonucu kontrol etme'].map((title, index) => (
+                    <div key={title} className="rounded-lg border border-emerald-200 dark:border-emerald-900 p-3">
+                      <strong>{index + 1}. Adım — {title}</strong>
+                      <p className="mt-1">{index === 0 ? exercise.questionText : index === 1 ? 'Sorudaki sayıları ve koşulları ayırt et.' : index === 2 ? 'Soruda istenen büyüklüğü belirle.' : index === 3 ? 'Uygun matematiksel işlemi veya bağıntıyı seç.' : index === 4 ? exercise.fullSolution : 'Bulduğun cevabın soru koşullarını sağlayıp sağlamadığını kontrol et.'}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </section>

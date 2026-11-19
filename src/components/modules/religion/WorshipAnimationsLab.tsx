@@ -28,7 +28,7 @@ import {
 } from '../../../utils/englishAudio';
 import wuduAthleteImg from '../../../assets/images/wudu_athlete_fullbody_1795091471521.jpg';
 import namazQawmahImg from '../../../assets/images/namaz_qawmah_leftedge_1795115489104.jpg';
-import namazTakbirImg from '../../../assets/images/namaz_takbir_leftedge_1795115488821.jpg';
+import namazTakbirImg from '../../../assets/images/takbir_correct.jpg';
 import namazQiyamLowImg from '../../../assets/images/namaz_qiyam_leftedge_1795115488900.jpg';
 import namazRukuImg from '../../../assets/images/namaz_ruku_leftedge_1795115497228.jpg';
 import namazSujudInRugImg from '../../../assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg';
@@ -251,20 +251,26 @@ function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
 
   const photo = NAMAZ_POSTURE_PHOTOS[step.postureKey];
   const isSalam = step.postureKey === 'salam';
-  const activeSrc = isSalam ? SALAM_PHOTOS[salamSide].src : photo.src;
+  // Force a fresh request for the corrected takbir photograph on older cached deployments.
+  // Other prayer images, Firebase authentication, and AI requests remain untouched.
+  const activeSrc = isSalam
+    ? SALAM_PHOTOS[salamSide].src
+    : step.postureKey === 'takbir'
+      ? `${photo.src}?takbir-photo=20261119-corrected`
+      : photo.src;
   const activeAlt = isSalam
     ? `Namaz Adım ${step.stepNumber}: ${SALAM_PHOTOS[salamSide].label}`
     : `Namaz Adım ${step.stepNumber}: ${step.title} — ${photo.caption}`;
 
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-stone-100 dark:bg-slate-950 max-w-[380px] mx-auto w-full">
-      <div className="relative aspect-[3/4] w-full overflow-hidden">
+      <div className="relative w-full overflow-hidden flex items-center justify-center bg-stone-100 dark:bg-slate-950">
         <img
           key={activeSrc}
           src={activeSrc}
           alt={activeAlt}
           referrerPolicy="no-referrer"
-          className={`w-full h-full object-cover object-center select-none transition-opacity duration-300 ${
+          className={`block w-full h-auto max-h-[min(72vh,720px)] object-contain object-center select-none transition-opacity duration-300 ${
             photo.flipX ? '-scale-x-100' : ''
           }`}
         />

@@ -17,7 +17,11 @@ import {
 } from 'lucide-react';
 import {
   Bar,
+  Cell,
   BarChart,
+  Line,
+  LineChart,
+  Legend,
   CartesianGrid,
   ResponsiveContainer,
   Tooltip,
@@ -158,6 +162,36 @@ export function StudentTrackingModule() {
         : practiceExams.filter((p) => p.classId === analyticsClassId),
     [analyticsClassId, practiceExams]
   );
+  const trialProgress = useMemo(() => {
+    const subjects = [
+      { key: 'Türkçe', d: 'turkceD', y: 'turkceY' },
+      { key: 'Matematik', d: 'matematikD', y: 'matematikY' },
+      { key: 'Fen', d: 'fenD', y: 'fenY' },
+      { key: 'İnkılap', d: 'inkilapD', y: 'inkilapY' },
+      { key: 'Din', d: 'dinD', y: 'dinY' },
+      { key: 'İngilizce', d: 'ingilizceD', y: 'ingilizceY' },
+    ] as const;
+    const ordered = [...analyticsPracticeExams].sort((a, b) =>
+      String(a.examDate ?? '').localeCompare(String(b.examDate ?? '')) || String(a.id ?? '').localeCompare(String(b.id ?? ''))
+    );
+    const dates = [...new Set(ordered.map((exam) => exam.examDate))];
+    const points = dates.map((date) => {
+      const exams = ordered.filter((exam) => exam.examDate === date);
+      const point: Record<string, string | number> = { date, label: date.split('-').reverse().join('.') };
+      for (const subject of subjects) {
+        const values = exams.map((exam) => Number(exam[subject.d]) - Number(exam[subject.y]) / (exam.wrongPenalty || 3));
+        point[subject.key] = Number((values.reduce((a, b) => a + b, 0) / values.length).toFixed(2));
+      }
+      return point;
+    });
+    const changes = subjects.map(({ key }) => {
+      const current = points.length ? Number(points[points.length - 1][key]) : null;
+      const previous = points.length > 1 ? Number(points[points.length - 2][key]) : null;
+      return { subject: key, current, previous, delta: current !== null && previous !== null ? Number((current - previous).toFixed(2)) : null };
+    });
+    return { points, changes };
+  }, [analyticsPracticeExams]);
+
   const analyticsStudents = useMemo(
     () =>
       analyticsClassId === 'all'
@@ -183,37 +217,17 @@ export function StudentTrackingModule() {
     });
   }, [classes, grades, students]);
 
-  // Student Role View: privacy-safe personal view
+  // Never infer a signed-in student's identity from the first Firestore record.
+  // Personal records require a verified user-to-student mapping.
   if (workspaceView === 'student') {
-    const personalStudent = students[0];
-    if (!personalStudent) {
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
-          <Users className="w-8 h-8 text-teal-600 mx-auto mb-3" />
-          <h2 className="text-lg font-semibold text-navy-900 dark:text-white">
-            Kişisel Akademik Dosya Bulunamadı
-          </h2>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            Öğrenci görünümünde yalnızca kendi akademik gelişiminiz görüntülenir. Öğretmen
-            görünümüne geçerek sınıf ve öğrenci kayıtları oluşturabilirsiniz.
-          </p>
-        </div>
-      );
-    }
-
     return (
-      <div className="space-y-4">
-        <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-3.5 text-xs text-slate-600 dark:text-slate-300">
-          <strong>Öğrenci Görünümü:</strong> Diğer öğrencilerin kayıtları gizlidir. Yalnızca
-          kendi yazılı notlarınız, LGS deneme netleriniz ve yapay zekâ çalışma önerileriniz gösterilir.
-        </div>
-        <StudentProfileView
-          student={personalStudent}
-          schoolClass={classMap.get(personalStudent.classId)}
-          grades={grades.filter((g) => g.studentId === personalStudent.id)}
-          practiceExams={practiceExams.filter((p) => p.studentId === personalStudent.id)}
-          readOnly
-        />
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
+        <Users className="w-8 h-8 text-teal-600 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-navy-900 dark:text-white">Öğrenci Dosyası Eşleştirmesi Gerekli</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+          Kişisel deneme ve not kayıtları, giriş yapan hesaba güvenli biçimde eşleştirilmeden gösterilmez.
+          Öğretmeninizden hesap eşleştirmesinin yapılmasını isteyin.
+        </p>
       </div>
     );
   }
@@ -1034,7 +1048,11 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="subject" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Ortalama']} />
-                      <Bar dataKey="average" fill="#0B1F3A" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={44} animationDuration={650}>
+                        {analyticsSubjectBreakdown.map((item, index) => (
+                          <Cell key={item.subject} fill={['#2563eb', '#e11d48', '#059669', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d'][index % 8]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -1058,13 +1076,58 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Sınıf Ortalaması']} />
-                      <Bar dataKey="average" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={48} animationDuration={650}>
+                        {classComparisonData.map((item, index) => (
+                          <Cell key={item.name} fill={['#0d9488', '#7c3aed', '#ea580c', '#2563eb', '#db2777', '#65a30d', '#0891b2'][index % 7]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
               </div>
             </div>
           </div>
+
+          <section className="rounded-xl border border-slate-200 dark:border-slate-800 bg-white dark:bg-slate-900 p-4 sm:p-6 space-y-5">
+            <div>
+              <h3 className="text-base font-semibold text-navy-900 dark:text-white">Denemeler Arası Ders Gelişimi</h3>
+              <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Her dersin net ortalaması ve önceki deneme tarihine göre artış/azalışı. Aynı tarihteki denemeler birlikte ortalanır.</p>
+            </div>
+            {trialProgress.points.length < 2 ? (
+              <p className="text-sm text-slate-500 py-8 text-center">Gelişim grafiği için farklı tarihlerde en az iki deneme kaydı gerekir.</p>
+            ) : (
+              <>
+                <div className="h-80 w-full" role="img" aria-label="Derslerin deneme tarihine göre net gelişim çizgi grafiği">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={trialProgress.points} margin={{ top: 10, right: 14, bottom: 8, left: -16 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.22} />
+                      <XAxis dataKey="label" tick={{ fontSize: 10 }} />
+                      <YAxis tick={{ fontSize: 11 }} />
+                      <Tooltip formatter={(value) => [`${Number(value).toFixed(2)} net`, '']} />
+                      <Legend wrapperStyle={{ fontSize: 11 }} />
+                      {[
+                        ['Türkçe', '#0d9488'], ['Matematik', '#2563eb'], ['Fen', '#9333ea'],
+                        ['İnkılap', '#ea580c'], ['Din', '#16a34a'], ['İngilizce', '#db2777'],
+                      ].map(([name, color]) => (
+                        <Line key={name} type="monotone" dataKey={name} stroke={color} strokeWidth={2.5} dot={{ r: 3 }} activeDot={{ r: 6 }} animationDuration={550} />
+                      ))}
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+                <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+                  {trialProgress.changes.map((item) => (
+                    <div key={item.subject} className="rounded-lg border border-slate-200 dark:border-slate-700 p-3">
+                      <p className="text-xs text-slate-500 dark:text-slate-400">{item.subject}</p>
+                      <p className="mt-1 font-semibold tabular-nums">{item.current?.toFixed(2) ?? '—'} net</p>
+                      <p className={`text-xs font-medium tabular-nums ${item.delta === null ? 'text-slate-500' : item.delta > 0 ? 'text-emerald-600 dark:text-emerald-400' : item.delta < 0 ? 'text-rose-600 dark:text-rose-400' : 'text-slate-500'}`}>
+                        {item.delta === null ? 'Önceki deneme yok' : item.delta > 0 ? `↑ +${item.delta.toFixed(2)} net` : item.delta < 0 ? `↓ ${item.delta.toFixed(2)} net` : '→ Değişim yok'}
+                      </p>
+                    </div>
+                  ))}
+                </div>
+              </>
+            )}
+          </section>
 
           {/* Class AI Result */}
           {classAIError && (
