@@ -258,13 +258,13 @@ function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
 
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-stone-100 dark:bg-slate-950 max-w-[380px] mx-auto w-full">
-      <div className="relative aspect-[3/4] w-full overflow-hidden">
+      <div className="relative w-full overflow-hidden flex items-center justify-center bg-stone-100 dark:bg-slate-950">
         <img
           key={activeSrc}
           src={activeSrc}
           alt={activeAlt}
           referrerPolicy="no-referrer"
-          className={`w-full h-full object-contain object-center select-none transition-opacity duration-300 ${
+          className={`block w-full h-auto max-h-[min(72vh,720px)] object-contain object-center select-none transition-opacity duration-300 ${
             photo.flipX ? '-scale-x-100' : ''
           }`}
         />
