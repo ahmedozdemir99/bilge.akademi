@@ -12,4 +12,4 @@
 
 ## Dağıtımdan önce
 
-`npm ci && npm run lint && npm run build` çalıştırın; Firebase Emulator ile erişim kurallarını test edin. Bu dalda CI testleri çalıştırılmamıştır.
+`npm install && npm run lint && npm run build` çalıştırın; Firebase Emulator ile erişim kurallarını test edin. Bu dalda CI testleri çalıştırılmamıştır.
