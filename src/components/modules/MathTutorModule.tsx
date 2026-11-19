@@ -129,6 +129,23 @@ export function MathTutorModule() {
   const [attemptStatus, setAttemptStatus] = useState<'idle' | 'correct' | 'wrong' | 'revealed'>('idle');
   const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
 
+  const validateExercise = (item: MathExerciseItem): string | null => {
+    if (!item.questionText?.trim() || !item.acceptedAnswers?.[0]?.trim()) return 'Soru veya cevap eksik.';
+    const q = item.questionText.toLocaleLowerCase('tr');
+    const answer = item.acceptedAnswers[0].trim();
+    const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
+    if ((q.includes('hangi günü') || q.includes('hangi günüdür')) && !days.some((day) => day.toLocaleLowerCase('tr') === answer.toLocaleLowerCase('tr'))) return 'Gün sorusunun cevabı gün adı olmalı.';
+    const intervals = [...q.matchAll(/her\s+(\d+)\s+dakikada/g)].map((m) => Number(m[1]));
+    const times = [...q.matchAll(/(\d{1,2})[.:](\d{2})/g)].map((m) => Number(m[1]) * 60 + Number(m[2]));
+    if (intervals.length === 2 && times.length >= 2 && q.includes('aynı anda') && q.includes('kaç kez')) {
+      const gcd = (a: number, b: number): number => b ? gcd(b, a % b) : a;
+      const period = intervals[0] * intervals[1] / gcd(intervals[0], intervals[1]);
+      const expected = Math.floor((times[1] - times[0]) / period) + 1;
+      if (times[1] > times[0] && Number(answer) !== expected) return `Doğru cevap ${expected} olmalı (ilk hareket dahil).`;
+    }
+    return null;
+  };
+
   const exerciseMcqOptions = useMemo(
     () => buildExerciseMcqOptions(exercise.acceptedAnswers),
     [exercise]
@@ -204,11 +221,17 @@ export function MathTutorModule() {
         handleNewDeterministicExercise();
         return;
       }
-      setExercise({
+      const nextExercise = {
         topic: exTopic,
         difficulty: exDifficulty,
         ...(data.exercise as Omit<MathExerciseItem, 'topic' | 'difficulty'>),
-      });
+      } as MathExerciseItem;
+      const validationError = validateExercise(nextExercise);
+      if (validationError) {
+        notify('error', 'Soru doğrulanamadı', validationError);
+        return;
+      }
+      setExercise(nextExercise);
       setUserAnswer('');
       setHintsShown(0);
       setAttemptStatus('idle');
