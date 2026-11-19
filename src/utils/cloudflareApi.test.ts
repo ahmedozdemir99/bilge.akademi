@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { onRequest, resetModelDiscoveryCacheForTests } from '../../functions/api/[[path]]';
+import { onRequest } from '../../functions/api/[[path]]';
 
 function createContext(
   url: string,
@@ -18,7 +18,6 @@ async function runTests() {
 
   try {
     // 1. Health endpoint without API key
-    resetModelDiscoveryCacheForTests();
     const healthMissing = await onRequest(
       createContext('https://bilgeakademi.pages.dev/api/health', { method: 'GET' }, {})
     );
@@ -31,7 +30,7 @@ async function runTests() {
     assert.equal(healthMissingBody.fallbackModel, 'gemini-3.1-flash-lite');
 
     // 2. Health endpoint with API key (must NOT leak key)
-    const fakeSecretKey = 'AIzaSyTEST_FAKE_SECRET_DO_NOT_LEAK_12345';
+    const fakeSecretKey = 'AIzaSyTEST_HEALTH_KEY_DO_NOT_LEAK_0001';
     const healthOk = await onRequest(
       createContext(
         'https://bilgeakademi.pages.dev/api/health',
@@ -63,7 +62,6 @@ async function runTests() {
     assert.ok(missingKeyBody.error?.includes('GEMINI_API_KEY'));
 
     // 4. Primary Flash model succeeds directly
-    resetModelDiscoveryCacheForTests();
     const calledUrlsPrimary: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -84,7 +82,7 @@ async function runTests() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Fotosentez nedir?' }),
         },
-        { GEMINI_API_KEY: fakeSecretKey }
+        { GEMINI_API_KEY: 'AIzaSyTEST_PRIMARY_KEY_0002' }
       )
     );
     assert.equal(primaryRes.status, 200);
@@ -94,7 +92,6 @@ async function runTests() {
     assert.ok(calledUrlsPrimary[0].includes('/models/gemini-4-hydrogen:generateContent'));
 
     // 5. Fallback to Flash-Lite when Primary hits 429 quota
-    resetModelDiscoveryCacheForTests();
     const calledUrlsFallback: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -121,7 +118,7 @@ async function runTests() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Kareköklü sayılar' }),
         },
-        { GEMINI_API_KEY: fakeSecretKey }
+        { GEMINI_API_KEY: 'AIzaSyTEST_FALLBACK_KEY_0003' }
       )
     );
     assert.equal(fallbackRes.status, 200);
@@ -131,7 +128,6 @@ async function runTests() {
     assert.ok(calledUrlsFallback[1].includes('/models/gemini-3.1-flash-lite:generateContent'));
 
     // 6. Dynamic discovery when static IDs return 404 on external API key
-    resetModelDiscoveryCacheForTests();
     const calledUrlsDiscovery: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
@@ -170,7 +166,7 @@ async function runTests() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Malazgirt Savaşı' }),
         },
-        { GEMINI_API_KEY: fakeSecretKey }
+        { GEMINI_API_KEY: 'AIzaSyTEST_DISCOVERY_KEY_0004' }
       )
     );
     assert.equal(discoveredRes.status, 200);
@@ -180,7 +176,6 @@ async function runTests() {
     assert.ok(calledUrlsDiscovery.some((u) => u.includes('gemini-3-flash-preview:generateContent')));
 
     // 7. Error mapping: 404 MODEL_NOT_FOUND when all models unavailable
-    resetModelDiscoveryCacheForTests();
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({ error: { status: 'NOT_FOUND', message: 'Model not found' } }),
@@ -195,7 +190,7 @@ async function runTests() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Test 404' }),
         },
-        { GEMINI_API_KEY: fakeSecretKey }
+        { GEMINI_API_KEY: 'AIzaSyTEST_404_KEY_0005' }
       )
     );
     assert.equal(notFoundRes.status, 404);
@@ -204,7 +199,6 @@ async function runTests() {
     assert.ok(notFoundBody.error?.includes('modeli bulunamadı'));
 
     // 8. Error mapping: 429 QUOTA_EXHAUSTED
-    resetModelDiscoveryCacheForTests();
     globalThis.fetch = (async () =>
       new Response(
         JSON.stringify({ error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' } }),
@@ -219,7 +213,7 @@ async function runTests() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Test 429' }),
         },
-        { GEMINI_API_KEY: fakeSecretKey }
+        { GEMINI_API_KEY: 'AIzaSyTEST_429_KEY_0006' }
       )
     );
     assert.equal(quotaRes.status, 429);
@@ -228,7 +222,6 @@ async function runTests() {
     assert.ok(quotaBody.error?.includes('kotası'));
 
     // 9. Error mapping: 504 TIMEOUT on AbortError
-    resetModelDiscoveryCacheForTests();
     globalThis.fetch = (async () => {
       const abortErr = new Error('The operation was aborted');
       abortErr.name = 'AbortError';
@@ -243,7 +236,7 @@ async function runTests() {
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ message: 'Test timeout' }),
         },
-        { GEMINI_API_KEY: fakeSecretKey }
+        { GEMINI_API_KEY: 'AIzaSyTEST_TIMEOUT_KEY_0007' }
       )
     );
     assert.equal(timeoutRes.status, 504);
@@ -254,7 +247,6 @@ async function runTests() {
     console.log('Cloudflare Pages API tests: 9/9 passed.');
   } finally {
     globalThis.fetch = originalFetch;
-    resetModelDiscoveryCacheForTests();
   }
 }
 

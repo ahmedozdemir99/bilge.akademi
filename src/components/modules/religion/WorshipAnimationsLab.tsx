@@ -27,14 +27,14 @@ import {
   stopAllSpeech,
 } from '../../../utils/englishAudio';
 import wuduAthleteImg from '../../../assets/images/wudu_athlete_fullbody_1795091471521.jpg';
-import namazQawmahImg from '../../../assets/images/namaz_athlete_qawmah_1795091453974.jpg';
-import namazTakbirImg from '../../../assets/images/namaz_athlete_takbir_1795091788958.jpg';
-import namazQiyamLowImg from '../../../assets/images/namaz_athlete_qiyam_inrug_1795108814356.jpg';
-import namazRukuImg from '../../../assets/images/namaz_athlete_ruku_inrug_1795108812960.jpg';
+import namazQawmahImg from '../../../assets/images/namaz_qawmah_backrug_1795114959685.jpg';
+import namazTakbirImg from '../../../assets/images/namaz_takbir_backrug_1795114961075.jpg';
+import namazQiyamLowImg from '../../../assets/images/namaz_qiyam_backrug_1795114962103.jpg';
+import namazRukuImg from '../../../assets/images/namaz_ruku_backrug_1795114992591.jpg';
 import namazSujudInRugImg from '../../../assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg';
-import namazTashahhudInRugImg from '../../../assets/images/namaz_athlete_tashahhud_inrug_1795096355811.jpg';
-import namazSalamRightImg from '../../../assets/images/namaz_athlete_salam_right_1795096355282.jpg';
-import namazSalamLeftImg from '../../../assets/images/namaz_athlete_salam_left_1795096355274.jpg';
+import namazTashahhudInRugImg from '../../../assets/images/namaz_tashahhud_backrug_1795114974817.jpg';
+import namazSalamRightImg from '../../../assets/images/namaz_salam_right_backrug_1795114960411.jpg';
+import namazSalamLeftImg from '../../../assets/images/namaz_salam_left_backrug_1795114961442.jpg';
 
 type WorshipLabTab = 'wudu' | 'prayer' | 'hajj' | 'fasting-zakat';
 
@@ -227,11 +227,6 @@ function WuduPhotoStage({ step, waterPhase }: { step: WuduStep; waterPhase: numb
           ))}
         </svg>
       </div>
-      <div className="px-4 py-2 text-center bg-stone-100/95 dark:bg-slate-900/95 border-t border-slate-200/70 dark:border-slate-800">
-        <p className="text-[11px] text-slate-600 dark:text-slate-400">
-          Yapay zekâyla oluşturulmuş temsili görsel
-        </p>
-      </div>
     </div>
   );
 }
@@ -325,11 +320,6 @@ function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
         </div>
       )}
 
-      <div className="px-4 py-2 text-center bg-stone-100/95 dark:bg-slate-900/95 border-t border-slate-200/70 dark:border-slate-800">
-        <p className="text-[11px] text-slate-600 dark:text-slate-400">
-          Yapay zekâyla oluşturulmuş temsili görsel
-        </p>
-      </div>
     </div>
   );
 }

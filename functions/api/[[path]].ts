@@ -20,13 +20,19 @@ const DISCOVERY_TIMEOUT_MS = 6000;
 const DISCOVERY_CACHE_TTL_MS = 10 * 60 * 1000;
 
 interface DiscoveredModelsCache {
+  keyHash: string;
   expiresAt: number;
   primary: string | null;
   fallback: string | null;
+  extras: string[];
   tts: string | null;
 }
 
 let discoveredModelsCache: DiscoveredModelsCache | null = null;
+
+function getKeyFingerprint(apiKey: string): string {
+  return `${apiKey.slice(0, 6)}:${apiKey.slice(-6)}:${apiKey.length}`;
+}
 
 function jsonResponse(body: unknown, status = 200, extraHeaders?: Record<string, string>): Response {
   return new Response(JSON.stringify(body), {
@@ -92,7 +98,7 @@ function isPermanentError(msg: string): boolean {
   );
 }
 
-export function formatGeminiError(rawOrErr: unknown): { status: number; message: string; code: string } {
+function formatGeminiError(rawOrErr: unknown): { status: number; message: string; code: string } {
   const raw = rawOrErr instanceof Error ? rawOrErr.message : String(rawOrErr);
 
   if (
@@ -151,7 +157,11 @@ function supportsLowThinking(model: string): boolean {
   return m.startsWith('gemini-4') || m.startsWith('gemini-3');
 }
 
-function rankTextFlashModels(modelIds: string[]): { primary: string | null; fallback: string | null } {
+function rankTextFlashModels(modelIds: string[]): {
+  primary: string | null;
+  fallback: string | null;
+  extras: string[];
+} {
   const disallowedFragments = [
     'embedding',
     'imagen',
@@ -211,8 +221,9 @@ function rankTextFlashModels(modelIds: string[]): { primary: string | null; fall
     .filter((id) => id !== primary)
     .sort((a, b) => scoreFallback(b) - scoreFallback(a));
   const fallback = sortedFallback[0] ?? null;
+  const extras = sortedFallback.slice(1, 3);
 
-  return { primary, fallback };
+  return { primary, fallback, extras };
 }
 
 function pickBestTtsModel(modelIds: string[]): string | null {
@@ -232,7 +243,12 @@ function pickBestTtsModel(modelIds: string[]): string | null {
 }
 
 async function discoverAccessibleModels(apiKey: string): Promise<DiscoveredModelsCache> {
-  if (discoveredModelsCache && discoveredModelsCache.expiresAt > Date.now()) {
+  const keyHash = getKeyFingerprint(apiKey);
+  if (
+    discoveredModelsCache &&
+    discoveredModelsCache.keyHash === keyHash &&
+    discoveredModelsCache.expiresAt > Date.now()
+  ) {
     return discoveredModelsCache;
   }
 
@@ -248,7 +264,7 @@ async function discoverAccessibleModels(apiKey: string): Promise<DiscoveredModel
       }
     );
     if (!res.ok) {
-      return { expiresAt: Date.now() + 30_000, primary: null, fallback: null, tts: null };
+      return { keyHash, expiresAt: Date.now() + 30_000, primary: null, fallback: null, extras: [], tts: null };
     }
     const payload = (await res.json().catch(() => ({}))) as {
       models?: Array<{ name?: string; supportedGenerationMethods?: string[] }>;
@@ -262,25 +278,23 @@ async function discoverAccessibleModels(apiKey: string): Promise<DiscoveredModel
       )
       .map((m) => m.name as string);
 
-    const { primary, fallback } = rankTextFlashModels(generateContentIds);
+    const { primary, fallback, extras } = rankTextFlashModels(generateContentIds);
     const tts = pickBestTtsModel(generateContentIds);
 
     discoveredModelsCache = {
+      keyHash,
       expiresAt: Date.now() + DISCOVERY_CACHE_TTL_MS,
       primary,
       fallback,
+      extras,
       tts,
     };
     return discoveredModelsCache;
   } catch {
-    return { expiresAt: Date.now() + 30_000, primary: null, fallback: null, tts: null };
+    return { keyHash, expiresAt: Date.now() + 30_000, primary: null, fallback: null, extras: [], tts: null };
   } finally {
     clearTimeout(timeoutId);
   }
-}
-
-export function resetModelDiscoveryCacheForTests(): void {
-  discoveredModelsCache = null;
 }
 
 async function callGeminiModel(
@@ -365,8 +379,11 @@ async function generateResilient(
     responseSchema?: Record<string, unknown>;
   } = {}
 ): Promise<GeminiRestResult> {
+  const keyHash = getKeyFingerprint(apiKey);
   const cached =
-    discoveredModelsCache && discoveredModelsCache.expiresAt > Date.now()
+    discoveredModelsCache &&
+    discoveredModelsCache.keyHash === keyHash &&
+    discoveredModelsCache.expiresAt > Date.now()
       ? discoveredModelsCache
       : null;
 
@@ -429,13 +446,15 @@ async function generateResilient(
     const dynamicQueue: Array<{ model: string; useLowThinking: boolean; timeoutMs: number }> = [];
     const triedSet = new Set(initialQueue.map((e) => e.model));
 
-    if (discovered.primary && !triedSet.has(discovered.primary)) {
-      dynamicQueue.push({ model: discovered.primary, useLowThinking: true, timeoutMs: PRIMARY_TIMEOUT_MS });
-      triedSet.add(discovered.primary);
-    }
-    if (discovered.fallback && !triedSet.has(discovered.fallback)) {
-      dynamicQueue.push({ model: discovered.fallback, useLowThinking: false, timeoutMs: FALLBACK_TIMEOUT_MS });
-      triedSet.add(discovered.fallback);
+    for (const candidate of [discovered.primary, discovered.fallback, ...discovered.extras]) {
+      if (candidate && !triedSet.has(candidate)) {
+        dynamicQueue.push({
+          model: candidate,
+          useLowThinking: candidate === discovered.primary,
+          timeoutMs: candidate === discovered.primary ? PRIMARY_TIMEOUT_MS : FALLBACK_TIMEOUT_MS,
+        });
+        triedSet.add(candidate);
+      }
     }
 
     for (const entry of dynamicQueue) {
