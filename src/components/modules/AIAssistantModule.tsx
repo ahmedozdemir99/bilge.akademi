@@ -93,9 +93,14 @@ export function AIAssistantModule() {
           history: nextHistory.slice(-8).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
+      const contentType = response.headers.get('content-type') || '';
+      if (!contentType.includes('application/json')) {
+        setError('Yapay zekâ API uç noktası yanıt vermiyor. Cloudflare Pages Functions dağıtımını ve /api/health adresini kontrol edin.');
+        return;
+      }
       const data = await response.json();
       if (!response.ok) {
-        setError(data.error || 'Yapay zekâ yanıtı alınamadı.');
+        setError(typeof data.error === 'string' ? data.error : `Yapay zekâ sunucusu HTTP ${response.status} hatası döndürdü.`);
         return;
       }
 
