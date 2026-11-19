@@ -40,7 +40,7 @@ type MathTab = 'proofs' | 'game' | 'encyclopedia' | 'tests' | 'solver' | 'graphs
 type GraphMode = 'geometry' | 'linear' | 'coordinate';
 
 function buildExerciseMcqOptions(acceptedAnswers: string[]): string[] {
-  const correct = (acceptedAnswers[0] ?? '').trim();
+  const correct = (acceptedAnswers.find((answer) => answer.trim() && checkMathAnswer(answer.trim(), acceptedAnswers)) ?? '').trim();
   if (!correct) return [];
   const candidates = new Set<string>([correct]);
   const weekdays = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
@@ -70,6 +70,7 @@ function buildExerciseMcqOptions(acceptedAnswers: string[]): string[] {
   // Never display unrelated fallback answers. Require four plausible options.
   if (candidates.size < 4) return [];
   const arr = [...candidates].slice(0, 4);
+  if (!arr.some((option) => checkMathAnswer(option, acceptedAnswers))) return [];
   const shift = [...correct].reduce((sum, char) => sum + char.charCodeAt(0), 0) % 4;
   return [...arr.slice(shift), ...arr.slice(0, shift)];
 }
@@ -131,6 +132,7 @@ export function MathTutorModule() {
 
   const validateExercise = (item: MathExerciseItem): string | null => {
     if (!item.questionText?.trim() || !item.acceptedAnswers?.[0]?.trim()) return 'Soru veya cevap eksik.';
+    if (!checkMathAnswer(item.acceptedAnswers[0], item.acceptedAnswers)) return 'Cevap doğrulanamıyor.';
     const q = item.questionText.toLocaleLowerCase('tr');
     const answer = item.acceptedAnswers[0].trim();
     const days = ['Pazartesi', 'Salı', 'Çarşamba', 'Perşembe', 'Cuma', 'Cumartesi', 'Pazar'];
@@ -228,7 +230,8 @@ export function MathTutorModule() {
       } as MathExerciseItem;
       const validationError = validateExercise(nextExercise);
       if (validationError) {
-        notify('error', 'Soru doğrulanamadı', validationError);
+        notify('error', 'Soru doğrulanamadı', validationError + ' Doğrulanmış yerel soruya geçildi.');
+        handleNewDeterministicExercise();
         return;
       }
       setExercise(nextExercise);
@@ -1075,7 +1078,7 @@ export function MathTutorModule() {
               )}
             </div>
 
-            {exerciseInputMode === 'mcq' && exerciseMcqOptions.length === 4 ? (
+            {exerciseInputMode === 'mcq' && exerciseMcqOptions.length === 4 && exerciseMcqOptions.some((option) => checkMathAnswer(option, exercise.acceptedAnswers)) ? (
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 {exerciseMcqOptions.map((opt, idx) => {
                   const letters = ['A', 'B', 'C', 'D'];
