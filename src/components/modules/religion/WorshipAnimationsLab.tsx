@@ -28,7 +28,7 @@ import {
 } from '../../../utils/englishAudio';
 import wuduAthleteImg from '../../../assets/images/wudu_athlete_fullbody_1795091471521.jpg';
 import namazQawmahImg from '../../../assets/images/namaz_qawmah_leftedge_1795115489104.jpg';
-import namazTakbirImg from '../../../assets/images/namaz_takbir_leftedge_1795115488821.jpg';
+import namazTakbirImg from '../../../assets/images/namaz_takbir_replacement.webp';
 import namazQiyamLowImg from '../../../assets/images/namaz_qiyam_leftedge_1795115488900.jpg';
 import namazRukuImg from '../../../assets/images/namaz_ruku_leftedge_1795115497228.jpg';
 import namazSujudInRugImg from '../../../assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg';
