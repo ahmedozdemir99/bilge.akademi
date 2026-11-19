@@ -171,7 +171,7 @@ export function StudentTrackingModule() {
       { key: 'İngilizce', d: 'ingilizceD', y: 'ingilizceY' },
     ] as const;
     const ordered = [...analyticsPracticeExams].sort((a, b) =>
-      a.examDate.localeCompare(b.examDate) || (a.createdAt ?? '').localeCompare(b.createdAt ?? '') || a.id.localeCompare(b.id)
+      String(a.examDate ?? '').localeCompare(String(b.examDate ?? '')) || String(a.id ?? '').localeCompare(String(b.id ?? ''))
     );
     const dates = [...new Set(ordered.map((exam) => exam.examDate))];
     const points = dates.map((date) => {
