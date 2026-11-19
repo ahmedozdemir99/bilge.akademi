@@ -38,48 +38,6 @@ function ConceptCanvas({module,index,stage}:{module:EnrichmentModule;index:numbe
    <div className="mt-1 flex flex-wrap justify-center gap-2" aria-hidden="true">{nodes.slice(0,stage+1).map((node,i)=><span key={i} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">{node}</span>)}</div>
  </div>;
 }
-function SubjectConceptDiagram({module,index,stage}:{module:keyof typeof SUBJECT_STORYBOARDS;index:number;stage:number}) {
- const parts=SUBJECT_STORYBOARDS[module][index];
- return <div className="flex items-center justify-center gap-2 flex-wrap" aria-label={`${module} konusunun ${stage+1}. aşaması`}>
- {parts.slice(0,stage+1).map((part,i)=><span key={i} className="rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-100 shadow-sm transition-all duration-500">{part}</span>)}
- </div>;
-}
-
-function MathConceptDiagram({index,stage}:{index:number;stage:number}) {
- const steps = [
-  [['24','36'],['2 × 12','3 × 12'],['EBOB = 12']],
-  [['8, 16, 24','12, 24'],['24 = 3 × 8','24 = 2 × 12'],['EKOK = 24']],
-  [['240 TL','%25'],['240 × 25/100','60 TL'],['240 − 60 = 180 TL']],
-  [['3 pay','4 pay'],['7 pay = 28 kişi','1 pay = 4'],['3 × 4 = 12 kız']],
-  [['3x + 7 = 28'],['3x = 21'],['x = 7']],
-  [['3 kırmızı','5 mavi'],['Toplam 8 bilye'],['P(kırmızı) = 3/8']],
-  [['2³ × 2⁴'],['2³⁺⁴'],['2⁷ = 128']],
-  [['√144','√81'],['12 + 9'],['21']],
-  [['Taban = 10','Yükseklik = 6'],['Alan = 10 × 6 / 2'],['30 cm²']],
-  [['4, 6, 6, 8, 11'],['Toplam = 35','Adet = 5'],['Ortalama = 7']],
- ][index];
- return <div className="flex flex-wrap items-center justify-center gap-2" aria-label={`Matematik modelinin ${stage+1}. aşaması`}>
- {steps[stage].map((part,i)=><span key={i} className="rounded-lg bg-indigo-50 dark:bg-indigo-950 border border-indigo-200 dark:border-indigo-700 px-2 py-2 text-sm sm:text-base font-semibold text-indigo-900 dark:text-indigo-100">{part}</span>)}
- </div>;
-}
-function ScienceConceptDiagram({index,stage}:{index:number;stage:number}) {
- const steps = [
-  [['Katı','❄'],['Isı alır','→'],['Sıvı','💧']],
-  [['Kuvvet: F'],['Alan: A'],['Basınç = F/A']],
-  [['Pil','→'],['Ampul 1','→'],['Ampul 2']],
-  [['A','↔','T'],['G','↔','C'],['DNA eşleşmesi']],
-  [['Güneş ışığı','☀'],['CO₂ + H₂O','→'],['Besin + O₂']],
-  [['Dünya ekseni','23,4°'],['Güneş çevresinde dolanma'],['Mevsimler']],
-  [['0–6','Asit'],['7','Nötr'],['8–14','Baz']],
-  [['Ağırlık','↓'],['Kaldırma kuvveti','↑'],['Dengede eşit']],
-  [['Aynı grup'],['Benzer dış elektron'],['Benzer özellik']],
-  [['Üretici','🌿'],['Tüketici','→'],['Enerji aktarımı']],
- ][index];
- return <div className="flex flex-wrap items-center justify-center gap-2" aria-label={`Fen modeli ${stage+1}. aşama`}>
- {steps[stage].map((part,i)=><span key={i} className="rounded-lg bg-cyan-50 dark:bg-cyan-950 border border-cyan-200 dark:border-cyan-700 px-2 py-2 text-sm sm:text-base font-semibold text-cyan-900 dark:text-cyan-100">{part}</span>)}
- </div>;
-}
-
 export function InteractiveVisualLab({module}:{module:EnrichmentModule}) {
  const [index,setIndex]=useState(0);
  const [stage,setStage]=useState(0);
