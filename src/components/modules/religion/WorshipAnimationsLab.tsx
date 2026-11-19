@@ -264,7 +264,7 @@ function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
           src={activeSrc}
           alt={activeAlt}
           referrerPolicy="no-referrer"
-          className={`w-full h-full object-cover object-center select-none transition-opacity duration-300 ${
+          className={`w-full h-full object-contain object-center select-none transition-opacity duration-300 ${
             photo.flipX ? '-scale-x-100' : ''
           }`}
         />
