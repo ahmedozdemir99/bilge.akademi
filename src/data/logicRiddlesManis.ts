@@ -26,9 +26,9 @@ export const VERBAL_LOGIC: SolvedLogic[] = [
   },
   {
     "topic": "Takvim",
-    "question": "Toplantı salıdan iki gün sonra, perşembeden bir gün önce değildir. Toplantı hangi gün?",
+    "question": "Toplantı salı gününden iki gün sonra yapılacak. Toplantı hangi gün?",
     "answer": "Perşembe",
-    "solution": "Salıdan iki gün sonrası perşembedir. 'Perşembeden bir gün önce değildir' koşuluyla çelişmez."
+    "solution": "Salıdan bir gün sonrası çarşamba, iki gün sonrası perşembedir."
   },
   {
     "topic": "Sözel ilişki",
@@ -138,9 +138,9 @@ export const RIDDLES: SolvedLogic[] = [
   },
   {
     "topic": "Bilmece 3",
-    "question": "İçine ne kadar koyarsan o kadar hafifleyen şey nedir?",
-    "answer": "Delikli sepet",
-    "solution": "Bilmece mecazidir: Delik açıldıkça sepetten malzeme eksilir."
+    "question": "İçinden ne kadar çok çıkarırsan o kadar büyüyen şey nedir?",
+    "answer": "Çukur",
+    "solution": "Toprak çıkarıldıkça çukur büyür."
   },
   {
     "topic": "Bilmece 4",
@@ -234,9 +234,9 @@ export const RIDDLES: SolvedLogic[] = [
   },
   {
     "topic": "Bilmece 19",
-    "question": "Her soruya cevap verir ama hiçbir şey bilmez. Nedir?",
+    "question": "Sana bakar ama gözleri yoktur; yaptığın hareketleri tekrarlar. Nedir?",
     "answer": "Ayna",
-    "solution": "Ayna görüntüyü yansıtır; bu bir mecazdır."
+    "solution": "Ayna karşısındaki kişinin görüntüsünü yansıtır."
   },
   {
     "topic": "Bilmece 20",
