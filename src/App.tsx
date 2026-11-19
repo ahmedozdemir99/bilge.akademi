@@ -15,13 +15,14 @@ import { StudentTrackingModule } from './components/modules/StudentTrackingModul
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/ToastContainer';
 import { EnrichmentPanel } from './components/ui/EnrichmentPanel';
+import { InteractiveVisualLab } from './components/ui/InteractiveVisualLab';
 import type { EnrichmentModule } from './data/enrichmentLibrary';
 
 const ENRICHED_MODULES: EnrichmentModule[] = ['mathematics', 'science', 'english', 'history', 'literature', 'religion', 'philosophy'];
 
 function ModuleEnrichment() {
   const { activeModule } = useAcademy();
-  return ENRICHED_MODULES.includes(activeModule as EnrichmentModule) ? <EnrichmentPanel key={activeModule} module={activeModule as EnrichmentModule} /> : null;
+  return ENRICHED_MODULES.includes(activeModule as EnrichmentModule) ? <><EnrichmentPanel key={activeModule} module={activeModule as EnrichmentModule} /><InteractiveVisualLab key={activeModule + '-visual'} module={activeModule as EnrichmentModule} /></> : null;
 }
 
 function BilgeAkademiRouter() {
