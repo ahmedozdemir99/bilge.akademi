@@ -15,8 +15,9 @@ import { useAcademy } from '../../context/AcademyContext';
 import type { ModuleId } from '../../types/academy';
 import { calculateAverageScore, calculateTrialRobotSummary } from '../../utils/exportUtils';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
+import heroAcademyImg from '../../assets/images/hero_bilge_akademi_1795080262577.jpg';
 
-const HERO_IMAGE = '/src/assets/images/hero_bilge_akademi_1795080262577.jpg';
+const HERO_IMAGE = heroAcademyImg;
 
 interface ModuleCardConfig {
   id: ModuleId;

@@ -604,10 +604,42 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       await signInWithPopup(auth, googleProvider);
       notify('success', 'Oturum açıldı', 'Verileriniz artık Firebase Firestore üzerinde güvenle saklanır.');
     } catch (error) {
-      const msg = error instanceof Error ? error.message : 'Giriş yapılamadı.';
-      if (!msg.includes('popup-closed-by-user')) {
-        notify('error', 'Giriş başarısız', 'Google ile oturum açılırken bir hata oluştu. Lütfen tekrar deneyin.');
+      const errObj = error as { code?: string; message?: string };
+      const code = errObj?.code ?? '';
+      const msg = errObj?.message ?? '';
+      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || msg.includes('popup-closed-by-user')) {
+        return;
       }
+      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
+        const host = typeof window !== 'undefined' ? window.location.hostname : '';
+        notify(
+          'error',
+          'Alan adı Firebase’de yetkilendirilmemiş',
+          `Google girişi için "${host}" alan adını Firebase Console > Authentication > Settings > Authorized domains listesine ekleyin. Tüm dersleri Demo Modunda giriş yapmadan kullanabilirsiniz.`
+        );
+        return;
+      }
+      if (code === 'auth/popup-blocked' || msg.includes('popup-blocked')) {
+        notify(
+          'error',
+          'Açılır pencere engellendi',
+          'Tarayıcı ayarlarından bu site için açılır pencerelere (pop-up) izin verip tekrar deneyin.'
+        );
+        return;
+      }
+      if (code.includes('api-key') || msg.includes('API key')) {
+        notify(
+          'error',
+          'Firebase API anahtarı kısıtlı',
+          'Google Cloud Console > Credentials bölümünde bu alan adının Firebase API anahtarına izinli olduğunu kontrol edin.'
+        );
+        return;
+      }
+      notify(
+        'error',
+        'Giriş başarısız',
+        `Google ile oturum açılırken bir hata oluştu${code ? ` (${code})` : ''}. Demo Moduyla tüm özellikler kullanılabilir.`
+      );
     }
   }, [notify]);
 

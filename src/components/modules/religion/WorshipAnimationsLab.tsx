@@ -26,6 +26,15 @@ import {
   speakInstant,
   stopAllSpeech,
 } from '../../../utils/englishAudio';
+import wuduAthleteImg from '../../../assets/images/wudu_athlete_fullbody_1795091471521.jpg';
+import namazQawmahImg from '../../../assets/images/namaz_athlete_qawmah_1795091453974.jpg';
+import namazTakbirImg from '../../../assets/images/namaz_athlete_takbir_1795091788958.jpg';
+import namazQiyamLowImg from '../../../assets/images/namaz_athlete_qiyam_inrug_1795108814356.jpg';
+import namazRukuImg from '../../../assets/images/namaz_athlete_ruku_inrug_1795108812960.jpg';
+import namazSujudInRugImg from '../../../assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg';
+import namazTashahhudInRugImg from '../../../assets/images/namaz_athlete_tashahhud_inrug_1795096355811.jpg';
+import namazSalamRightImg from '../../../assets/images/namaz_athlete_salam_right_1795096355282.jpg';
+import namazSalamLeftImg from '../../../assets/images/namaz_athlete_salam_left_1795096355274.jpg';
 
 type WorshipLabTab = 'wudu' | 'prayer' | 'hajj' | 'fasting-zakat';
 
@@ -33,62 +42,62 @@ const TURKISH_WORSHIP_VOICE = 'Charon' as const;
 const TURKISH_WORSHIP_STYLE =
   'Calm, warm, articulate native Turkish teacher voice with crisp pronunciation of Turkish and Islamic terms';
 
-const WUDU_ATHLETE_PHOTO = '/src/assets/images/wudu_athlete_fullbody_1795091471521.jpg';
+const WUDU_ATHLETE_PHOTO = wuduAthleteImg;
 
 const NAMAZ_POSTURE_PHOTOS: Record<
   PrayerPostureStep['postureKey'],
   { src: string; flipX?: boolean; caption: string }
 > = {
   niyyah: {
-    src: '/src/assets/images/namaz_athlete_qawmah_1795091453974.jpg',
+    src: namazQawmahImg,
     caption: 'Kıbleye yönelme ve niyet duruşu',
   },
   takbir: {
-    src: '/src/assets/images/namaz_athlete_takbir_1795091788958.jpg',
+    src: namazTakbirImg,
     caption: 'İftitah tekbiri (Allâhu Ekber)',
   },
   qiyam: {
-    src: '/src/assets/images/namaz_athlete_qiyam_low_1795093345509.jpg',
+    src: namazQiyamLowImg,
     caption: 'Kıyam ve kıraat (eller göbek altında bağlı)',
   },
   ruku: {
-    src: '/src/assets/images/namaz_athlete_ruku_match_1795093346239.jpg',
+    src: namazRukuImg,
     caption: 'Rükû (sırt düz, eller dizlerde)',
   },
   qawmah: {
-    src: '/src/assets/images/namaz_athlete_qawmah_1795091453974.jpg',
+    src: namazQawmahImg,
     caption: 'Kavme (rükûdan tam doğrulma)',
   },
   sujud1: {
-    src: '/src/assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg',
+    src: namazSujudInRugImg,
     caption: 'Birinci secde (tüm vücut seccade sınırları içinde)',
   },
   jalsa: {
-    src: '/src/assets/images/namaz_athlete_tashahhud_inrug_1795096355811.jpg',
+    src: namazTashahhudInRugImg,
     caption: 'Celse (iki secde arası oturuş)',
   },
   sujud2: {
-    src: '/src/assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg',
+    src: namazSujudInRugImg,
     caption: 'İkinci secde (tüm vücut seccade sınırları içinde)',
   },
   tashahhud: {
-    src: '/src/assets/images/namaz_athlete_tashahhud_inrug_1795096355811.jpg',
+    src: namazTashahhudInRugImg,
     caption: 'Ka’de-i Âhire (son oturuş)',
   },
   salam: {
-    src: '/src/assets/images/namaz_athlete_salam_right_1795096355282.jpg',
+    src: namazSalamRightImg,
     caption: 'Sağa ve sola selam verme',
   },
 };
 
 const SALAM_PHOTOS = {
   right: {
-    src: '/src/assets/images/namaz_athlete_salam_right_1795096355282.jpg',
+    src: namazSalamRightImg,
     label: '1. Sağa Selam',
     detail: 'Baş sağ omuza çevrilir: “Es-selâmü aleyküm ve rahmetullâh”',
   },
   left: {
-    src: '/src/assets/images/namaz_athlete_salam_left_1795096355274.jpg',
+    src: namazSalamLeftImg,
     label: '2. Sola Selam',
     detail: 'Baş sol omuza çevrilir: “Es-selâmü aleyküm ve rahmetullâh”',
   },

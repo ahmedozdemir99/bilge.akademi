@@ -93,6 +93,22 @@ npx tsx src/utils/modules.test.ts
 
 ---
 
+## Cloudflare Pages Yayınlama Rehberi
+
+Bu proje hem Node.js/Express (`server.ts`) hem de **Cloudflare Pages Functions (`functions/api/[[path]].ts`)** ile tam uyumludur.
+
+1. **Derleme Ayarları (Cloudflare Pages):**
+   - Build command: `npm run build`
+   - Build output directory: `dist`
+2. **Yapay Zekâ ve Seslendirme (`GEMINI_API_KEY`):**
+   - Cloudflare Pages panelinde **Settings → Environment variables** bölümüne gidin.
+   - Hem **Production** hem **Preview** ortamı için `GEMINI_API_KEY` değişkenini (Secret olarak) ekleyip yeniden yayınlayın (**Retry deployment**).
+3. **Google ile Giriş (Firebase Authentication):**
+   - Firebase Console → **Authentication → Settings → Authorized domains** listesine Cloudflare alan adlarınızı ekleyin (`bilge-akademi.pages.dev` ve `main.bilge-akademi.pages.dev`).
+   - Not: Giriş yapılmasa bile tüm dersler, testler, deneyler ve ibadet rehberi **Demo Modu** ile eksiksiz çalışır.
+
+---
+
 ## Lisans
 
 Bu proje eğitim amaçlı geliştirilmiştir.
