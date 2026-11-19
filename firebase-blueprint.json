@@ -1,0 +1,694 @@
+{
+  "entities": {
+    "UserProfile": {
+      "title": "UserProfile",
+      "description": "Temel kullanıcı profil bilgileri (PII hariç).",
+      "type": "object",
+      "properties": {
+        "uid": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "displayName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "role": {
+          "type": "string",
+          "enum": ["student", "teacher", "admin"]
+        },
+        "schoolName": {
+          "type": "string",
+          "maxLength": 120
+        },
+        "branch": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["uid", "displayName", "role", "createdAt", "updatedAt"]
+    },
+    "UserPrivateContact": {
+      "title": "UserPrivateContact",
+      "description": "Kullanıcının izole edilmiş kişisel iletişim bilgileri (PII).",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "email", "updatedAt"]
+    },
+    "UserSettings": {
+      "title": "UserSettings",
+      "description": "Kullanıcı arayüzü, tema ve çalışma görünümü tercihleri.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "theme": {
+          "type": "string",
+          "enum": ["light", "dark"]
+        },
+        "workspaceView": {
+          "type": "string",
+          "enum": ["teacher", "student"]
+        },
+        "compactMode": {
+          "type": "boolean"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "theme", "workspaceView", "compactMode", "updatedAt"]
+    },
+    "SchoolClass": {
+      "title": "SchoolClass",
+      "description": "Öğretmene ait sınıf ve şube kaydı.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 60
+        },
+        "gradeLevel": {
+          "type": "integer"
+        },
+        "section": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 10
+        },
+        "academicYear": {
+          "type": "string",
+          "minLength": 4,
+          "maxLength": 20
+        },
+        "subjectFocus": {
+          "type": "string",
+          "maxLength": 80
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["teacherId", "name", "gradeLevel", "section", "academicYear", "createdAt", "updatedAt"]
+    },
+    "Student": {
+      "title": "Student",
+      "description": "Yalnızca yetkili öğretmen tarafından erişilebilen hassas öğrenci kaydı.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "fullName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 100
+        },
+        "studentNumber": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 24
+        },
+        "gradeLevel": {
+          "type": "integer"
+        },
+        "guardianNote": {
+          "type": "string",
+          "maxLength": 400
+        },
+        "status": {
+          "type": "string",
+          "enum": ["active", "inactive"]
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["teacherId", "classId", "fullName", "studentNumber", "gradeLevel", "status", "createdAt", "updatedAt"]
+    },
+    "Subject": {
+      "title": "Subject",
+      "description": "Öğretmen tarafından tanımlanan ders kaydı.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "code": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 16
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["teacherId", "name", "code", "createdAt"]
+    },
+    "Exam": {
+      "title": "Exam",
+      "description": "Sınıf veya ders bazlı sınav tanımı.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "subjectName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "title": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "examType": {
+          "type": "string",
+          "enum": ["Yazılı", "Deneme", "Sözlü", "Proje", "Performans"]
+        },
+        "examDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "maxScore": {
+          "type": "number"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["teacherId", "classId", "subjectName", "title", "examType", "examDate", "maxScore", "createdAt", "updatedAt"]
+    },
+    "Grade": {
+      "title": "Grade",
+      "description": "Öğrenciye ait yazılı veya sınav not kaydı.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "subjectName": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 80
+        },
+        "examTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "examType": {
+          "type": "string",
+          "enum": ["Yazılı", "Deneme", "Sözlü", "Proje", "Performans"]
+        },
+        "examDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "score": {
+          "type": "number"
+        },
+        "maxScore": {
+          "type": "number"
+        },
+        "teacherNote": {
+          "type": "string",
+          "maxLength": 300
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["teacherId", "studentId", "classId", "subjectName", "examTitle", "examType", "examDate", "score", "maxScore", "createdAt", "updatedAt"]
+    },
+    "AttendanceRecord": {
+      "title": "AttendanceRecord",
+      "description": "Öğrenci günlük devam ve mazeretli/mazeretsiz devamsızlık kaydı.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "date": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "status": {
+          "type": "string",
+          "enum": ["present", "excused", "unexcused", "late"]
+        },
+        "reason": {
+          "type": "string",
+          "maxLength": 240
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["teacherId", "studentId", "classId", "date", "status", "createdAt", "updatedAt"]
+    },
+    "Poem": {
+      "title": "Poem",
+      "description": "Kullanıcının Şiir ve Edebiyat Atölyesinde oluşturduğu şiir.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "genre": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 50
+        },
+        "content": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 5000
+        },
+        "isDraft": {
+          "type": "boolean"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "title", "genre", "content", "isDraft", "createdAt", "updatedAt"]
+    },
+    "AIConversation": {
+      "title": "AIConversation",
+      "description": "Ortak Yapay Zekâ Asistanı sohbet özeti kaydı.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "moduleContext": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 60
+        },
+        "title": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 120
+        },
+        "lastPrompt": {
+          "type": "string",
+          "maxLength": 1000
+        },
+        "lastResponse": {
+          "type": "string",
+          "maxLength": 4000
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "moduleContext", "title", "createdAt", "updatedAt"]
+    },
+    "QuizAttempt": {
+      "title": "QuizAttempt",
+      "description": "Bilgi yarışması çözüm sonucu.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "moduleName": {
+          "type": "string",
+          "enum": ["edebiyat", "tarih", "matematik", "felsefe", "fen", "ingilizce", "din"]
+        },
+        "topic": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "score": {
+          "type": "integer"
+        },
+        "totalQuestions": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "moduleName", "topic", "score", "totalQuestions", "createdAt"]
+    },
+    "MathAttempt": {
+      "title": "MathAttempt",
+      "description": "Matematik alıştırması çözüm denemesi.",
+      "type": "object",
+      "properties": {
+        "ownerId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "topic": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 100
+        },
+        "difficulty": {
+          "type": "string",
+          "enum": ["kolay", "orta", "zor"]
+        },
+        "isCorrect": {
+          "type": "boolean"
+        },
+        "hintsUsed": {
+          "type": "integer"
+        },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["ownerId", "topic", "difficulty", "isCorrect", "hintsUsed", "createdAt"]
+    },
+    "PracticeExamRecord": {
+      "title": "PracticeExamRecord",
+      "description": "Ortaokul / LGS ders bazlı deneme sınavı doğru, yanlış ve net kaydı.",
+      "type": "object",
+      "properties": {
+        "teacherId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "studentId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "classId": {
+          "type": "string",
+          "minLength": 1,
+          "maxLength": 128,
+          "pattern": "^[a-zA-Z0-9_\\-]+$"
+        },
+        "examTitle": {
+          "type": "string",
+          "minLength": 2,
+          "maxLength": 120
+        },
+        "examDate": {
+          "type": "string",
+          "minLength": 10,
+          "maxLength": 10,
+          "pattern": "^\\d{4}-\\d{2}-\\d{2}$"
+        },
+        "wrongPenalty": {
+          "type": "integer",
+          "enum": [3, 4]
+        },
+        "turkceD": { "type": "integer" },
+        "turkceY": { "type": "integer" },
+        "matematikD": { "type": "integer" },
+        "matematikY": { "type": "integer" },
+        "fenD": { "type": "integer" },
+        "fenY": { "type": "integer" },
+        "inkilapD": { "type": "integer" },
+        "inkilapY": { "type": "integer" },
+        "dinD": { "type": "integer" },
+        "dinY": { "type": "integer" },
+        "ingilizceD": { "type": "integer" },
+        "ingilizceY": { "type": "integer" },
+        "totalCorrect": { "type": "integer" },
+        "totalWrong": { "type": "integer" },
+        "totalNet": { "type": "number" },
+        "estimatedLgsScore": { "type": "number" },
+        "createdAt": {
+          "type": "string",
+          "format": "date-time"
+        },
+        "updatedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": [
+        "teacherId",
+        "studentId",
+        "classId",
+        "examTitle",
+        "examDate",
+        "wrongPenalty",
+        "turkceD",
+        "turkceY",
+        "matematikD",
+        "matematikY",
+        "fenD",
+        "fenY",
+        "inkilapD",
+        "inkilapY",
+        "dinD",
+        "dinY",
+        "ingilizceD",
+        "ingilizceY",
+        "totalCorrect",
+        "totalWrong",
+        "totalNet",
+        "estimatedLgsScore",
+        "createdAt",
+        "updatedAt"
+      ]
+    },
+    "AdminGrant": {
+      "title": "AdminGrant",
+      "description": "Sistem yöneticisi yetki kaydı.",
+      "type": "object",
+      "properties": {
+        "email": {
+          "type": "string",
+          "format": "email",
+          "maxLength": 160
+        },
+        "grantedAt": {
+          "type": "string",
+          "format": "date-time"
+        }
+      },
+      "required": ["email", "grantedAt"]
+    }
+  },
+  "firestore": {
+    "/users/{userId}": {
+      "schema": { "$ref": "#/entities/UserProfile" },
+      "description": "Kullanıcı profil belgeleri (yalnızca hesap sahibi veya yönetici erişebilir)."
+    },
+    "/users/{userId}/private/{docId}": {
+      "schema": { "$ref": "#/entities/UserPrivateContact" },
+      "description": "İzole edilmiş kullanıcı PII belgeleri (e-posta vb.)."
+    },
+    "/userSettings/{userId}": {
+      "schema": { "$ref": "#/entities/UserSettings" },
+      "description": "Kullanıcı tema ve görünüm tercihleri."
+    },
+    "/classes/{classId}": {
+      "schema": { "$ref": "#/entities/SchoolClass" },
+      "description": "Öğretmenlere ait sınıf ve şube kayıtları."
+    },
+    "/students/{studentId}": {
+      "schema": { "$ref": "#/entities/Student" },
+      "description": "Öğretmenlere ait hassas öğrenci kayıtları."
+    },
+    "/subjects/{subjectId}": {
+      "schema": { "$ref": "#/entities/Subject" },
+      "description": "Öğretmen ders tanımları."
+    },
+    "/exams/{examId}": {
+      "schema": { "$ref": "#/entities/Exam" },
+      "description": "Sınıf bazlı sınav tanımları."
+    },
+    "/grades/{gradeId}": {
+      "schema": { "$ref": "#/entities/Grade" },
+      "description": "Öğrenci yazılı ve sınav notları."
+    },
+    "/attendance/{attendanceId}": {
+      "schema": { "$ref": "#/entities/AttendanceRecord" },
+      "description": "Arşiv devam kayıtları."
+    },
+    "/practiceExams/{examRecordId}": {
+      "schema": { "$ref": "#/entities/PracticeExamRecord" },
+      "description": "Ortaokul/LGS ders ders deneme doğru, yanlış, net ve tahmini puan kayıtları."
+    },
+    "/poems/{poemId}": {
+      "schema": { "$ref": "#/entities/Poem" },
+      "description": "Kullanıcılara ait şiir ve taslaklar."
+    },
+    "/aiConversations/{conversationId}": {
+      "schema": { "$ref": "#/entities/AIConversation" },
+      "description": "Kullanıcıya ait yapay zekâ asistan sohbet kayıtları."
+    },
+    "/quizAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/QuizAttempt" },
+      "description": "Bilgi yarışması sonuç kayıtları."
+    },
+    "/mathAttempts/{attemptId}": {
+      "schema": { "$ref": "#/entities/MathAttempt" },
+      "description": "Matematik alıştırması sonuç kayıtları."
+    },
+    "/admins/{userId}": {
+      "schema": { "$ref": "#/entities/AdminGrant" },
+      "description": "Yetkili yönetici kimlik listesi."
+    }
+  }
+}

@@ -1,0 +1,1293 @@
+import React, { useMemo, useState } from 'react';
+import {
+  AlertCircle,
+  Bot,
+  Calculator,
+  CheckCircle2,
+  Lightbulb,
+  Loader2,
+  RefreshCw,
+  SlidersHorizontal,
+} from 'lucide-react';
+import {
+  CartesianGrid,
+  Line,
+  LineChart,
+  ReferenceLine,
+  ResponsiveContainer,
+  Tooltip,
+  XAxis,
+  YAxis,
+} from 'recharts';
+import { useAcademy } from '../../context/AcademyContext';
+import {
+  analyzeLinear,
+  analyzeParabola,
+  checkMathAnswer,
+  generateDeterministicExercise,
+  MATH_TOPICS,
+  sampleMathFunction,
+  type MathExerciseItem,
+} from '../../utils/mathEngine';
+import { MATH_TEST_PACKS } from '../../data/tests/mathTestsData';
+import { MathFormula } from '../ui/MathFormula';
+import { MultiTestQuizEngine } from '../ui/MultiTestQuizEngine';
+import { MathEncyclopediaPanel } from './math/MathEncyclopediaPanel';
+import { OneWordOneOperationGame } from './math/OneWordOneOperationGame';
+import { VisualProofsLab } from './math/VisualProofsLab';
+
+type MathTab = 'proofs' | 'game' | 'encyclopedia' | 'tests' | 'solver' | 'graphs' | 'exercises';
+type GraphMode = 'custom' | 'parabola' | 'linear' | 'geometry';
+type GeoShape = 'triangle' | 'circle' | 'rectangle' | 'cylinder';
+
+function buildExerciseMcqOptions(acceptedAnswers: string[]): string[] {
+  const correct = (acceptedAnswers[0] ?? '0').trim();
+  const numMatch = correct.replace(',', '.').match(/^-?\d+(\.\d+)?$/);
+  const candidates = new Set<string>([correct]);
+
+  if (numMatch) {
+    const base = Number(numMatch[0]);
+    const isInt = Number.isInteger(base);
+    const deltas =
+      Math.abs(base) >= 30 ? [-12, -6, 6, 12, -4, 4] : [-3, -2, -1, 1, 2, 3, 4];
+    for (const d of deltas) {
+      if (candidates.size >= 4) break;
+      const val = isInt ? base + d : Number((base + d * 0.5).toFixed(2));
+      if (base >= 0 && val < 0) continue;
+      candidates.add(String(val));
+    }
+  } else if (/^\d+\/\d+$/.test(correct)) {
+    const [n, d] = correct.split('/').map(Number);
+    for (const alt of [`${n + 1}/${d}`, `${Math.max(1, n - 1)}/${d}`, `${n}/${d + 1}`, `${n}/${d + 2}`]) {
+      if (candidates.size >= 4) break;
+      candidates.add(alt);
+    }
+  } else {
+    for (const fallback of ['2x + 1', 'x - 3', '3x + 2', 'x + 4']) {
+      if (candidates.size >= 4) break;
+      candidates.add(fallback);
+    }
+  }
+
+  let pad = 1;
+  while (candidates.size < 4) {
+    candidates.add(String(pad * 5));
+    pad += 1;
+  }
+
+  // Deterministic order based on answer string hash so options don't jump on re-render
+  const arr = Array.from(candidates);
+  const seed = correct.split('').reduce((acc, ch) => acc + ch.charCodeAt(0), 0);
+  const shift = seed % arr.length;
+  return [...arr.slice(shift), ...arr.slice(0, shift)];
+}
+
+interface AIMathSolution {
+  analysis: string;
+  givens: string[];
+  targets: string[];
+  method: string;
+  steps: { title: string; explanation: string; latex: string }[];
+  finalAnswerLatex: string;
+  finalAnswerText: string;
+  verification: string;
+  alternativeMethod: string;
+}
+
+const SAMPLE_PROBLEMS = [
+  '36 ve 48 sayılarının EBOB ve EKOK değerlerini asal çarpanlarına ayırarak bulunuz.',
+  'Bir dik üçgenin dik kenarları 6 cm ve 8 cm olduğuna göre hipotenüs uzunluğunu ve alanını hesaplayınız.',
+  '(x + 5)² cebirsel ifadesini tam kare özdeşliği kullanarak açınız ve x = 4 için değerini bulunuz.',
+  'Etiket fiyatı 240 TL olan bir ürüne önce %25 indirim yapılıyor. İndirimli satış fiyatı kaç TL olur?',
+];
+
+export function MathTutorModule() {
+  const { recordMathAttempt, recordQuizAttempt, mathAttempts, notify } = useAcademy();
+  const [activeTab, setActiveTab] = useState<MathTab>('proofs');
+
+  // 1. 6-Step Solver State
+  const [solverTopic, setSolverTopic] = useState<string>(MATH_TOPICS[0]);
+  const [solverGrade, setSolverGrade] = useState<string>('8. Sınıf (LGS)');
+  const [problemText, setProblemText] = useState(SAMPLE_PROBLEMS[0]);
+  const [solving, setSolving] = useState(false);
+  const [solveError, setSolveError] = useState('');
+  const [solution, setSolution] = useState<AIMathSolution | null>(null);
+
+  // 2. Deterministic Graphs & Geometry State
+  const [graphMode, setGraphMode] = useState<GraphMode>('parabola');
+  const [customExpr, setCustomExpr] = useState('x^2 - 2*x - 3');
+  const [xRange, setXRange] = useState(8);
+
+  const [parA, setParA] = useState(1);
+  const [parB, setParB] = useState(-2);
+  const [parC, setParC] = useState(-3);
+
+  const [linM, setLinM] = useState(1.5);
+  const [linN, setLinN] = useState(-2);
+
+  const [geoShape, setGeoShape] = useState<GeoShape>('triangle');
+  const [geoP1, setGeoP1] = useState(8);
+  const [geoP2, setGeoP2] = useState(6);
+
+  // 3. Smart Exercises + Progressive Hint Tutor Mode
+  const [exGrade, setExGrade] = useState('8. Sınıf (LGS)');
+  const [exTopic, setExTopic] = useState<string>(MATH_TOPICS[0]);
+  const [exDifficulty, setExDifficulty] = useState<'kolay' | 'orta' | 'zor'>('orta');
+  const [exercise, setExercise] = useState<MathExerciseItem>(() =>
+    generateDeterministicExercise(MATH_TOPICS[0], 'orta')
+  );
+  const [exLoading, setExLoading] = useState(false);
+  const [userAnswer, setUserAnswer] = useState('');
+  const [exerciseInputMode, setExerciseInputMode] = useState<'mcq' | 'text'>('mcq');
+  const [hintsShown, setHintsShown] = useState(0);
+  const [attemptStatus, setAttemptStatus] = useState<'idle' | 'correct' | 'wrong' | 'revealed'>('idle');
+  const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
+
+  const exerciseMcqOptions = useMemo(
+    () => buildExerciseMcqOptions(exercise.acceptedAnswers),
+    [exercise]
+  );
+
+  // Graph data memoization (pure deterministic Math.js)
+  const parabolaInfo = useMemo(() => analyzeParabola(parA, parB, parC), [parA, parB, parC]);
+  const linearInfo = useMemo(() => analyzeLinear(linM, linN), [linM, linN]);
+
+  const activeExpression =
+    graphMode === 'custom'
+      ? customExpr
+      : graphMode === 'parabola'
+        ? `${parA}*x^2 + (${parB})*x + (${parC})`
+        : `${linM}*x + (${linN})`;
+
+  const plotResult = useMemo(
+    () => sampleMathFunction(activeExpression, -xRange, xRange, 80),
+    [activeExpression, xRange]
+  );
+
+  // Geometry metrics
+  const geoMetrics = useMemo(() => {
+    if (geoShape === 'triangle') {
+      const hyp = Math.sqrt(geoP1 * geoP1 + geoP2 * geoP2);
+      return {
+        title: 'Dik Üçgen',
+        p1Label: 'Taban (a)',
+        p2Label: 'Yükseklik (b)',
+        items: [
+          { label: 'Alan', latex: `A = \\frac{a \\cdot b}{2} = ${((geoP1 * geoP2) / 2).toFixed(2)}` },
+          { label: 'Hipotenüs', latex: `c = \\sqrt{a^2 + b^2} = ${hyp.toFixed(2)}` },
+          { label: 'Çevre', latex: `\\text{Ç} = ${(geoP1 + geoP2 + hyp).toFixed(2)}` },
+        ],
+      };
+    }
+    if (geoShape === 'circle') {
+      return {
+        title: 'Daire / Çember',
+        p1Label: 'Yarıçap (r)',
+        p2Label: 'Merkez Açı (°)',
+        items: [
+          { label: 'Alan', latex: `A = \\pi r^2 \\approx ${(Math.PI * geoP1 * geoP1).toFixed(2)}` },
+          { label: 'Çevre', latex: `\\text{Ç} = 2\\pi r \\approx ${(2 * Math.PI * geoP1).toFixed(2)}` },
+          {
+            label: 'Daire Dilimi Alanı',
+            latex: `A_{\\text{dilim}} \\approx ${((Math.PI * geoP1 * geoP1 * Math.min(360, geoP2 * 30)) / 360).toFixed(2)}`,
+          },
+        ],
+      };
+    }
+    if (geoShape === 'rectangle') {
+      const diag = Math.sqrt(geoP1 * geoP1 + geoP2 * geoP2);
+      return {
+        title: 'Dikdörtgen',
+        p1Label: 'Uzun Kenar (a)',
+        p2Label: 'Kısa Kenar (b)',
+        items: [
+          { label: 'Alan', latex: `A = a \\cdot b = ${(geoP1 * geoP2).toFixed(2)}` },
+          { label: 'Çevre', latex: `\\text{Ç} = 2(a+b) = ${(2 * (geoP1 + geoP2)).toFixed(2)}` },
+          { label: 'Köşegen', latex: `d = \\sqrt{a^2+b^2} = ${diag.toFixed(2)}` },
+        ],
+      };
+    }
+    const vol = Math.PI * geoP1 * geoP1 * geoP2;
+    const surf = 2 * Math.PI * geoP1 * (geoP1 + geoP2);
+    return {
+      title: 'Dik Dairesel Silindir',
+      p1Label: 'Taban Yarıçapı (r)',
+      p2Label: 'Yükseklik (h)',
+      items: [
+        { label: 'Hacim', latex: `V = \\pi r^2 h \\approx ${vol.toFixed(2)}` },
+        { label: 'Yüzey Alanı', latex: `S = 2\\pi r(r + h) \\approx ${surf.toFixed(2)}` },
+      ],
+    };
+  }, [geoP1, geoP2, geoShape]);
+
+  const handleSolveProblem = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (problemText.trim().length < 2) return;
+    setSolving(true);
+    setSolveError('');
+    try {
+      const response = await fetch('/api/ai/math-solve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          problem: problemText,
+          topic: solverTopic,
+          gradeLevel: solverGrade,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        setSolveError(data.error || 'Çözüm oluşturulamadı.');
+        return;
+      }
+      setSolution(data.solution as AIMathSolution);
+    } catch {
+      setSolveError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
+    } finally {
+      setSolving(false);
+    }
+  };
+
+  const handleNewDeterministicExercise = (topic = exTopic, diff = exDifficulty) => {
+    setExercise(generateDeterministicExercise(topic, diff));
+    setUserAnswer('');
+    setHintsShown(0);
+    setAttemptStatus('idle');
+  };
+
+  const handleNewAIExercise = async () => {
+    setExLoading(true);
+    try {
+      const response = await fetch('/api/ai/math-exercise', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          gradeLevel: exGrade,
+          topic: exTopic,
+          difficulty: exDifficulty,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        notify('error', 'Soru üretilemedi', data.error || 'Deterministik soru üreticisi kullanılıyor.');
+        handleNewDeterministicExercise();
+        return;
+      }
+      setExercise({
+        topic: exTopic,
+        difficulty: exDifficulty,
+        ...(data.exercise as Omit<MathExerciseItem, 'topic' | 'difficulty'>),
+      });
+      setUserAnswer('');
+      setHintsShown(0);
+      setAttemptStatus('idle');
+    } catch {
+      notify('error', 'Bağlantı hatası', 'Yapay zekâ servisine ulaşılamadı.');
+    } finally {
+      setExLoading(false);
+    }
+  };
+
+  const evaluateExerciseAnswer = async (candidate: string) => {
+    if (!candidate.trim() || attemptStatus === 'correct' || attemptStatus === 'revealed') return;
+    setUserAnswer(candidate);
+
+    const isRight = checkMathAnswer(candidate, exercise.acceptedAnswers);
+    if (isRight) {
+      setAttemptStatus('correct');
+      setSessionScore((s) => ({ correct: s.correct + 1, total: s.total + 1 }));
+      await recordMathAttempt({
+        topic: exercise.topic,
+        difficulty: exercise.difficulty,
+        isCorrect: true,
+        hintsUsed: hintsShown,
+      });
+      notify('success', 'Tebrikler, doğru cevap!', `${exercise.topic} alıştırması kaydedildi.`);
+    } else {
+      const nextHint = Math.min(exercise.hints.length, hintsShown + 1);
+      setHintsShown(nextHint);
+      setAttemptStatus('wrong');
+    }
+  };
+
+  const handleCheckAnswer = async (e: React.FormEvent) => {
+    e.preventDefault();
+    await evaluateExerciseAnswer(userAnswer);
+  };
+
+  const handleRevealSolution = async () => {
+    setAttemptStatus('revealed');
+    setHintsShown(exercise.hints.length);
+    setSessionScore((s) => ({ ...s, total: s.total + 1 }));
+    await recordMathAttempt({
+      topic: exercise.topic,
+      difficulty: exercise.difficulty,
+      isCorrect: false,
+      hintsUsed: exercise.hints.length,
+    });
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Header */}
+      <div className="flex flex-col gap-4">
+        <div>
+          <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
+            Modül 04 · Ortaokul Müfredatı (5–8. Sınıf &amp; LGS) · Görsel İspatlar · 1 Kelime 1 İşlem
+          </p>
+          <h1 className="mt-1 text-2xl sm:text-3xl font-semibold text-navy-900 dark:text-white tracking-tight">
+            Ortaokul Matematik Dünyası
+          </h1>
+          <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
+            Çizimli görsel ispatlar, 1 Kelime 1 İşlem oyunu, matematik hikâyeleri, bilim insanları,
+            zekâ soruları, interaktif grafikler ve 6 aşamalı LGS çözüm rehberi.
+          </p>
+        </div>
+
+        <div
+          className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 self-start"
+          role="tablist"
+        >
+          {(
+            [
+              { id: 'proofs', label: 'Görsel İspatlar' },
+              { id: 'game', label: '1 Kelime 1 İşlem' },
+              { id: 'encyclopedia', label: 'Hikâyeler, Bilim & Zekâ' },
+              { id: 'tests', label: 'Testler (5×10)' },
+              { id: 'exercises', label: `LGS Alıştırmaları (${mathAttempts.length})` },
+              { id: 'solver', label: '6 Aşamalı Çözücü' },
+              { id: 'graphs', label: 'İnteraktif Grafikler' },
+            ] as { id: MathTab; label: string }[]
+          ).map((t) => (
+            <button
+              key={t.id}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === t.id}
+              onClick={() => setActiveTab(t.id)}
+              className={`px-3 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+                activeTab === t.id
+                  ? 'bg-white dark:bg-slate-800 text-navy-900 dark:text-white shadow-xs'
+                  : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
+              }`}
+            >
+              {t.label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {/* NEW TAB: VISUAL INTERACTIVE PROOFS */}
+      {activeTab === 'proofs' && <VisualProofsLab />}
+
+      {/* NEW TAB: 1 KELİME 1 İŞLEM + MENTAL MATH GAME */}
+      {activeTab === 'game' && <OneWordOneOperationGame />}
+
+      {/* NEW TAB: STORIES, SCIENTISTS, SCIENCE HISTORY & LOGIC PUZZLES */}
+      {activeTab === 'encyclopedia' && <MathEncyclopediaPanel />}
+
+      {/* NEW TAB: 5x10 MULTIPLE CHOICE MATH TEST BANK */}
+      {activeTab === 'tests' && (
+        <MultiTestQuizEngine
+          moduleLabel="Ortaokul Matematik"
+          tests={MATH_TEST_PACKS}
+          onCompleteTest={async ({ testTitle, correctCount, totalQuestions }) => {
+            await recordQuizAttempt({
+              moduleName: 'matematik',
+              topic: testTitle,
+              score: correctCount,
+              totalQuestions,
+            });
+            notify(
+              'success',
+              'Matematik testi kaydedildi',
+              `${totalQuestions} soruda ${correctCount} doğru sonucunuz raporlara işlendi.`
+            );
+          }}
+        />
+      )}
+
+      {/* TAB 1: 6-STEP PROBLEM SOLVER */}
+      {activeTab === 'solver' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <form
+            onSubmit={handleSolveProblem}
+            className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-4"
+          >
+            <h2 className="text-base font-semibold text-navy-900 dark:text-white">
+              Matematik Problemini Yazın
+            </h2>
+
+            <div className="grid grid-cols-2 gap-3">
+              <div>
+                <label htmlFor="m-topic" className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                  Konu
+                </label>
+                <select
+                  id="m-topic"
+                  value={solverTopic}
+                  onChange={(e) => setSolverTopic(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                >
+                  {MATH_TOPICS.map((t) => (
+                    <option key={t} value={t}>
+                      {t}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div>
+                <label htmlFor="m-grade" className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                  Seviye
+                </label>
+                <select
+                  id="m-grade"
+                  value={solverGrade}
+                  onChange={(e) => setSolverGrade(e.target.value)}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                >
+                  <option value="5. Sınıf (Ortaokul)">5. Sınıf (Ortaokul)</option>
+                  <option value="6. Sınıf (Ortaokul)">6. Sınıf (Ortaokul)</option>
+                  <option value="7. Sınıf (Ortaokul)">7. Sınıf (Ortaokul)</option>
+                  <option value="8. Sınıf (LGS)">8. Sınıf (LGS)</option>
+                </select>
+              </div>
+            </div>
+
+            <div>
+              <label htmlFor="m-prob" className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                Soru Metni
+              </label>
+              <textarea
+                id="m-prob"
+                rows={4}
+                value={problemText}
+                onChange={(e) => setProblemText(e.target.value)}
+                required
+                placeholder="Örn. 2x^2 - 5x - 3 = 0 denkleminin kökler toplamını ve köklerini bulunuz."
+                className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+              />
+            </div>
+
+            <button
+              type="submit"
+              disabled={solving}
+              className="w-full inline-flex items-center justify-center gap-2 px-4 py-2.5 text-sm font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-60 cursor-pointer"
+            >
+              {solving ? <Loader2 className="w-4 h-4 animate-spin" /> : <Calculator className="w-4 h-4" />}
+              <span>{solving ? 'Adım Adım Çözülüyor...' : '6 Aşamada Çöz'}</span>
+            </button>
+
+            <div className="pt-3 border-t border-slate-100 dark:border-slate-800 space-y-2">
+              <p className="text-xs font-medium text-slate-500 dark:text-slate-400">
+                Örnek Problemler
+              </p>
+              {SAMPLE_PROBLEMS.map((sample) => (
+                <button
+                  key={sample}
+                  type="button"
+                  onClick={() => setProblemText(sample)}
+                  className="w-full text-left p-2.5 rounded-lg text-xs text-slate-600 dark:text-slate-300 bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 hover:border-teal-600/60 cursor-pointer"
+                >
+                  {sample}
+                </button>
+              ))}
+            </div>
+          </form>
+
+          {/* Solution Output */}
+          <section className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 min-h-[420px]">
+            {solveError && (
+              <div className="flex items-start gap-2.5 p-4 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-300">
+                <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                <span>{solveError}</span>
+              </div>
+            )}
+
+            {!solution && !solving && !solveError && (
+              <div className="py-16 text-center">
+                <Calculator className="w-8 h-8 text-gold-500 mx-auto mb-3" />
+                <p className="text-sm font-medium text-slate-800 dark:text-slate-200">
+                  1. Analiz · 2. Verilen-İstenen · 3. Yöntem · 4. İşlemler · 5. Doğrulama · 6. Alternatif
+                </p>
+                <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                  Tüm matematiksel ifadeler KaTeX ile düzgün biçimde görüntülenir.
+                </p>
+              </div>
+            )}
+
+            {solution && (
+              <div className="space-y-5">
+                <div>
+                  <h3 className="text-xs font-semibold text-teal-700 dark:text-teal-400 mb-1">
+                    1. Soru Analizi
+                  </h3>
+                  <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                    {solution.analysis}
+                  </p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                    <h4 className="text-xs font-semibold text-navy-900 dark:text-gold-400 mb-1.5">
+                      2a. Verilenler
+                    </h4>
+                    <ul className="list-disc pl-4 space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                      {solution.givens.map((g, i) => (
+                        <li key={i}>{g}</li>
+                      ))}
+                    </ul>
+                  </div>
+                  <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800">
+                    <h4 className="text-xs font-semibold text-teal-700 dark:text-teal-400 mb-1.5">
+                      2b. İstenenler
+                    </h4>
+                    <ul className="list-disc pl-4 space-y-1 text-xs text-slate-700 dark:text-slate-300">
+                      {solution.targets.map((t, i) => (
+                        <li key={i}>{t}</li>
+                      ))}
+                    </ul>
+                  </div>
+                </div>
+
+                <div>
+                  <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-200 mb-1">
+                    3. Çözüm Yöntemi
+                  </h3>
+                  <p className="text-sm text-slate-600 dark:text-slate-300">{solution.method}</p>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold text-slate-800 dark:text-slate-200">
+                    4. Adım Adım Çözüm
+                  </h3>
+                  {solution.steps.map((st, idx) => (
+                    <div
+                      key={idx}
+                      className="p-4 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-2"
+                    >
+                      <p className="text-xs font-semibold text-navy-900 dark:text-white">
+                        Adım {idx + 1}: {st.title}
+                      </p>
+                      <p className="text-xs text-slate-600 dark:text-slate-300">{st.explanation}</p>
+                      {st.latex && (
+                        <div className="overflow-x-auto py-1 text-navy-900 dark:text-teal-300">
+                          <MathFormula latex={st.latex} display />
+                        </div>
+                      )}
+                    </div>
+                  ))}
+                </div>
+
+                <div className="p-4 rounded-xl bg-navy-900 text-white space-y-2">
+                  <p className="text-xs text-gold-400 font-semibold">Sonuç</p>
+                  <div className="overflow-x-auto text-lg">
+                    <MathFormula latex={solution.finalAnswerLatex || solution.finalAnswerText} display />
+                  </div>
+                  <p className="text-xs text-slate-200">{solution.finalAnswerText}</p>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div>
+                    <p className="font-semibold text-emerald-700 dark:text-emerald-400 mb-1">
+                      5. Sonucun Doğrulanması
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {solution.verification}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="font-semibold text-navy-900 dark:text-gold-400 mb-1">
+                      6. Alternatif Yaklaşım
+                    </p>
+                    <p className="text-slate-600 dark:text-slate-300 leading-relaxed">
+                      {solution.alternativeMethod}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+
+      {/* TAB 2: DETERMINISTIC INTERACTIVE GRAPHS & GEOMETRY */}
+      {activeTab === 'graphs' && (
+        <div className="space-y-5">
+          <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            {(
+              [
+                { id: 'parabola', label: 'Parabol (ax² + bx + c)' },
+                { id: 'linear', label: 'Doğru Denklemi (mx + n)' },
+                { id: 'custom', label: 'Serbest Fonksiyon f(x)' },
+                { id: 'geometry', label: 'Geometrik Şekiller' },
+              ] as { id: GraphMode; label: string }[]
+            ).map((gm) => (
+              <button
+                key={gm.id}
+                type="button"
+                onClick={() => setGraphMode(gm.id)}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer whitespace-nowrap ${
+                  graphMode === gm.id
+                    ? 'bg-white dark:bg-slate-800 text-navy-900 dark:text-white shadow-xs'
+                    : 'text-slate-600 dark:text-slate-400'
+                }`}
+              >
+                {gm.label}
+              </button>
+            ))}
+          </div>
+
+          {graphMode !== 'geometry' ? (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Interactive Stage (Left 8 cols) */}
+              <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-4">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="text-base text-navy-900 dark:text-white">
+                    {graphMode === 'parabola' && <MathFormula latex={parabolaInfo.latex} />}
+                    {graphMode === 'linear' && <MathFormula latex={linearInfo.latex} />}
+                    {graphMode === 'custom' && <MathFormula latex={`f(x) = ${customExpr}`} />}
+                  </div>
+                  <span className="text-xs font-mono text-slate-500 tabular-nums">
+                    Aralık: [{-xRange}, {xRange}]
+                  </span>
+                </div>
+
+                {plotResult.error ? (
+                  <p className="text-xs text-red-700 dark:text-red-400 p-4 rounded-lg bg-red-50 dark:bg-red-950/40">
+                    {plotResult.error}
+                  </p>
+                ) : (
+                  <div className="h-[380px] w-full">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <LineChart data={plotResult.points} margin={{ top: 12, right: 16, left: -12, bottom: 8 }}>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.25} />
+                        <XAxis
+                          dataKey="x"
+                          type="number"
+                          domain={[-xRange, xRange]}
+                          tick={{ fontSize: 11, fill: '#64748b' }}
+                        />
+                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                        <ReferenceLine x={0} stroke="#0B1F3A" strokeOpacity={0.65} strokeWidth={1.5} />
+                        <ReferenceLine y={0} stroke="#0B1F3A" strokeOpacity={0.65} strokeWidth={1.5} />
+                        <Tooltip
+                          formatter={(val) => [val ?? 'Tanımsız', 'f(x)']}
+                          labelFormatter={(l) => `x = ${l}`}
+                        />
+                        <Line
+                          type="monotone"
+                          dataKey="y"
+                          stroke="#0D9488"
+                          strokeWidth={2.5}
+                          dot={false}
+                          connectNulls={false}
+                        />
+                      </LineChart>
+                    </ResponsiveContainer>
+                  </div>
+                )}
+              </div>
+
+              {/* Parameter Control Deck (Right 4 cols) */}
+              <aside className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <h3 className="text-sm font-semibold text-navy-900 dark:text-white">
+                    Parametre Kontrolleri
+                  </h3>
+                </div>
+
+                {graphMode === 'parabola' && (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>Baş Katsayı (a)</span>
+                        <span className="font-mono font-semibold tabular-nums">{parA}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-5}
+                        max={5}
+                        step={0.5}
+                        value={parA}
+                        onChange={(e) => setParA(Number(e.target.value))}
+                        className="w-full accent-teal-600"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>Lineer Katsayı (b)</span>
+                        <span className="font-mono font-semibold tabular-nums">{parB}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-10}
+                        max={10}
+                        step={0.5}
+                        value={parB}
+                        onChange={(e) => setParB(Number(e.target.value))}
+                        className="w-full accent-teal-600"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>Sabit Terim (c)</span>
+                        <span className="font-mono font-semibold tabular-nums">{parC}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-10}
+                        max={10}
+                        step={0.5}
+                        value={parC}
+                        onChange={(e) => setParC(Number(e.target.value))}
+                        className="w-full accent-teal-600"
+                      />
+                    </div>
+
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                      <p>
+                        <strong>Kolların Yönü:</strong> {parabolaInfo.concavity}
+                      </p>
+                      <p className="font-mono tabular-nums">
+                        <strong>Tepe Noktası T(r, k):</strong> ({parabolaInfo.vertexX}, {parabolaInfo.vertexY})
+                      </p>
+                      <p className="font-mono tabular-nums">
+                        <strong>Diskriminant (Δ):</strong> {parabolaInfo.discriminant}
+                      </p>
+                      <p className="font-mono tabular-nums">
+                        <strong>Gerçel Kökler:</strong>{' '}
+                        {parabolaInfo.roots.length > 0 ? parabolaInfo.roots.join(' ve ') : 'Yok (Δ < 0)'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {graphMode === 'linear' && (
+                  <div className="space-y-4">
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>Eğim (m)</span>
+                        <span className="font-mono font-semibold tabular-nums">{linM}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-6}
+                        max={6}
+                        step={0.5}
+                        value={linM}
+                        onChange={(e) => setLinM(Number(e.target.value))}
+                        className="w-full accent-teal-600"
+                      />
+                    </div>
+                    <div>
+                      <div className="flex justify-between text-xs mb-1">
+                        <span>y-Kesen (n)</span>
+                        <span className="font-mono font-semibold tabular-nums">{linN}</span>
+                      </div>
+                      <input
+                        type="range"
+                        min={-10}
+                        max={10}
+                        step={0.5}
+                        value={linN}
+                        onChange={(e) => setLinN(Number(e.target.value))}
+                        className="w-full accent-teal-600"
+                      />
+                    </div>
+                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs font-mono tabular-nums">
+                      <p>Eğim Açısı: {linearInfo.angleDeg}°</p>
+                      <p>y-Eksenini Kestiği Nokta: (0, {linearInfo.yIntercept})</p>
+                      <p>
+                        x-Eksenini Kestiği Nokta:{' '}
+                        {linearInfo.xIntercept !== null ? `(${linearInfo.xIntercept}, 0)` : 'Paralel (yok)'}
+                      </p>
+                    </div>
+                  </div>
+                )}
+
+                {graphMode === 'custom' && (
+                  <div className="space-y-3">
+                    <label htmlFor="custom-fn" className="block text-xs font-medium text-slate-600 dark:text-slate-300">
+                      Fonksiyon İfadesi f(x)
+                    </label>
+                    <input
+                      id="custom-fn"
+                      type="text"
+                      value={customExpr}
+                      onChange={(e) => setCustomExpr(e.target.value)}
+                      className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                    />
+                    <div className="flex flex-wrap gap-1.5">
+                      {['x^2 - 2*x - 3', 'sin(x) * 4', 'x^3 - 3*x', 'abs(x) - 2'].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setCustomExpr(preset)}
+                          className="px-2.5 py-1 text-[11px] font-mono rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                )}
+
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <div className="flex justify-between text-xs mb-1">
+                    <span>x Ekseni Aralığı</span>
+                    <span className="font-mono tabular-nums">±{xRange}</span>
+                  </div>
+                  <input
+                    type="range"
+                    min={4}
+                    max={20}
+                    step={2}
+                    value={xRange}
+                    onChange={(e) => setXRange(Number(e.target.value))}
+                    className="w-full accent-teal-600"
+                  />
+                </div>
+              </aside>
+            </div>
+          ) : (
+            /* Geometry Interactive Visualizer */
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center min-h-[340px]">
+                <svg viewBox="0 0 360 260" className="w-full max-w-md h-auto">
+                  {geoShape === 'triangle' && (
+                    <g>
+                      <polygon
+                        points={`60,220 ${60 + geoP1 * 18},220 60,${220 - geoP2 * 14}`}
+                        fill="#0D9488"
+                        fillOpacity="0.18"
+                        stroke="#0D9488"
+                        strokeWidth="2.5"
+                      />
+                      <rect x="60" y="206" width="14" height="14" fill="none" stroke="#C89B3C" strokeWidth="1.5" />
+                      <text x={60 + geoP1 * 9} y="242" fill="#64748b" fontSize="13" textAnchor="middle">
+                        a = {geoP1}
+                      </text>
+                      <text x="34" y={220 - geoP2 * 7} fill="#64748b" fontSize="13" textAnchor="middle">
+                        b = {geoP2}
+                      </text>
+                    </g>
+                  )}
+                  {geoShape === 'circle' && (
+                    <g>
+                      <circle
+                        cx="180"
+                        cy="130"
+                        r={Math.min(100, geoP1 * 8)}
+                        fill="#0D9488"
+                        fillOpacity="0.18"
+                        stroke="#0D9488"
+                        strokeWidth="2.5"
+                      />
+                      <line
+                        x1="180"
+                        y1="130"
+                        x2={180 + Math.min(100, geoP1 * 8)}
+                        y2="130"
+                        stroke="#C89B3C"
+                        strokeWidth="2"
+                      />
+                      <text x="180" y="120" fill="#64748b" fontSize="13">
+                        r = {geoP1}
+                      </text>
+                    </g>
+                  )}
+                  {geoShape === 'rectangle' && (
+                    <g>
+                      <rect
+                        x="60"
+                        y={210 - geoP2 * 13}
+                        width={geoP1 * 18}
+                        height={geoP2 * 13}
+                        fill="#0D9488"
+                        fillOpacity="0.18"
+                        stroke="#0D9488"
+                        strokeWidth="2.5"
+                      />
+                      <line
+                        x1="60"
+                        y1="210"
+                        x2={60 + geoP1 * 18}
+                        y2={210 - geoP2 * 13}
+                        stroke="#C89B3C"
+                        strokeDasharray="4 4"
+                        strokeWidth="1.8"
+                      />
+                      <text x={60 + geoP1 * 9} y="232" fill="#64748b" fontSize="13" textAnchor="middle">
+                        a = {geoP1}
+                      </text>
+                      <text x="40" y={210 - geoP2 * 6.5} fill="#64748b" fontSize="13" textAnchor="middle">
+                        b = {geoP2}
+                      </text>
+                    </g>
+                  )}
+                  {geoShape === 'cylinder' && (
+                    <g>
+                      <ellipse
+                        cx="180"
+                        cy={200 - geoP2 * 11}
+                        rx={geoP1 * 8}
+                        ry={geoP1 * 2.6}
+                        fill="#0D9488"
+                        fillOpacity="0.24"
+                        stroke="#0D9488"
+                        strokeWidth="2"
+                      />
+                      <line
+                        x1={180 - geoP1 * 8}
+                        y1={200 - geoP2 * 11}
+                        x2={180 - geoP1 * 8}
+                        y2="200"
+                        stroke="#0D9488"
+                        strokeWidth="2"
+                      />
+                      <line
+                        x1={180 + geoP1 * 8}
+                        y1={200 - geoP2 * 11}
+                        x2={180 + geoP1 * 8}
+                        y2="200"
+                        stroke="#0D9488"
+                        strokeWidth="2"
+                      />
+                      <ellipse
+                        cx="180"
+                        cy="200"
+                        rx={geoP1 * 8}
+                        ry={geoP1 * 2.6}
+                        fill="#0D9488"
+                        fillOpacity="0.12"
+                        stroke="#0D9488"
+                        strokeWidth="2"
+                      />
+                      <text x={192 + geoP1 * 8} y={200 - geoP2 * 5.5} fill="#64748b" fontSize="13">
+                        h = {geoP2}
+                      </text>
+                    </g>
+                  )}
+                </svg>
+              </div>
+
+              <aside className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-5">
+                <div className="grid grid-cols-2 gap-2">
+                  {(
+                    [
+                      { id: 'triangle', label: 'Dik Üçgen' },
+                      { id: 'circle', label: 'Daire' },
+                      { id: 'rectangle', label: 'Dikdörtgen' },
+                      { id: 'cylinder', label: 'Silindir' },
+                    ] as { id: GeoShape; label: string }[]
+                  ).map((sh) => (
+                    <button
+                      key={sh.id}
+                      type="button"
+                      onClick={() => setGeoShape(sh.id)}
+                      className={`px-3 py-2 text-xs font-medium rounded-lg border cursor-pointer ${
+                        geoShape === sh.id
+                          ? 'border-teal-600 bg-teal-50 dark:bg-teal-950/50 text-navy-900 dark:text-white'
+                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                      }`}
+                    >
+                      {sh.label}
+                    </button>
+                  ))}
+                </div>
+
+                <div className="space-y-3">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>{geoMetrics.p1Label}</span>
+                      <span className="font-mono font-semibold tabular-nums">{geoP1}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={2}
+                      max={12}
+                      value={geoP1}
+                      onChange={(e) => setGeoP1(Number(e.target.value))}
+                      className="w-full accent-teal-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>{geoMetrics.p2Label}</span>
+                      <span className="font-mono font-semibold tabular-nums">{geoP2}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={2}
+                      max={12}
+                      value={geoP2}
+                      onChange={(e) => setGeoP2(Number(e.target.value))}
+                      className="w-full accent-teal-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
+                  <p className="text-xs font-semibold text-navy-900 dark:text-white">
+                    {geoMetrics.title} Hesaplamaları
+                  </p>
+                  {geoMetrics.items.map((item) => (
+                    <div
+                      key={item.label}
+                      className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs"
+                    >
+                      <span className="text-slate-600 dark:text-slate-400">{item.label}</span>
+                      <MathFormula latex={item.latex} />
+                    </div>
+                  ))}
+                </div>
+              </aside>
+            </div>
+          )}
+        </div>
+      )}
+
+      {/* TAB 3: SMART EXERCISES WITH PROGRESSIVE HINT TUTOR MODE */}
+      {activeTab === 'exercises' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <aside className="lg:col-span-4 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+            <h2 className="text-sm font-semibold text-navy-900 dark:text-white">
+              Alıştırma Ayarları
+            </h2>
+
+            <div>
+              <label htmlFor="ex-grade" className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                Sınıf Seviyesi
+              </label>
+              <select
+                id="ex-grade"
+                value={exGrade}
+                onChange={(e) => setExGrade(e.target.value)}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+              >
+                <option value="5. Sınıf">5. Sınıf (Ortaokul)</option>
+                <option value="6. Sınıf">6. Sınıf (Ortaokul)</option>
+                <option value="7. Sınıf">7. Sınıf (Ortaokul)</option>
+                <option value="8. Sınıf (LGS)">8. Sınıf (LGS)</option>
+              </select>
+            </div>
+
+            <div>
+              <label htmlFor="ex-topic" className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                Konu
+              </label>
+              <select
+                id="ex-topic"
+                value={exTopic}
+                onChange={(e) => {
+                  setExTopic(e.target.value);
+                  handleNewDeterministicExercise(e.target.value, exDifficulty);
+                }}
+                className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+              >
+                {MATH_TOPICS.map((t) => (
+                  <option key={t} value={t}>
+                    {t}
+                  </option>
+                ))}
+              </select>
+            </div>
+
+            <div>
+              <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">
+                Zorluk Derecesi
+              </p>
+              <div className="grid grid-cols-3 gap-1.5">
+                {(['kolay', 'orta', 'zor'] as const).map((d) => (
+                  <button
+                    key={d}
+                    type="button"
+                    onClick={() => {
+                      setExDifficulty(d);
+                      handleNewDeterministicExercise(exTopic, d);
+                    }}
+                    className={`py-2 text-xs font-medium rounded-lg border capitalize cursor-pointer ${
+                      exDifficulty === d
+                        ? 'border-teal-600 bg-teal-50 dark:bg-teal-950/50 text-navy-900 dark:text-white'
+                        : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
+                    }`}
+                  >
+                    {d}
+                  </button>
+                ))}
+              </div>
+            </div>
+
+            <div className="space-y-2 pt-2">
+              <button
+                type="button"
+                onClick={() => handleNewDeterministicExercise()}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 cursor-pointer"
+              >
+                <RefreshCw className="w-3.5 h-3.5" />
+                <span>Hızlı Yeni Soru Üret</span>
+              </button>
+              <button
+                type="button"
+                disabled={exLoading}
+                onClick={() => void handleNewAIExercise()}
+                className="w-full inline-flex items-center justify-center gap-1.5 px-4 py-2.5 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 cursor-pointer"
+              >
+                {exLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5 text-teal-600" />}
+                <span>{exLoading ? 'Üretiliyor...' : 'Yapay Zekâ ile Özgün Soru Üret'}</span>
+              </button>
+            </div>
+
+            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 text-xs text-slate-600 dark:text-slate-300 font-mono tabular-nums">
+              Oturum Başarısı: {sessionScore.correct} / {sessionScore.total} doğru
+            </div>
+          </aside>
+
+          {/* Interactive Exercise + Progressive Hint Tutor */}
+          <section className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 sm:p-8 space-y-6">
+            <div>
+              <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
+                Öğretici Mod · {exercise.topic} · Zorluk: {exercise.difficulty}
+              </p>
+              <h3 className="mt-2 text-lg font-semibold text-navy-900 dark:text-white">
+                {exercise.questionText}
+              </h3>
+              <div className="mt-4 p-5 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 overflow-x-auto text-center text-lg">
+                <MathFormula latex={exercise.expressionLatex} display />
+              </div>
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div className="inline-flex p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setExerciseInputMode('mcq')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer whitespace-nowrap ${
+                    exerciseInputMode === 'mcq'
+                      ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Çoktan Seçmeli (A–D)
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setExerciseInputMode('text')}
+                  className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer whitespace-nowrap ${
+                    exerciseInputMode === 'text'
+                      ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
+                      : 'text-slate-600 dark:text-slate-400'
+                  }`}
+                >
+                  Klasik Cevap Yazma
+                </button>
+              </div>
+              {attemptStatus === 'wrong' && (
+                <button
+                  type="button"
+                  onClick={() => void handleRevealSolution()}
+                  className="px-4 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-700 dark:text-slate-200 cursor-pointer whitespace-nowrap"
+                >
+                  Çözümü Göster
+                </button>
+              )}
+            </div>
+
+            {exerciseInputMode === 'mcq' ? (
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                {exerciseMcqOptions.map((opt, idx) => {
+                  const letters = ['A', 'B', 'C', 'D'];
+                  const isPicked = userAnswer === opt;
+                  const isSolved = attemptStatus === 'correct' || attemptStatus === 'revealed';
+                  const isRightOpt = checkMathAnswer(opt, exercise.acceptedAnswers);
+                  let cls =
+                    'border-slate-200 dark:border-slate-700 bg-slate-50/70 dark:bg-slate-950/60 text-slate-800 dark:text-slate-200 hover:border-teal-500';
+                  if (isSolved && isRightOpt) {
+                    cls =
+                      'border-emerald-600 bg-emerald-50 dark:bg-emerald-950/40 text-emerald-950 dark:text-emerald-200 font-semibold';
+                  } else if (isPicked && attemptStatus === 'wrong') {
+                    cls =
+                      'border-red-500 bg-red-50 dark:bg-red-950/40 text-red-900 dark:text-red-200';
+                  }
+                  return (
+                    <button
+                      key={`${opt}-${idx}`}
+                      type="button"
+                      disabled={isSolved}
+                      onClick={() => void evaluateExerciseAnswer(opt)}
+                      className={`text-left px-4 py-3 rounded-xl border text-sm font-mono transition-colors flex items-center gap-3 cursor-pointer disabled:cursor-default ${cls}`}
+                    >
+                      <span className="font-semibold text-xs text-teal-700 dark:text-teal-400">
+                        {letters[idx]})
+                      </span>
+                      <span>{opt}</span>
+                    </button>
+                  );
+                })}
+              </div>
+            ) : (
+              <form onSubmit={handleCheckAnswer} className="flex flex-wrap items-center gap-3">
+                <input
+                  type="text"
+                  value={userAnswer}
+                  onChange={(e) => setUserAnswer(e.target.value)}
+                  disabled={attemptStatus === 'correct' || attemptStatus === 'revealed'}
+                  placeholder="Cevabınızı yazın (ör. 12 veya 3/4)..."
+                  className="flex-1 min-w-[200px] px-4 py-2.5 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                />
+                <button
+                  type="submit"
+                  disabled={!userAnswer.trim() || attemptStatus === 'correct' || attemptStatus === 'revealed'}
+                  className="px-5 py-2.5 text-sm font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 disabled:opacity-50 cursor-pointer whitespace-nowrap"
+                >
+                  Cevabı Kontrol Et
+                </button>
+              </form>
+            )}
+
+            {/* Progressive Hints (Tutor Mode) */}
+            {hintsShown > 0 && attemptStatus !== 'correct' && (
+              <div className="space-y-2.5">
+                <div className="flex items-center gap-2 text-xs font-semibold text-amber-700 dark:text-amber-400">
+                  <Lightbulb className="w-4 h-4" />
+                  <span>
+                    Öğretici İpuçları ({hintsShown}/{exercise.hints.length}) — Doğru cevabı bulmak
+                    için tekrar deneyin!
+                  </span>
+                </div>
+                {exercise.hints.slice(0, hintsShown).map((hint, idx) => (
+                  <div
+                    key={idx}
+                    className="p-3.5 rounded-lg bg-amber-50/70 dark:bg-amber-950/30 border border-amber-200 dark:border-amber-900 text-xs text-amber-950 dark:text-amber-200"
+                  >
+                    <strong>{idx + 1}. İpucu:</strong> {hint}
+                  </div>
+                ))}
+              </div>
+            )}
+
+            {/* Correct or Revealed Solution */}
+            {(attemptStatus === 'correct' || attemptStatus === 'revealed') && (
+              <div className="p-5 rounded-xl bg-emerald-50/70 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-900 space-y-2">
+                <div className="flex items-center gap-2 text-sm font-semibold text-emerald-800 dark:text-emerald-300">
+                  <CheckCircle2 className="w-4 h-4" />
+                  <span>
+                    {attemptStatus === 'correct' ? 'Doğru Cevap!' : 'Çözüm Açıklaması'}
+                  </span>
+                </div>
+                <div className="text-sm text-slate-900 dark:text-white">
+                  Sonuç: <MathFormula latex={exercise.answerDisplayLatex} />
+                </div>
+                <p className="text-xs text-slate-700 dark:text-slate-300 leading-relaxed">
+                  {exercise.fullSolution}
+                </p>
+              </div>
+            )}
+          </section>
+        </div>
+      )}
+    </div>
+  );
+}
