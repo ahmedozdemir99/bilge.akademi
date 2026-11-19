@@ -60,6 +60,7 @@ export function StudentTrackingModule() {
     practiceExams,
     isDemoMode,
     workspaceView,
+    user,
     compactMode,
     dataLoading,
     addClass,
@@ -186,7 +187,9 @@ export function StudentTrackingModule() {
 
   // Student Role View: privacy-safe personal view
   if (workspaceView === 'student') {
-    const personalStudent = students[0];
+    // Cloud student accounts are not yet linked to a specific student record.
+    // Never present the first teacher-owned record as the signed-in student's own.
+    const personalStudent = isDemoMode ? students[0] : null;
     if (!personalStudent) {
       return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
@@ -195,7 +198,7 @@ export function StudentTrackingModule() {
             Kişisel Akademik Dosya Bulunamadı
           </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            Öğrenci görünümünde yalnızca kendi akademik gelişiminiz görüntülenir. Öğretmen
+            {user ? 'Bu hesapla eşleştirilmiş öğrenci dosyası henüz yok. Öğrenci verilerinin yanlış kişiye gösterilmesini önlemek için kişisel dosya kapalıdır.' : 'Örnek öğrenci görünümü. Öğretmen'}
             görünümüne geçerek sınıf ve öğrenci kayıtları oluşturabilirsiniz.
           </p>
         </div>
