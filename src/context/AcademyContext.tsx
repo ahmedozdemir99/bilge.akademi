@@ -663,10 +663,11 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   // Batches stay below Firestore's 500-write limit.
   const deleteDependentRecords = useCallback(async (field: 'classId' | 'studentId', id: string) => {
     for (const collectionName of ['grades', 'attendance', 'practiceExams'] as const) {
-      const matching = await getDocs(query(collection(db, collectionName), where('teacherId', '==', user!.uid), where(field, '==', id)));
-      for (let index = 0; index < matching.docs.length; index += 400) {
+      const matching = await getDocs(query(collection(db, collectionName), where('teacherId', '==', user!.uid)));
+      const dependentDocs = matching.docs.filter((record) => record.data()[field] === id);
+      for (let index = 0; index < dependentDocs.length; index += 400) {
         const batch = writeBatch(db);
-        matching.docs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
+        dependentDocs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
         await batch.commit();
       }
     }
@@ -774,11 +775,12 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       const path = `classes/${id}`;
       try {
         // Remove students and their related records before deleting the class.
-        const classStudents = await getDocs(query(collection(db, 'students'), where('teacherId', '==', user.uid), where('classId', '==', id)));
+        const classStudents = await getDocs(query(collection(db, 'students'), where('teacherId', '==', user.uid)));
+        const studentDocs = classStudents.docs.filter((record) => record.data().classId === id);
         await deleteDependentRecords('classId', id);
-        for (let index = 0; index < classStudents.docs.length; index += 400) {
+        for (let index = 0; index < studentDocs.length; index += 400) {
           const batch = writeBatch(db);
-          classStudents.docs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
+          studentDocs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
           await batch.commit();
         }
         await deleteDoc(doc(db, 'classes', id));
