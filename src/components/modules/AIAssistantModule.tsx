@@ -93,9 +93,21 @@ export function AIAssistantModule() {
           history: nextHistory.slice(-8).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
-      const data = await response.json();
+      const data = (await response.json().catch(() => ({}))) as { error?: string; reply?: string };
       if (!response.ok) {
-        setError(data.error || 'Yapay zekâ yanıtı alınamadı.');
+        if (data.error) {
+          setError(data.error);
+        } else if (response.status === 404) {
+          setError('İstenen yapay zekâ modeli bulunamadı veya şu anda erişilemiyor.');
+        } else if (response.status === 429) {
+          setError('Yapay zekâ kullanım kotası geçici olarak doldu. Kısa bir süre sonra tekrar deneyin.');
+        } else if (response.status === 504) {
+          setError('Yapay zekâ isteği zaman aşımına uğradı. Lütfen sorunuzu kısaltıp tekrar deneyin.');
+        } else if (response.status === 503) {
+          setError('Yapay zekâ servisi şu anda yapılandırılmamış veya bakımda.');
+        } else {
+          setError('Yapay zekâ yanıtı alınamadı. Lütfen tekrar deneyin.');
+        }
         return;
       }
 

@@ -56,19 +56,33 @@ function formatGeminiError(error: unknown): { status: number; message: string; c
         'Gemini API anahtarı geçersiz veya yetkisiz görünüyor. Lütfen Ayarlar > Gizli Anahtarlar (Secrets) panelinden API anahtarınızı kontrol edin.',
     };
   }
+  if (
+    (error instanceof Error && error.name === 'AbortError') ||
+    raw.includes('GEMINI_TIMEOUT') ||
+    raw.includes('DEADLINE_EXCEEDED') ||
+    raw.includes('504')
+  ) {
+    return {
+      status: 504,
+      code: 'TIMEOUT',
+      message:
+        'Yapay zekâ isteği zaman aşımına uğradı. Lütfen sorunuzu kısaltıp birkaç saniye sonra tekrar deneyin.',
+    };
+  }
   if (raw.includes('RESOURCE_EXHAUSTED') || raw.includes('429')) {
     return {
       status: 429,
       code: 'QUOTA_EXHAUSTED',
       message:
-        'Yapay zekâ kullanım kotası geçici olarak doldu. Kısa bir süre sonra tekrar deneyin veya Ayarlar > Gizli Anahtarlar (Secrets) panelinden faturalandırmalı bir anahtar seçin.',
+        'Yapay zekâ kullanım kotası geçici olarak doldu. Lütfen kısa bir süre bekleyip tekrar deneyin.',
     };
   }
   if (raw.includes('NOT_FOUND') || raw.includes('404')) {
     return {
       status: 404,
       code: 'MODEL_NOT_FOUND',
-      message: 'İstenen yapay zekâ modeli geçici olarak erişilemiyor.',
+      message:
+        'İstenen yapay zekâ modeli bulunamadı veya şu anda erişilemiyor. Lütfen daha sonra tekrar deneyin.',
     };
   }
   return {
@@ -185,7 +199,14 @@ function ensureClient(res: express.Response): GoogleGenAI | null {
 
 app.get('/api/health', (_req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY');
-  res.json({ ok: true, aiConfigured: hasKey, model: MODEL_NAME, fallbackModel: FALLBACK_MODEL_NAME });
+  res.json({
+    ok: true,
+    runtime: 'node-express',
+    aiConfigured: hasKey,
+    model: MODEL_NAME,
+    fallbackModel: FALLBACK_MODEL_NAME,
+    ttsModel: 'gemini-3.8-flash-lite-tts',
+  });
 });
 
 /* ---------------- MODULE 1: STUDENT & CLASS AI ANALYSIS ---------------- */
