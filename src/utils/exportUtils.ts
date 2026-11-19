@@ -127,9 +127,10 @@ export function anonymizeStudentForAI(
   grades: Grade[],
   attendance: AttendanceRecord[]
 ): AnonymizedStudentPayload {
-  const shortHash = student.id.replace(/[^a-zA-Z0-9]/g, '').slice(-4).toUpperCase() || '0001';
+  // Use a per-analysis random identifier rather than exposing a stable ID suffix.
+  const randomCode = crypto.randomUUID().replace(/-/g, '').slice(0, 12).toUpperCase();
   return {
-    anonymousCode: `OGR-${student.gradeLevel}-${shortHash}`,
+    anonymousCode: `OGR-${student.gradeLevel}-${randomCode}`,
     gradeLevel: student.gradeLevel,
     subjectAverages: calculateSubjectAverages(grades),
     recentGrades: [...grades]
@@ -147,7 +148,9 @@ export function anonymizeStudentForAI(
 }
 
 function escapeCsvCell(value: string | number | null | undefined): string {
-  const str = value == null ? '' : String(value);
+  const raw = value == null ? '' : String(value);
+  // Prevent spreadsheet formula injection in exported student-controlled cells.
+  const str = /^[\\t\\r\\n ]*[=+@-]/.test(raw) && typeof value === 'string' ? `'${raw}` : raw;
   if (str.includes(';') || str.includes('"') || str.includes('\n') || str.includes(',')) {
     return `"${str.replace(/"/g, '""')}"`;
   }
