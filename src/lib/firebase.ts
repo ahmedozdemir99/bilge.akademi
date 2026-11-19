@@ -65,12 +65,12 @@ export async function testFirestoreConnection(): Promise<boolean> {
     await getDocFromServer(doc(db, 'test', 'connection'));
     return true;
   } catch (error) {
-    if (error instanceof Error && error.message.includes('the client is offline')) {
-      console.error('Firebase bağlantısı kurulamadı. Lütfen yapılandırmayı kontrol edin.');
-      return false;
-    }
-    // Permission denied on test/connection confirms live server reachability
-    return true;
+    const code = (error as { code?: string })?.code;
+    // A permission error means the server responded; network and configuration
+    // errors must never be reported as a healthy connection.
+    if (code === 'permission-denied') return true;
+    console.error('Firebase bağlantı kontrolü başarısız:', code ?? error);
+    return false;
   }
 }
 
