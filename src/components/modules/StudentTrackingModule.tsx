@@ -216,37 +216,17 @@ export function StudentTrackingModule() {
     });
   }, [classes, grades, students]);
 
-  // Student Role View: privacy-safe personal view
+  // Never infer a signed-in student's identity from the first Firestore record.
+  // Personal records require a verified user-to-student mapping.
   if (workspaceView === 'student') {
-    const personalStudent = students[0];
-    if (!personalStudent) {
-      return (
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
-          <Users className="w-8 h-8 text-teal-600 mx-auto mb-3" />
-          <h2 className="text-lg font-semibold text-navy-900 dark:text-white">
-            Kişisel Akademik Dosya Bulunamadı
-          </h2>
-          <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            Öğrenci görünümünde yalnızca kendi akademik gelişiminiz görüntülenir. Öğretmen
-            görünümüne geçerek sınıf ve öğrenci kayıtları oluşturabilirsiniz.
-          </p>
-        </div>
-      );
-    }
-
     return (
-      <div className="space-y-4">
-        <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-3.5 text-xs text-slate-600 dark:text-slate-300">
-          <strong>Öğrenci Görünümü:</strong> Diğer öğrencilerin kayıtları gizlidir. Yalnızca
-          kendi yazılı notlarınız, LGS deneme netleriniz ve yapay zekâ çalışma önerileriniz gösterilir.
-        </div>
-        <StudentProfileView
-          student={personalStudent}
-          schoolClass={classMap.get(personalStudent.classId)}
-          grades={grades.filter((g) => g.studentId === personalStudent.id)}
-          practiceExams={practiceExams.filter((p) => p.studentId === personalStudent.id)}
-          readOnly
-        />
+      <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
+        <Users className="w-8 h-8 text-teal-600 mx-auto mb-3" />
+        <h2 className="text-lg font-semibold text-navy-900 dark:text-white">Öğrenci Dosyası Eşleştirmesi Gerekli</h2>
+        <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-lg mx-auto">
+          Kişisel deneme ve not kayıtları, giriş yapan hesaba güvenli biçimde eşleştirilmeden gösterilmez.
+          Öğretmeninizden hesap eşleştirmesinin yapılmasını isteyin.
+        </p>
       </div>
     );
   }
