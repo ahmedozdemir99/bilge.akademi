@@ -3,15 +3,6 @@ import { ENRICHMENT_LIBRARY, type EnrichmentModule } from '../../data/enrichment
 
 const colors = ['#0d9488','#2563eb','#e11d48','#7c3aed','#d97706','#059669','#db2777','#0891b2','#ea580c','#65a30d'];
 const labels: Record<EnrichmentModule,string> = {mathematics:'Matematik',science:'Fen',english:'İngilizce',history:'Tarih',literature:'Edebiyat',religion:'Din Kültürü',philosophy:'Felsefe'};
-const icons: Record<EnrichmentModule,string[]> = {
- mathematics:['24 ÷ 12 = 2','8 · 3 = 24','%25','3 : 4','3x + 7','3 / 8','2³ × 2⁴','√144','10 × 6 / 2','Σ / n'],
- science:['❄ → 💧','F / A','💡 — 💡','A ↔ T','☀ → 🌱','23,4°','pH 3','↑ Fₖ','1–18','☀ → 🌿 → 🐛'],
- english:['go → goes','watch → watched','fast → faster','should','borrow ↔ lend','7:30','← LEFT','Do + you','will','because'],
- history:['1071','1453','1919','1920','1923','1923','🌍','✉','📚','🏛'],
- literature:['☀ ☺','🦁 ≈ 💪','▰ ▰ ▰ ▰','♡','✦','BEN','♫','💧 → 🌊','📖','her + şey'],
- religion:['☪','☀ → 🌙','🤲','✓','⚖','💧','١','✦','♡','🤝'],
- philosophy:['?','∀ → ∴','⚖','? → bilgi','∃','P₁ + P₂ → S','¬(P ∧ ¬P)','⚖ → ?','✧','? → ?']
-};
 const descriptors: Record<EnrichmentModule,string[]> = {
  mathematics:['Ortak bölenler','Ortak katların buluşması','İndirim yüzdesi','Parçaların oranı','Denklemin dengesi','Olasılık modeli','Üslerin birleşmesi','Karelerin kökü','Alan modeli','Verilerin ortalaması'],
  science:['Hâl değişimi','Temas alanı ve basınç','Seri devre','Tamamlayıcı bazlar','Fotosentez girdileri','Eksen eğikliği','pH ölçeği','Kuvvet dengesi','Periyodik gruplar','Enerji aktarımı'],
@@ -69,50 +60,84 @@ function ScienceConceptDiagram({index,stage}:{index:number;stage:number}) {
 export function InteractiveVisualLab({module}:{module:EnrichmentModule}) {
  const [index,setIndex]=useState(0);
  const [stage,setStage]=useState(0);
- const [showAnswer,setShowAnswer]=useState(false);
- const item=ENRICHMENT_LIBRARY[module][index];
+ const [revealed,setRevealed]=useState(false);
+ const [completed,setCompleted]=useState<number[]>([]);
+ const [filter,setFilter]=useState<'all'|'remaining'>('all');
+ const activities=ENRICHMENT_LIBRARY[module];
+ const item=activities[index];
  const color=colors[index];
- const reset=(next:number)=>{setIndex(next);setStage(0);setShowAnswer(false);};
- return <section className="mt-8 rounded-2xl border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 p-4 sm:p-6 shadow-sm" aria-label={`${labels[module]} görsel materyalleri`}>
-   <header className="mb-4">
-     <p className="text-xs font-semibold tracking-widest uppercase text-teal-700 dark:text-teal-300">Görsel ve etkileşimli öğrenme laboratuvarı</p>
-     <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1">{labels[module]} · 10 Görsel Materyal</h2>
-     <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Yedi derste konuya özgü aşamalı şemalar bulunur. Adımları ilerletip soruyu çözün.</p>
-   </header>
-   <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 mb-5">
-     {ENRICHMENT_LIBRARY[module].map((entry,i)=><button key={i} type="button" title={entry.topic} aria-label={`${i+1}. ${entry.topic}`} aria-pressed={index===i} onClick={()=>reset(i)} className={`rounded-lg py-2 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 ${index===i?'text-white shadow-md':'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`} style={index===i?{backgroundColor:colors[i]}:undefined}>{i+1}</button>)}
-   </div>
-   <div className="rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700">
-     <div className="px-4 py-3 flex items-center justify-between gap-2 text-white" style={{backgroundColor:color}}>
-       <strong className="text-sm">{item.topic}</strong><span className="text-xs font-semibold">Materyal {index+1}/10</span>
+ const isComplete=completed.includes(index);
+ const goTo=(next:number)=>{setIndex(next);setStage(0);setRevealed(false);};
+ const finish=()=>{setRevealed(true);setCompleted(current=>current.includes(index)?current:[...current,index]);};
+ const diagramStage=stage===2&&!revealed?1:stage;
+ const visible=activities.map((entry,i)=>({entry,i})).filter(({i})=>filter==='all'||!completed.includes(i));
+ return <section className="mt-10 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 dark:border-slate-700 dark:bg-slate-900" aria-label={`${labels[module]} etkileşimli materyal atölyesi`}>
+   <header className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-5 py-7 text-white sm:px-8 sm:py-9">
+     <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full border-[36px] border-white/5"/>
+     <div className="relative flex flex-wrap items-start justify-between gap-4">
+       <div className="max-w-xl">
+         <p className="text-xs font-bold uppercase tracking-[.22em] text-teal-300">Bilge Akademi · Keşif Stüdyosu</p>
+         <h2 className="mt-2 text-2xl font-extrabold tracking-tight sm:text-3xl">{labels[module]} <span className="text-teal-300">Görsel Atölyesi</span></h2>
+         <p className="mt-2 text-sm leading-6 text-slate-300">Kavramı keşfet, modeli incele, soruyu çöz. Yanıtı görmeden önce kendi düşünceni oluştur.</p>
+       </div>
+       <div className="rounded-2xl border border-white/15 bg-white/10 px-5 py-3 text-center backdrop-blur-sm">
+         <div className="text-2xl font-black tabular-nums">{completed.length}<span className="text-base text-slate-300">/10</span></div>
+         <p className="text-xs text-slate-300">Tamamlanan</p>
+       </div>
      </div>
-     <div className="relative min-h-56 p-5 sm:p-7 flex flex-col items-center justify-center gap-4 bg-slate-50 dark:bg-slate-950 overflow-hidden">
-       <div aria-hidden="true" className="absolute inset-0 opacity-20" style={{backgroundImage:`radial-gradient(${color} 1px, transparent 1px)`,backgroundSize:'22px 22px'}}/>
-       <div className="relative flex items-center gap-3 w-full max-w-md justify-center">
-         <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-2xl flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-md transition-all duration-500" style={{backgroundColor:color,transform:stage>0?'translateY(-5px) scale(1.05)':'none'}}>{index+1}</div>
-         <div className="flex-1 min-w-0">
-           <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden"><div className="h-full transition-all duration-700" style={{backgroundColor:color,width:`${(stage+1)*33.34}%`}}/></div>
-           <div className="mt-3 text-center rounded-xl border-2 bg-white dark:bg-slate-900 px-3 py-4 text-lg sm:text-xl font-bold break-words transition-all duration-500" style={{borderColor:color,color}}>{module==='mathematics' ? <MathConceptDiagram index={index} stage={stage} /> : module==='science' ? <ScienceConceptDiagram index={index} stage={stage} /> : <SubjectConceptDiagram module={module} index={index} stage={stage} />}</div>
+     <div className="relative mt-6 h-2 overflow-hidden rounded-full bg-white/15" role="progressbar" aria-label="Tamamlanan materyaller" aria-valuenow={completed.length} aria-valuemin={0} aria-valuemax={10}>
+       <div className="h-full rounded-full bg-gradient-to-r from-teal-300 to-emerald-400 transition-[width] duration-500" style={{width:`${completed.length*10}%`}}/>
+     </div>
+   </header>
+   <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
+     <aside className="border-b border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40 lg:border-b-0 lg:border-r lg:p-5" aria-label="Materyal listesi">
+       <div className="mb-3 flex items-center justify-between gap-2">
+         <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Konu Haritası</h3>
+         <button type="button" onClick={()=>setFilter(v=>v==='all'?'remaining':'all')} aria-pressed={filter==='remaining'} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">{filter==='all'?'Kalanlar':'Tümü'}</button>
+       </div>
+       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:grid-cols-1">
+         {visible.map(({entry,i})=><button type="button" key={i} onClick={()=>goTo(i)} aria-current={index===i?'step':undefined} className={`flex min-w-0 items-center gap-2 rounded-xl border p-2.5 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 ${index===i?'border-teal-500 bg-teal-50 shadow-sm dark:border-teal-400 dark:bg-teal-950/40':'border-transparent bg-white hover:border-slate-300 dark:bg-slate-800/70 dark:hover:border-slate-600'}`}>
+           <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${completed.includes(i)?'bg-emerald-600 text-white':index===i?'bg-teal-700 text-white':'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200'}`}>{completed.includes(i)?'✓':i+1}</span>
+           <span className="min-w-0 truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={entry.topic}>{entry.topic}</span>
+         </button>)}
+       </div>
+       {visible.length===0&&<p className="rounded-xl bg-emerald-50 p-3 text-sm text-emerald-900 dark:bg-emerald-950 dark:text-emerald-200">Tebrikler! Tüm materyalleri tamamladın.</p>}
+     </aside>
+     <div className="min-w-0 p-4 sm:p-7">
+       <div className="mb-5 flex flex-wrap items-center justify-between gap-3">
+         <div>
+           <p className="text-xs font-bold uppercase tracking-widest text-teal-700 dark:text-teal-300">Materyal {index+1} / {activities.length}</p>
+           <h3 className="mt-1 text-xl font-bold text-slate-900 dark:text-white sm:text-2xl">{item.topic}</h3>
+           <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{descriptors[module][index]}</p>
+         </div>
+         <span className={`rounded-full px-3 py-1 text-xs font-bold ${isComplete?'bg-emerald-100 text-emerald-800 dark:bg-emerald-950 dark:text-emerald-200':'bg-amber-100 text-amber-800 dark:bg-amber-950 dark:text-amber-200'}`}>{isComplete?'✓ İncelendi':'● Keşfediliyor'}</span>
+       </div>
+       <div className="mb-4 grid grid-cols-3 gap-2" aria-label="Öğrenme aşamaları">
+         {['Keşfet','İlişkilendir','Düşün'].map((label,i)=><button type="button" key={label} onClick={()=>setStage(i)} aria-current={stage===i?'step':undefined} className={`min-w-0 rounded-xl border px-2 py-3 text-center text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 sm:text-sm ${stage===i?'border-teal-600 bg-teal-700 text-white':'border-slate-200 bg-slate-50 text-slate-600 hover:border-teal-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>{i+1}. {label}</button>)}
+       </div>
+       <div className="relative flex min-h-[290px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-8 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 sm:min-h-[350px] sm:px-8">
+         <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{backgroundImage:`radial-gradient(${color} 1px, transparent 1px)`,backgroundSize:'24px 24px'}}/>
+         <div className="relative mb-5 flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-black text-white shadow-lg sm:h-16 sm:w-16" style={{backgroundColor:color}}>{index+1}</div>
+         <div className="relative flex min-h-[105px] w-full max-w-xl items-center justify-center rounded-2xl border border-slate-200 bg-white/95 px-4 py-5 shadow-sm dark:border-slate-600 dark:bg-slate-950/90" aria-live="polite">
+           {module==='mathematics'?<MathConceptDiagram index={index} stage={diagramStage}/>:module==='science'?<ScienceConceptDiagram index={index} stage={diagramStage}/>:<SubjectConceptDiagram module={module} index={index} stage={diagramStage}/>}
+         </div>
+         <div className="relative mt-5 max-w-lg text-center">
+           <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{stage===0?'Önce modeldeki öğeleri tanı.':stage===1?'Öğeler arasındaki bağlantıyı düşün.':'Soruyu çöz; sonucu hazır olduğunda aç.'}</p>
+           {stage===2&&<p className="mt-3 rounded-xl bg-indigo-50 px-4 py-3 text-sm font-medium leading-6 text-indigo-950 dark:bg-indigo-950/50 dark:text-indigo-100">{item.question}</p>}
          </div>
        </div>
-       <div className="relative text-center max-w-lg">
-         <p className="font-semibold text-slate-900 dark:text-white">{descriptors[module][index]}</p>
-         <p className="mt-2 text-sm text-slate-600 dark:text-slate-300" aria-live="polite">{stage===0?'Modeldeki sembolleri ve ilişkileri inceleyin.':stage===1?item.question:'Şimdi kendi yanıtınızı oluşturun. Hazır olduğunuzda açıklamayı açın.'}</p>
+       <div className="mt-5 flex flex-wrap items-center gap-2">
+         <button type="button" onClick={()=>setStage(v=>Math.max(0,v-1))} disabled={stage===0} className="rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-800 disabled:cursor-not-allowed disabled:opacity-40 dark:border-slate-600 dark:text-slate-100">← Önceki adım</button>
+         {stage<2?<button type="button" onClick={()=>setStage(v=>Math.min(2,v+1))} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500">Devam Et →</button>:<button type="button" onClick={()=>revealed?setRevealed(false):finish()} className="rounded-xl bg-teal-700 px-5 py-3 text-sm font-bold text-white hover:bg-teal-800 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500">{revealed?'Çözümü Gizle':'Çözümü Göster ✓'}</button>}
+         <button type="button" onClick={()=>goTo((index+1)%activities.length)} className="ml-auto rounded-xl border border-slate-300 px-4 py-3 text-sm font-semibold text-slate-800 hover:bg-slate-50 dark:border-slate-600 dark:text-slate-100 dark:hover:bg-slate-800">Sonraki Konu →</button>
        </div>
-       <div className="relative flex gap-2" role="group" aria-label="Öğrenme aşamaları">
-         {[0,1,2].map(step=><button key={step} type="button" aria-label={`Görsel adım ${step+1}`} aria-pressed={stage===step} onClick={()=>setStage(step)} className={`h-3 rounded-full transition-all duration-300 ${stage===step?'w-10':'w-3 bg-slate-300 dark:bg-slate-600'}`} style={stage===step?{backgroundColor:color}:undefined}/>)}
-       </div>
+       {revealed&&<div className="mt-5 rounded-2xl border border-emerald-200 bg-emerald-50 p-5 dark:border-emerald-800 dark:bg-emerald-950/30" role="status">
+         <p className="text-xs font-bold uppercase tracking-wider text-emerald-700 dark:text-emerald-300">Açıklamalı Çözüm</p>
+         <p className="mt-2 text-lg font-extrabold text-emerald-950 dark:text-emerald-100">{item.answer}</p>
+         <p className="mt-2 text-sm leading-7 text-slate-700 dark:text-slate-200">{item.explanation}</p>
+       </div>}
+       <p className="mt-5 text-xs leading-5 text-slate-500 dark:text-slate-400">Materyaller eğitim amaçlı şematik modellerdir; ölçekli fiziksel simülasyon değildir. Adımlar kullanıcı denetiminde ilerler.</p>
      </div>
    </div>
-   <div className="mt-4 flex flex-wrap gap-2">
-     <button type="button" onClick={()=>setStage(v=>(v+1)%3)} className="rounded-lg px-4 py-2 text-sm font-semibold text-white" style={{backgroundColor:color}}>Sonraki Aşama</button>
-     <button type="button" onClick={()=>setShowAnswer(v=>!v)} className="rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-semibold text-slate-900 dark:text-white">{showAnswer?'Yanıtı Gizle':'Yanıtı Kontrol Et'}</button>
-     <button type="button" onClick={()=>reset((index+1)%10)} className="rounded-lg border border-slate-300 dark:border-slate-600 px-4 py-2 text-sm font-semibold text-slate-900 dark:text-white">Sonraki Materyal</button>
-   </div>
-   {showAnswer&&<div className="mt-4 rounded-xl bg-emerald-50 dark:bg-emerald-950/30 border border-emerald-200 dark:border-emerald-800 p-4" aria-live="polite">
-     <p className="font-semibold text-emerald-900 dark:text-emerald-200">{item.answer}</p>
-     <p className="mt-1 text-sm text-slate-700 dark:text-slate-200">{item.explanation}</p>
-   </div>}
-   <p className="mt-3 text-xs text-slate-500 dark:text-slate-400">Görseller şematiktir; tarih, bilim ve kavram modelleri ölçekli fiziksel simülasyon değildir. Hareketler kullanıcı kontrolüyle ilerler.</p>
  </section>;
 }
