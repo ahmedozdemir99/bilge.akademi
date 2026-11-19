@@ -27,14 +27,14 @@ import {
   stopAllSpeech,
 } from '../../../utils/englishAudio';
 import wuduAthleteImg from '../../../assets/images/wudu_athlete_fullbody_1795091471521.jpg';
-import namazQawmahImg from '../../../assets/images/namaz_qawmah_backrug_1795114959685.jpg';
-import namazTakbirImg from '../../../assets/images/namaz_takbir_backrug_1795114961075.jpg';
-import namazQiyamLowImg from '../../../assets/images/namaz_qiyam_backrug_1795114962103.jpg';
-import namazRukuImg from '../../../assets/images/namaz_ruku_backrug_1795114992591.jpg';
+import namazQawmahImg from '../../../assets/images/namaz_qawmah_leftedge_1795115489104.jpg';
+import namazTakbirImg from '../../../assets/images/namaz_takbir_leftedge_1795115488821.jpg';
+import namazQiyamLowImg from '../../../assets/images/namaz_qiyam_leftedge_1795115488900.jpg';
+import namazRukuImg from '../../../assets/images/namaz_ruku_leftedge_1795115497228.jpg';
 import namazSujudInRugImg from '../../../assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg';
-import namazTashahhudInRugImg from '../../../assets/images/namaz_tashahhud_backrug_1795114974817.jpg';
-import namazSalamRightImg from '../../../assets/images/namaz_salam_right_backrug_1795114960411.jpg';
-import namazSalamLeftImg from '../../../assets/images/namaz_salam_left_backrug_1795114961442.jpg';
+import namazTashahhudInRugImg from '../../../assets/images/namaz_tashahhud_leftedge_1795115487074.jpg';
+import namazSalamRightImg from '../../../assets/images/namaz_salam_right_leftedge_1795115493637.jpg';
+import namazSalamLeftImg from '../../../assets/images/namaz_salam_left_away_1795115532265.jpg';
 
 type WorshipLabTab = 'wudu' | 'prayer' | 'hajj' | 'fasting-zakat';
 
