@@ -14,6 +14,15 @@ import { SettingsModule } from './components/modules/SettingsModule';
 import { StudentTrackingModule } from './components/modules/StudentTrackingModule';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/ToastContainer';
+import { EnrichmentPanel } from './components/ui/EnrichmentPanel';
+import type { EnrichmentModule } from './data/enrichmentLibrary';
+
+const ENRICHED_MODULES: EnrichmentModule[] = ['mathematics', 'science', 'english', 'history', 'literature', 'religion', 'philosophy'];
+
+function ModuleEnrichment() {
+  const { activeModule } = useAcademy();
+  return ENRICHED_MODULES.includes(activeModule as EnrichmentModule) ? <EnrichmentPanel key={activeModule} module={activeModule as EnrichmentModule} /> : null;
+}
 
 function BilgeAkademiRouter() {
   const { activeModule, workspaceView } = useAcademy();
@@ -55,7 +64,10 @@ export default function App() {
     <ErrorBoundary>
       <AcademyProvider>
         <AppShell>
-          <BilgeAkademiRouter />
+          <div className="min-w-0 w-full">
+            <BilgeAkademiRouter />
+            <ModuleEnrichment />
+          </div>
         </AppShell>
         <ToastContainer />
       </AcademyProvider>
