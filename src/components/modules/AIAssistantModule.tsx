@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../../lib/secureAiFetch';
 import React, { useEffect, useRef, useState } from 'react';
 import { AlertCircle, Bot, Loader2, RotateCcw, Send, ShieldCheck } from 'lucide-react';
 import { useAcademy } from '../../context/AcademyContext';
@@ -83,7 +84,7 @@ export function AIAssistantModule() {
     setLoading(true);
 
     try {
-      const response = await fetch('/api/ai/assistant', {
+      const response = await secureAiFetch('/api/ai/assistant', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
