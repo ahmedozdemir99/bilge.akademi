@@ -1,5 +1,7 @@
 import 'dotenv/config';
 import express from 'express';
+import { initializeApp, getApps, applicationDefault } from 'firebase-admin/app';
+import { getAuth } from 'firebase-admin/auth';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
@@ -8,6 +10,33 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
+
+// Use a service-account credential via GOOGLE_APPLICATION_CREDENTIALS on the Node backend.
+if (!getApps().length) initializeApp({ credential: applicationDefault() });
+
+const aiRequests = new Map<string, { count: number; resetAt: number }>();
+app.use('/api/ai', async (req, res, next) => {
+  const token = req.header('Authorization')?.match(/^Bearer (.+)$/)?.[1];
+  if (!token) return res.status(401).json({ error: 'Yapay zekâ kullanımı için oturum açın.' });
+  try {
+    const decoded = await getAuth().verifyIdToken(token, true);
+    if (!decoded.email_verified) return res.status(403).json({ error: 'E-posta doğrulaması gerekli.' });
+    const now = Date.now();
+    const previous = aiRequests.get(decoded.uid);
+    const entry = !previous || previous.resetAt <= now ? { count: 0, resetAt: now + 60_000 } : previous;
+    if (entry.count >= 12) {
+      res.setHeader('Retry-After', String(Math.ceil((entry.resetAt - now) / 1000)));
+      return res.status(429).json({ error: 'Dakikalık yapay zekâ kullanım sınırına ulaşıldı.' });
+    }
+    entry.count += 1;
+    aiRequests.set(decoded.uid, entry);
+    if (aiRequests.size > 10000) for (const [key, value] of aiRequests) if (value.resetAt <= now) aiRequests.delete(key);
+    res.locals.authUid = decoded.uid;
+    next();
+  } catch {
+    return res.status(401).json({ error: 'Oturum geçersiz. Yeniden giriş yapın.' });
+  }
+});
 app.use(express.json({ limit: '1.5mb' }));
 
 const PORT = Number(process.env.PORT) || 3000;
@@ -734,7 +763,7 @@ Görevlerin:
 /* ---------------- TEXT-TO-SPEECH AUDIO GENERATION (GEMINI TTS) ---------------- */
 
 const ALLOWED_TTS_VOICES = new Set(['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr']);
-const ttsCache = new Map<string, { audioBase64: string; mimeType: string; voiceName: string }>();
+const ttsCache = new Map<string, { audioBase64: string; mimeType: string; voiceName: string; expiresAt: number }>();
 
 app.post('/api/ai/tts', async (req, res) => {
   const ai = getGenAITtsClient();
@@ -758,10 +787,12 @@ app.post('/api/ai/tts', async (req, res) => {
   const styleKey = typeof style === 'string' ? style.trim().slice(0, 140) : '';
   const cacheKey = `${selectedVoice}::${styleKey}::${cleanText}`;
   const cached = ttsCache.get(cacheKey);
-  if (cached) {
-    res.json(cached);
+  if (cached && cached.expiresAt > Date.now()) {
+    const { expiresAt: _expiresAt, ...audio } = cached;
+    res.json(audio);
     return;
   }
+  if (cached) ttsCache.delete(cacheKey);
 
   try {
     const response = await withGeminiRetry(() =>
@@ -810,7 +841,7 @@ app.post('/api/ai/tts', async (req, res) => {
       const oldestKey = ttsCache.keys().next().value;
       if (oldestKey) ttsCache.delete(oldestKey);
     }
-    ttsCache.set(cacheKey, payload);
+    ttsCache.set(cacheKey, { ...payload, expiresAt: Date.now() + 10 * 60_000 });
 
     res.json(payload);
   } catch (error) {

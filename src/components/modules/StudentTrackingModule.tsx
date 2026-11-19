@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../../lib/secureAiFetch';
 import { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -59,6 +60,7 @@ export function StudentTrackingModule() {
     practiceExams,
     isDemoMode,
     workspaceView,
+    user,
     compactMode,
     dataLoading,
     addClass,
@@ -185,7 +187,9 @@ export function StudentTrackingModule() {
 
   // Student Role View: privacy-safe personal view
   if (workspaceView === 'student') {
-    const personalStudent = students[0];
+    // Cloud student accounts are not yet linked to a specific student record.
+    // Never present the first teacher-owned record as the signed-in student's own.
+    const personalStudent = isDemoMode ? students[0] : null;
     if (!personalStudent) {
       return (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8 text-center">
@@ -194,8 +198,9 @@ export function StudentTrackingModule() {
             Kişisel Akademik Dosya Bulunamadı
           </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            Öğrenci görünümünde yalnızca kendi akademik gelişiminiz görüntülenir. Öğretmen
-            görünümüne geçerek sınıf ve öğrenci kayıtları oluşturabilirsiniz.
+            {user
+              ? 'Bu hesapla eşleştirilmiş öğrenci dosyası henüz yok. Yanlış kişisel verilerin gösterilmesini önlemek için bu alan kapalıdır.'
+              : 'Demo öğrenci dosyası bulunamadı. Öğretmen görünümüne geçerek örnek kayıtlar oluşturabilirsiniz.'}
           </p>
         </div>
       );
@@ -308,7 +313,7 @@ export function StudentTrackingModule() {
     const targetClass = analyticsClassId === 'all' ? null : classMap.get(analyticsClassId);
     const trialSummary = calculateTrialRobotSummary(analyticsPracticeExams);
     try {
-      const response = await fetch('/api/ai/class-analysis', {
+      const response = await secureAiFetch('/api/ai/class-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

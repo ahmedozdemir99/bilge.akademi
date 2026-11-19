@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../../lib/secureAiFetch';
 import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -164,7 +165,7 @@ export function MathTutorModule() {
     setSolving(true);
     setSolveError('');
     try {
-      const response = await fetch('/api/ai/math-solve', {
+      const response = await secureAiFetch('/api/ai/math-solve', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -196,7 +197,7 @@ export function MathTutorModule() {
   const handleNewAIExercise = async () => {
     setExLoading(true);
     try {
-      const response = await fetch('/api/ai/math-exercise', {
+      const response = await secureAiFetch('/api/ai/math-exercise', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../lib/secureAiFetch';
 /**
  * Client-side audio playback helper supporting:
  * 1. Instant zero-latency browser SpeechSynthesis (en-US, en-GB, tr-TR)
@@ -81,7 +82,7 @@ export async function generateOrGetStudioWav(
     return cached;
   }
 
-  const response = await fetch('/api/ai/tts', {
+  const response = await secureAiFetch('/api/ai/tts', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     body: JSON.stringify({ text, voiceName, style }),

@@ -3,6 +3,8 @@ import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebas
 import {
   collection,
   deleteDoc,
+  getDocs,
+  writeBatch,
   doc,
   getDoc,
   onSnapshot,
@@ -657,6 +659,20 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     [notify, user]
   );
 
+  // Delete dependent documents first to avoid orphaned sensitive records.
+  // Batches stay below Firestore's 500-write limit.
+  const deleteDependentRecords = useCallback(async (field: 'classId' | 'studentId', id: string) => {
+    for (const collectionName of ['grades', 'attendance', 'practiceExams'] as const) {
+      const matching = await getDocs(query(collection(db, collectionName), where('teacherId', '==', user!.uid)));
+      const dependentDocs = matching.docs.filter((record) => record.data()[field] === id);
+      for (let index = 0; index < dependentDocs.length; index += 400) {
+        const batch = writeBatch(db);
+        dependentDocs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
+        await batch.commit();
+      }
+    }
+  }, [user]);
+
   // --- CRUD: Classes ---
   const addClass = useCallback(
     async (input: ClassInput) => {
@@ -758,13 +774,24 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
       const path = `classes/${id}`;
       try {
+        // Remove students and their related records before deleting the class.
+        const classStudents = await getDocs(query(collection(db, 'students'), where('teacherId', '==', user.uid)));
+        const studentDocs = classStudents.docs.filter((record) => record.data().classId === id);
+        await deleteDependentRecords('classId', id);
+        // Include historical records if a student was previously moved between classes.
+        for (const studentDoc of studentDocs) await deleteDependentRecords('studentId', studentDoc.id);
+        for (let index = 0; index < studentDocs.length; index += 400) {
+          const batch = writeBatch(db);
+          studentDocs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
+          await batch.commit();
+        }
         await deleteDoc(doc(db, 'classes', id));
         notify('info', 'Sınıf silindi', 'Sınıf kaydı kaldırıldı.');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, path);
       }
     },
-    [notify, user]
+    [deleteDependentRecords, notify, user]
   );
 
   // --- CRUD: Students ---
@@ -876,13 +903,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
       const path = `students/${id}`;
       try {
+        await deleteDependentRecords('studentId', id);
         await deleteDoc(doc(db, 'students', id));
         notify('info', 'Öğrenci silindi', 'Öğrenci kaydı Firestore üzerinden kaldırıldı.');
       } catch (error) {
         handleFirestoreError(error, OperationType.DELETE, path);
       }
     },
-    [notify, user]
+    [deleteDependentRecords, notify, user]
   );
 
   // --- CRUD: Grades ---

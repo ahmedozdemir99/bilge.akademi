@@ -1,0 +1,8 @@
+/sw.js
+  Cache-Control: no-cache
+/manifest.webmanifest
+  Content-Type: application/manifest+json
+  Cache-Control: public, max-age=3600
+/icon.svg
+  Content-Type: image/svg+xml
+  Cache-Control: public, max-age=86400
