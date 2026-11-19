@@ -763,7 +763,7 @@ Görevlerin:
 /* ---------------- TEXT-TO-SPEECH AUDIO GENERATION (GEMINI TTS) ---------------- */
 
 const ALLOWED_TTS_VOICES = new Set(['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr']);
-const ttsCache = new Map<string, { audioBase64: string; mimeType: string; voiceName: string }>();
+const ttsCache = new Map<string, { audioBase64: string; mimeType: string; voiceName: string; expiresAt: number }>();
 
 app.post('/api/ai/tts', async (req, res) => {
   const ai = getGenAITtsClient();
@@ -787,10 +787,12 @@ app.post('/api/ai/tts', async (req, res) => {
   const styleKey = typeof style === 'string' ? style.trim().slice(0, 140) : '';
   const cacheKey = `${selectedVoice}::${styleKey}::${cleanText}`;
   const cached = ttsCache.get(cacheKey);
-  if (cached) {
-    res.json(cached);
+  if (cached && cached.expiresAt > Date.now()) {
+    const { expiresAt: _expiresAt, ...audio } = cached;
+    res.json(audio);
     return;
   }
+  if (cached) ttsCache.delete(cacheKey);
 
   try {
     const response = await withGeminiRetry(() =>
@@ -839,7 +841,7 @@ app.post('/api/ai/tts', async (req, res) => {
       const oldestKey = ttsCache.keys().next().value;
       if (oldestKey) ttsCache.delete(oldestKey);
     }
-    ttsCache.set(cacheKey, payload);
+    ttsCache.set(cacheKey, { ...payload, expiresAt: Date.now() + 10 * 60_000 });
 
     res.json(payload);
   } catch (error) {
