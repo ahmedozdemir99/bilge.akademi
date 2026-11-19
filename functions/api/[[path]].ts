@@ -887,7 +887,7 @@ Problem: ${problem.slice(0, 1200)}`;
       const prompt = `MEB Ortaokul müfredatına (5–8. Sınıf & LGS) tam uyumlu olacak şekilde "${String(gradeLevel || '8. Sınıf (LGS)').slice(0, 30)}" seviyesinde, "${String(topic || 'Birinci Dereceden Denklemler').slice(0, 60)}" konusunda, "${String(difficulty || 'orta').slice(0, 20)}" zorluk derecesinde TEK bir özgün Türkçe matematik alıştırma sorusu üret.
 Lise konularına (parabol, fonksiyon, ikinci dereceden denklem, trigonometri) kesinlikle girme.
 Cevabı net sayısal veya kısa cebirsel ifade olsun.
-Ayrıca öğrenci yanlış cevap verirse aşamalı gösterilecek 3 kademeli ipucu ve eksiksiz adım adım çözüm açıklaması üret.`;
+Soruyu gerçek yaşamla ilişkili, tek doğru cevaplı, matematiksel olarak tutarlı ve MEB kazanımlarına uygun üret. Aynı soruda birden fazla yorumla farklı doğru sonuç çıkmasın. Öğrenciye gösterilecek questionText alanında çözüm yöntemi, formül, EBOB/EKOK etiketi, ipucu veya cevabı açık etme. expressionLatex yalnızca çözümden sonra gösterilecek; soruda yer almayan çözüm formülünü bu alana koyabilirsin. acceptedAnswers içinde doğru yanıtın doğal türünü koru: gün sorulursa Türkçe gün adı, uzunluk sorulursa sayısal değer, cebirsel ifade sorulursa ifade. Önce soruyu kendin çözerek sonucu doğrula. fullSolution alanında 6 aşamayı numaralandırarak açıkla: (1) soruyu anlama, (2) verilenler, (3) istenenler, (4) yöntem, (5) işlem ve sonuç, (6) doğrulama. hints alanını boş dizi olarak ver; sınav ekranında ipucu gösterilmeyecek.`;
 
       const res = await generateResilient(apiKey, prompt, {
         systemInstruction:
