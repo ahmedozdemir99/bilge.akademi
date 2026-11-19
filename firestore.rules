@@ -57,6 +57,12 @@ service cloud.firestore {
         get(/databases/$(database)/documents/students/$(studentId)).data.teacherId == request.auth.uid;
     }
 
+    // Validate that dependent academic records reference the same owned class.
+    function ownsStudentInClass(studentId, classId) {
+      return ownsStudent(studentId) &&
+        get(/databases/$(database)/documents/students/$(studentId)).data.classId == classId;
+    }
+
     // --- Validation Blueprints (Pure static validation, zero DB reads) ---
     function isValidUserProfile(data, userId) {
       return data.keys().hasAll(['uid', 'displayName', 'role', 'createdAt', 'updatedAt']) &&
@@ -383,6 +389,7 @@ service cloud.firestore {
           isAdmin() ||
           (existing().teacherId == request.auth.uid &&
             ownsClass(incoming().classId) &&
+            ownsStudentInClass(incoming().studentId, incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'fullName', 'studentNumber', 'gradeLevel', 'guardianNote', 'status', 'updatedAt']))
         );
       allow delete: if isVerifiedUser() && isValidId(studentId) && (existing().teacherId == request.auth.uid || isAdmin());
@@ -419,6 +426,7 @@ service cloud.firestore {
           isAdmin() ||
           (existing().teacherId == request.auth.uid &&
             ownsClass(incoming().classId) &&
+            ownsStudentInClass(incoming().studentId, incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'subjectName', 'title', 'examType', 'examDate', 'maxScore', 'updatedAt']))
         );
       allow delete: if isVerifiedUser() && isValidId(examId) && (existing().teacherId == request.auth.uid || isAdmin());
@@ -434,7 +442,7 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId) &&
-        ownsStudent(incoming().studentId);
+        ownsStudentInClass(incoming().studentId, incoming().classId);
       allow update: if isVerifiedUser() &&
         isValidId(gradeId) &&
         isValidGrade(incoming()) &&
@@ -445,6 +453,7 @@ service cloud.firestore {
           isAdmin() ||
           (existing().teacherId == request.auth.uid &&
             ownsClass(incoming().classId) &&
+            ownsStudentInClass(incoming().studentId, incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'subjectName', 'examTitle', 'examType', 'examDate', 'score', 'maxScore', 'teacherNote', 'updatedAt']))
         );
       allow delete: if isVerifiedUser() && isValidId(gradeId) && (existing().teacherId == request.auth.uid || isAdmin());
@@ -460,7 +469,7 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId) &&
-        ownsStudent(incoming().studentId);
+        ownsStudentInClass(incoming().studentId, incoming().classId);
       allow update: if isVerifiedUser() &&
         isValidId(attendanceId) &&
         isValidAttendance(incoming()) &&
@@ -471,6 +480,7 @@ service cloud.firestore {
           isAdmin() ||
           (existing().teacherId == request.auth.uid &&
             ownsClass(incoming().classId) &&
+            ownsStudentInClass(incoming().studentId, incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'date', 'status', 'reason', 'updatedAt']))
         );
       allow delete: if isVerifiedUser() && isValidId(attendanceId) && (existing().teacherId == request.auth.uid || isAdmin());
@@ -486,7 +496,7 @@ service cloud.firestore {
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId) &&
-        ownsStudent(incoming().studentId);
+        ownsStudentInClass(incoming().studentId, incoming().classId);
       allow update: if isVerifiedUser() &&
         isValidId(examRecordId) &&
         isValidPracticeExam(incoming()) &&
@@ -497,6 +507,7 @@ service cloud.firestore {
           isAdmin() ||
           (existing().teacherId == request.auth.uid &&
             ownsClass(incoming().classId) &&
+            ownsStudentInClass(incoming().studentId, incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly([
               'classId', 'examTitle', 'examDate', 'wrongPenalty',
               'turkceD', 'turkceY', 'matematikD', 'matematikY', 'fenD', 'fenY',
