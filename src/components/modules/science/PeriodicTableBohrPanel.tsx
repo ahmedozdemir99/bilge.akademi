@@ -85,7 +85,7 @@ export function PeriodicTableBohrPanel() {
           {[['Metal','bg-sky-300 text-sky-950'],['Yarı Metal','bg-amber-300 text-amber-950'],['Ametal','bg-emerald-300 text-emerald-950'],['Soygaz','bg-violet-300 text-violet-950'],['Geçiş Metali','bg-rose-300 text-rose-950'],['Lantanit','bg-orange-300 text-orange-950'],['Aktinit','bg-fuchsia-300 text-fuchsia-950']].map(([label, color]) => <span key={label} className={`rounded-md px-2 py-1 ${color}`}>{label}</span>)}
         </div>
         <div className="overflow-x-auto pb-3" aria-label="118 elementli tam periyodik tablo">
-          <div className="min-w-[1080px] space-y-1.5">
+          <div className="min-w-[850px] space-y-1">
             <div className="grid grid-cols-18 gap-1 text-center text-[10px] font-semibold text-slate-500">
               {Array.from({length:18},(_,i)=><span key={i}>{i+1}</span>)}
             </div>
@@ -93,7 +93,7 @@ export function PeriodicTableBohrPanel() {
               <div key={period} className="grid grid-cols-18 gap-1">
                 {Array.from({length:18},(_,i)=>{
                   const item=FULL_PERIODIC_ELEMENTS.find(el=>el.p===period && el.g===i+1);
-                  if(!item) return <div key={i} className="h-[67px]" />;
+                  if(!item) return <div key={i} className="h-[53px]" />;
                   const detailed=PERIODIC_ELEMENTS.find(el=>el.atomicNumber===item.n);
                   const category = detailed?.category ?? ([8,9].includes(period) ? (period===8?'Lantanit':'Aktinit') : item.g>=3&&item.g<=12?'Geçiş Metali' : [2,10,18,36,54,86,118].includes(item.n)?'Soygaz' : [5,14,32,33,51,52].includes(item.n)?'Yarı Metal' : [1,6,7,8,9,15,16,17,34,35,53,85,117].includes(item.n)?'Ametal':'Metal');
                   const palette:Record<string,string>={
@@ -106,8 +106,8 @@ export function PeriodicTableBohrPanel() {
                     'Aktinit':'bg-fuchsia-200 border-fuchsia-500 text-fuchsia-950 dark:bg-fuchsia-900 dark:text-fuchsia-50'
                   };
                   const dimmed=categoryFilter!=='Tümü' && category!==categoryFilter;
-                  const cls=`h-[67px] min-w-0 p-1 rounded-md border-2 flex flex-col items-center justify-center transition-all ${palette[category]} ${dimmed?'opacity-25':'opacity-100'} ${detailed?'cursor-pointer hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2':'cursor-default'} ${selected.atomicNumber===item.n?'ring-2 ring-offset-1 ring-slate-900 dark:ring-white':''}`;
-                  const inner=<><span className="text-[9px] leading-none">{item.n}</span><strong className="text-[17px] leading-tight">{item.s}</strong><span className="text-[8px] leading-tight truncate w-full text-center" title={item.name}>{item.name}</span></>;
+                  const cls=`h-[67px] min-w-0 p-0.5 rounded-md border flex flex-col items-center justify-center transition-all ${palette[category]} ${dimmed?'opacity-25':'opacity-100'} ${detailed?'cursor-pointer hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2':'cursor-default'} ${selected.atomicNumber===item.n?'ring-2 ring-offset-1 ring-slate-900 dark:ring-white':''}`;
+                  const inner=<><span className="text-[8px] leading-none">{item.n}</span><strong className="text-[14px] leading-tight">{item.s}</strong><span className="text-[7px] leading-tight truncate w-full text-center" title={item.name}>{item.name}</span></>;
                   return detailed?<button key={item.n} type="button" title={`${item.n}. ${item.name} — ${category}`} aria-label={`${item.n}. ${item.name}`} onClick={()=>handleSelectElement(item.s)} className={cls}>{inner}</button>:<div key={item.n} title={`${item.n}. ${item.name} — ${category}`} className={cls}>{inner}</div>;
                 })}
               </div>
