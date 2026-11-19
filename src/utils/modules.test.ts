@@ -5,12 +5,16 @@ import {
 } from './poetryUtils.ts';
 import {
   analyzeLinear,
-  analyzeParabola,
   checkMathAnswer,
   generateDeterministicExercise,
   MATH_TOPICS,
-  sampleMathFunction,
+  sampleLinearEquation,
 } from './mathEngine.ts';
+import {
+  getQariAudioUrl,
+  QARI_OPTIONS,
+  SURAH_DUA_LIBRARY,
+} from '../data/religionRichData.ts';
 
 import { MATH_TEST_PACKS } from '../data/tests/mathTestsData.ts';
 import { LITERATURE_TEST_PACKS } from '../data/tests/literatureTestsData.ts';
@@ -44,26 +48,36 @@ function runModuleTests() {
     'Should include an algorithmic uncertainty notice'
   );
 
-  // 3. Deterministic math engine: function sampling
-  const sampled = sampleMathFunction('x^2 - 4', -2, 2, 4);
-  assert.equal(sampled.error, undefined);
-  assert.equal(sampled.points.length, 5);
-  assert.equal(sampled.points[0].y, 0); // (-2)^2 - 4 = 0
-  assert.equal(sampled.points[2].y, -4); // 0^2 - 4 = -4
-  assert.equal(sampled.points[4].y, 0); // 2^2 - 4 = 0
+  // 3. Deterministic middle-school linear equation sampler: y = 2x - 4
+  const sampledLinear = sampleLinearEquation(2, -4, -2, 2, 4);
+  assert.equal(sampledLinear.length, 5);
+  assert.equal(sampledLinear[0].y, -8); // 2(-2) - 4 = -8
+  assert.equal(sampledLinear[2].y, -4); // 2(0) - 4 = -4
+  assert.equal(sampledLinear[4].y, 0); // 2(2) - 4 = 0
 
-  // 4. Parabola analyzer: f(x) = x^2 - 4x + 3 -> vertex (2, -1), roots 1 and 3
-  const parabola = analyzeParabola(1, -4, 3);
-  assert.equal(parabola.vertexX, 2);
-  assert.equal(parabola.vertexY, -1);
-  assert.equal(parabola.discriminant, 4);
-  assert.deepEqual(parabola.roots, [1, 3]);
+  // 4. Qari audio & Arabic metadata verification for Din Kültürü Surahs & Duas
+  assert.equal(QARI_OPTIONS.length, 4);
+  assert.ok(SURAH_DUA_LIBRARY.length >= 11, 'En az 11 sure/ayet/dua kaydı olmalıdır');
+  for (const entry of SURAH_DUA_LIBRARY) {
+    assert.ok(
+      Boolean(entry.quranApiRef || entry.staticArabicText),
+      `${entry.title} için Arapça metin kaynağı tanımlı olmalıdır`
+    );
+    if (entry.audioType === 'surah' || entry.audioType === 'ayah') {
+      for (const qari of QARI_OPTIONS) {
+        const url = getQariAudioUrl(entry, qari.id);
+        assert.ok(url && url.endsWith('.mp3'), `${entry.title} / ${qari.name} geçerli MP3 URL döndürmelidir`);
+      }
+    }
+  }
 
-  // 5. Linear analyzer: y = 2x - 6 -> slope 2, yIntercept -6, xIntercept 3
+  // 5. Linear analyzer: y = 2x - 6 -> slope 2, yIntercept -6, xIntercept 3, 5 table points
   const linear = analyzeLinear(2, -6);
   assert.equal(linear.slope, 2);
   assert.equal(linear.yIntercept, -6);
   assert.equal(linear.xIntercept, 3);
+  assert.equal(linear.passesOrigin, false);
+  assert.equal(linear.tablePoints.length, 5);
 
   // 6. Answer checker (fractions, Turkish comma decimals, algebraic equivalence)
   assert.equal(checkMathAnswer('0,5', ['1/2']), true);

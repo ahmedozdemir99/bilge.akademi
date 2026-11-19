@@ -17,107 +17,7 @@ export type MathTopic = (typeof MATH_TOPICS)[number];
 
 export interface PlotPoint {
   x: number;
-  y: number | null;
-}
-
-export interface FunctionSampleResult {
-  points: PlotPoint[];
-  error?: string;
-}
-
-export function sampleMathFunction(
-  expression: string,
-  xMin = -10,
-  xMax = 10,
-  steps = 80
-): FunctionSampleResult {
-  const cleaned = expression.trim().replace(/,/g, '.');
-  if (!cleaned) {
-    return { points: [], error: 'Lütfen geçerli bir fonksiyon ifadesi yazın (ör. x^2 - 2*x - 3).' };
-  }
-  try {
-    const compiled = compile(cleaned);
-    const points: PlotPoint[] = [];
-    const stepSize = (xMax - xMin) / steps;
-    for (let i = 0; i <= steps; i += 1) {
-      const x = Number((xMin + i * stepSize).toFixed(2));
-      let y: number | null = null;
-      try {
-        const val = compiled.evaluate({ x });
-        if (typeof val === 'number' && Number.isFinite(val) && Math.abs(val) <= 1000) {
-          y = Number(val.toFixed(3));
-        }
-      } catch {
-        y = null;
-      }
-      points.push({ x, y });
-    }
-    return { points };
-  } catch {
-    return {
-      points: [],
-      error: 'İfade çözümlenemedi. Örnek biçimler: x^2 - 4, sin(x), 2*x + 1, x^3 - 3*x',
-    };
-  }
-}
-
-export interface ParabolaAnalysis {
-  discriminant: number;
-  vertexX: number;
-  vertexY: number;
-  yIntercept: number;
-  concavity: 'Yukarı Doğru (Minimum)' | 'Aşağı Doğru (Maksimum)' | 'Doğrusal (a = 0)';
-  roots: number[];
-  latex: string;
-}
-
-export function analyzeParabola(a: number, b: number, c: number): ParabolaAnalysis {
-  const formatTerm = (coef: number, sym: string, isFirst = false) => {
-    if (coef === 0) return '';
-    const sign = coef > 0 ? (isFirst ? '' : ' + ') : isFirst ? '-' : ' - ';
-    const abs = Math.abs(coef);
-    const numStr = sym && abs === 1 ? '' : String(abs);
-    return `${sign}${numStr}${sym}`;
-  };
-
-  const expr = `${formatTerm(a, 'x^2', true)}${formatTerm(b, 'x', a === 0)}${formatTerm(c, '', a === 0 && b === 0)}` || '0';
-  const latex = `f(x) = ${expr}`;
-
-  if (a === 0) {
-    const root = b !== 0 ? [Number((-c / b).toFixed(2))] : [];
-    return {
-      discriminant: 0,
-      vertexX: 0,
-      vertexY: c,
-      yIntercept: c,
-      concavity: 'Doğrusal (a = 0)',
-      roots: root,
-      latex,
-    };
-  }
-
-  const discriminant = Number((b * b - 4 * a * c).toFixed(3));
-  const vertexX = Number((-b / (2 * a)).toFixed(2));
-  const vertexY = Number((a * vertexX * vertexX + b * vertexX + c).toFixed(2));
-  let roots: number[] = [];
-  if (discriminant > 0) {
-    const sqrtD = Math.sqrt(discriminant);
-    const r1 = Number(((-b - sqrtD) / (2 * a)).toFixed(2));
-    const r2 = Number(((-b + sqrtD) / (2 * a)).toFixed(2));
-    roots = [r1, r2].sort((u, v) => u - v);
-  } else if (discriminant === 0) {
-    roots = [vertexX];
-  }
-
-  return {
-    discriminant,
-    vertexX,
-    vertexY,
-    yIntercept: c,
-    concavity: a > 0 ? 'Yukarı Doğru (Minimum)' : 'Aşağı Doğru (Maksimum)',
-    roots,
-    latex,
-  };
+  y: number;
 }
 
 export interface LinearAnalysis {
@@ -125,15 +25,55 @@ export interface LinearAnalysis {
   yIntercept: number;
   xIntercept: number | null;
   angleDeg: number;
+  slopeDirection: 'Pozitif Eğim (Sağa Yatık / Artan)' | 'Negatif Eğim (Sola Yatık / Azalan)' | 'Sıfır Eğim (x Eksenine Paralel)';
+  passesOrigin: boolean;
+  tablePoints: PlotPoint[];
   latex: string;
+}
+
+export function sampleLinearEquation(m: number, n: number, xMin = -8, xMax = 8, steps = 32): PlotPoint[] {
+  const points: PlotPoint[] = [];
+  const stepSize = (xMax - xMin) / steps;
+  for (let i = 0; i <= steps; i += 1) {
+    const x = Number((xMin + i * stepSize).toFixed(2));
+    const y = Number((m * x + n).toFixed(2));
+    points.push({ x, y });
+  }
+  return points;
 }
 
 export function analyzeLinear(m: number, n: number): LinearAnalysis {
   const xIntercept = m !== 0 ? Number((-n / m).toFixed(2)) : null;
   const angleDeg = Number(((Math.atan(m) * 180) / Math.PI).toFixed(1));
-  const signN = n >= 0 ? `+ ${n}` : `- ${Math.abs(n)}`;
-  const latex = `y = ${m}x ${n === 0 ? '' : signN}`.trim();
-  return { slope: m, yIntercept: n, xIntercept, angleDeg, latex };
+  const signN = n > 0 ? `+ ${n}` : n < 0 ? `- ${Math.abs(n)}` : '';
+  const mPart = m === 0 ? '' : m === 1 ? 'x' : m === -1 ? '-x' : `${m}x`;
+  const latex =
+    m === 0
+      ? `y = ${n}`
+      : `y = ${mPart}${signN ? ` ${signN}` : ''}`.trim();
+
+  const slopeDirection: LinearAnalysis['slopeDirection'] =
+    m > 0
+      ? 'Pozitif Eğim (Sağa Yatık / Artan)'
+      : m < 0
+        ? 'Negatif Eğim (Sola Yatık / Azalan)'
+        : 'Sıfır Eğim (x Eksenine Paralel)';
+
+  const tablePoints: PlotPoint[] = [-2, -1, 0, 1, 2].map((x) => ({
+    x,
+    y: Number((m * x + n).toFixed(2)),
+  }));
+
+  return {
+    slope: m,
+    yIntercept: n,
+    xIntercept,
+    angleDeg,
+    slopeDirection,
+    passesOrigin: n === 0,
+    tablePoints,
+    latex,
+  };
 }
 
 export interface MathExerciseItem {

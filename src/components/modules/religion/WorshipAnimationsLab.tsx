@@ -1,10 +1,13 @@
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import {
-  ChevronLeft,
-  ChevronRight,
+  ArrowLeft,
+  ArrowRight,
+  ChevronDown,
+  ChevronUp,
   Pause,
   Play,
   RotateCcw,
+  Square,
   Volume2,
 } from 'lucide-react';
 import {
@@ -20,460 +23,219 @@ import { speakInstant, stopAllSpeech } from '../../../utils/englishAudio';
 
 type WorshipLabTab = 'wudu' | 'prayer' | 'hajj' | 'fasting-zakat';
 
-/* ---------- 1. ANIMATED WUDU SVG STAGE ---------- */
-function WuduSvgStage({ step, waterPhase }: { step: WuduStep; waterPhase: number }) {
-  const h = step.bodyHighlight;
-  const activeColor = '#0D9488';
-  const activeGlow = '#2DD4BF';
-  const idleStroke = '#64748B';
-  const dropOffset = (waterPhase % 24);
+const WUDU_ATHLETE_PHOTO = '/src/assets/images/wudu_athlete_fullbody_1795091471521.jpg';
 
-  const fillFor = (part: WuduStep['bodyHighlight']) =>
-    h === part ? 'rgba(13, 148, 136, 0.28)' : 'rgba(148, 163, 184, 0.14)';
-  const strokeFor = (part: WuduStep['bodyHighlight']) =>
-    h === part ? activeColor : idleStroke;
+const NAMAZ_POSTURE_PHOTOS: Record<
+  PrayerPostureStep['postureKey'],
+  { src: string; flipX?: boolean; caption: string }
+> = {
+  niyyah: {
+    src: '/src/assets/images/namaz_athlete_qawmah_1795091453974.jpg',
+    caption: 'Kıbleye yönelme ve niyet duruşu',
+  },
+  takbir: {
+    src: '/src/assets/images/namaz_athlete_takbir_1795091788958.jpg',
+    caption: 'İftitah tekbiri (Allâhu Ekber)',
+  },
+  qiyam: {
+    src: '/src/assets/images/namaz_athlete_qiyam_1795091452731.jpg',
+    flipX: true,
+    caption: 'Kıyam ve kıraat (eller bağlı)',
+  },
+  ruku: {
+    src: '/src/assets/images/namaz_athlete_ruku_1795091453221.jpg',
+    caption: 'Rükû (sırt düz, eller dizlerde)',
+  },
+  qawmah: {
+    src: '/src/assets/images/namaz_athlete_qawmah_1795091453974.jpg',
+    caption: 'Kavme (rükûdan tam doğrulma)',
+  },
+  sujud1: {
+    src: '/src/assets/images/namaz_athlete_sujud_1795091454999.jpg',
+    caption: 'Birinci secde',
+  },
+  jalsa: {
+    src: '/src/assets/images/namaz_athlete_tashahhud_1795091521021.jpg',
+    caption: 'Celse (iki secde arası oturuş)',
+  },
+  sujud2: {
+    src: '/src/assets/images/namaz_athlete_sujud_1795091454999.jpg',
+    caption: 'İkinci secde',
+  },
+  tashahhud: {
+    src: '/src/assets/images/namaz_athlete_tashahhud_1795091521021.jpg',
+    caption: 'Ka’de-i Âhire (son oturuş)',
+  },
+  salam: {
+    src: '/src/assets/images/namaz_athlete_tashahhud_1795091521021.jpg',
+    caption: 'Sağa ve sola selam verme',
+  },
+};
 
-  // Target coordinate for animated water droplets
-  const dropletTarget: Record<WuduStep['bodyHighlight'], { x: number; y: number }> = {
-    heart: { x: 180, y: 128 },
-    hands: { x: 112, y: 185 },
-    mouth: { x: 180, y: 78 },
-    nose: { x: 180, y: 69 },
-    face: { x: 180, y: 68 },
-    arms: { x: 120, y: 150 },
-    head: { x: 180, y: 40 },
-    ears: { x: 210, y: 66 },
-    feet: { x: 180, y: 274 },
-  };
-  const target = dropletTarget[h];
+/* Precision hotspot targets on 300x400 (3:4) full-body tracksuit athlete photo */
+interface HotspotPoint {
+  x: number;
+  y: number;
+  rx: number;
+  ry: number;
+}
 
+const WUDU_PHOTO_HOTSPOTS: Record<WuduStep['bodyHighlight'], HotspotPoint[]> = {
+  heart: [{ x: 154, y: 146, rx: 22, ry: 22 }],
+  hands: [
+    { x: 111, y: 226, rx: 18, ry: 22 },
+    { x: 193, y: 226, rx: 18, ry: 22 },
+  ],
+  mouth: [{ x: 151, y: 78, rx: 14, ry: 9 }],
+  nose: [{ x: 151, y: 68, rx: 11, ry: 11 }],
+  face: [{ x: 150, y: 70, rx: 25, ry: 29 }],
+  arms: [
+    { x: 110, y: 185, rx: 16, ry: 34 },
+    { x: 193, y: 185, rx: 16, ry: 34 },
+  ],
+  head: [{ x: 150, y: 46, rx: 32, ry: 17 }],
+  ears: [
+    { x: 132, y: 72, rx: 10, ry: 14 },
+    { x: 169, y: 72, rx: 10, ry: 14 },
+  ],
+  feet: [
+    { x: 122, y: 368, rx: 24, ry: 15 },
+    { x: 182, y: 368, rx: 24, ry: 15 },
+  ],
+};
+
+function StepProgressBar({ current, total }: { current: number; total: number }) {
+  const pct = Math.max(4, Math.min(100, (current / total) * 100));
   return (
     <svg
-      viewBox="0 0 360 320"
-      className="w-full h-[300px] sm:h-[330px] select-none"
-      role="img"
-      aria-label={`Abdest Adım ${step.stepNumber}: ${step.title}`}
+      viewBox="0 0 120 8"
+      className="w-36 sm:w-44 h-2.5 shrink-0"
+      role="progressbar"
+      aria-valuenow={current}
+      aria-valuemin={1}
+      aria-valuemax={total}
+      aria-label={`Adım ${current} / ${total}`}
     >
-      <defs>
-        <linearGradient id="wuduBg" x1="0" y1="0" x2="0" y2="1">
-          <stop offset="0%" stopColor="#0B1F3A" stopOpacity="0.06" />
-          <stop offset="100%" stopColor="#0D9488" stopOpacity="0.09" />
-        </linearGradient>
-      </defs>
-
-      <rect x="8" y="8" width="344" height="304" rx="14" fill="url(#wuduBg)" />
-
-      {/* Subtle architectural arch frame */}
-      <path
-        d="M 48 296 L 48 92 Q 180 12 312 92 L 312 296"
-        fill="none"
-        stroke="#C89B3C"
-        strokeOpacity="0.3"
-        strokeWidth="1.5"
-        strokeDasharray="4 4"
-      />
-
-      {/* Head & Hair (Mesh) */}
-      <path
-        d="M 155 56 Q 180 28 205 56"
-        fill={fillFor('head')}
-        stroke={strokeFor('head')}
-        strokeWidth={h === 'head' ? 3.5 : 2}
-      />
-
-      {/* Ears */}
-      <ellipse
-        cx="151"
-        cy="66"
-        rx="5"
-        ry="9"
-        fill={fillFor('ears')}
-        stroke={strokeFor('ears')}
-        strokeWidth={h === 'ears' ? 3 : 1.5}
-      />
-      <ellipse
-        cx="209"
-        cy="66"
-        rx="5"
-        ry="9"
-        fill={fillFor('ears')}
-        stroke={strokeFor('ears')}
-        strokeWidth={h === 'ears' ? 3 : 1.5}
-      />
-
-      {/* Face */}
-      <circle
-        cx="180"
-        cy="66"
-        r="26"
-        fill={fillFor('face')}
-        stroke={strokeFor('face')}
-        strokeWidth={h === 'face' ? 3.5 : 2}
-      />
-
-      {/* Nose */}
-      <path
-        d="M 180 61 L 177 70 L 183 70"
-        fill="none"
-        stroke={strokeFor('nose')}
-        strokeWidth={h === 'nose' ? 3 : 1.6}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Mouth */}
-      <path
-        d="M 171 78 Q 180 84 189 78"
-        fill="none"
-        stroke={strokeFor('mouth')}
-        strokeWidth={h === 'mouth' ? 3.2 : 1.6}
-        strokeLinecap="round"
-      />
-
-      {/* Torso */}
+      <rect x="0" y="0" width="120" height="8" rx="4" className="fill-slate-200 dark:fill-slate-800" />
       <rect
-        x="148"
-        y="98"
-        width="64"
-        height="96"
-        rx="22"
-        fill="rgba(148, 163, 184, 0.14)"
-        stroke={idleStroke}
-        strokeWidth="2"
+        x="0"
+        y="0"
+        width={(120 * pct) / 100}
+        height="8"
+        rx="4"
+        className="fill-teal-700 dark:fill-teal-500 transition-all duration-300"
       />
-
-      {/* Heart (Niyet) */}
-      <circle
-        cx="180"
-        cy="134"
-        r={h === 'heart' ? 14 : 9}
-        fill={h === 'heart' ? 'rgba(200, 155, 60, 0.35)' : 'rgba(148, 163, 184, 0.15)'}
-        stroke={h === 'heart' ? '#C89B3C' : 'transparent'}
-        strokeWidth="2.5"
-      />
-
-      {/* Arms (Dirseklerle beraber) */}
-      <path
-        d="M 148 112 L 116 154 L 112 184"
-        fill="none"
-        stroke={strokeFor('arms')}
-        strokeWidth={h === 'arms' ? 13 : 10}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-      <path
-        d="M 212 112 L 244 154 L 248 184"
-        fill="none"
-        stroke={strokeFor('arms')}
-        strokeWidth={h === 'arms' ? 13 : 10}
-        strokeLinecap="round"
-        strokeLinejoin="round"
-      />
-
-      {/* Hands */}
-      <circle
-        cx="112"
-        cy="190"
-        r="11"
-        fill={fillFor('hands')}
-        stroke={strokeFor('hands')}
-        strokeWidth={h === 'hands' ? 3.5 : 2}
-      />
-      <circle
-        cx="248"
-        cy="190"
-        r="11"
-        fill={fillFor('hands')}
-        stroke={strokeFor('hands')}
-        strokeWidth={h === 'hands' ? 3.5 : 2}
-      />
-
-      {/* Legs */}
-      <line x1="164" y1="194" x2="160" y2="262" stroke={idleStroke} strokeWidth="11" strokeLinecap="round" />
-      <line x1="196" y1="194" x2="200" y2="262" stroke={idleStroke} strokeWidth="11" strokeLinecap="round" />
-
-      {/* Feet (Topuklarla beraber) */}
-      <ellipse
-        cx="154"
-        cy="274"
-        rx="18"
-        ry="10"
-        fill={fillFor('feet')}
-        stroke={strokeFor('feet')}
-        strokeWidth={h === 'feet' ? 3.5 : 2}
-      />
-      <ellipse
-        cx="206"
-        cy="274"
-        rx="18"
-        ry="10"
-        fill={fillFor('feet')}
-        stroke={strokeFor('feet')}
-        strokeWidth={h === 'feet' ? 3.5 : 2}
-      />
-
-      {/* Animated water ripples & droplets around active area */}
-      <g>
-        <circle
-          cx={target.x}
-          cy={target.y}
-          r={18 + (waterPhase % 14)}
-          fill="none"
-          stroke={h === 'heart' ? '#C89B3C' : activeGlow}
-          strokeOpacity={Math.max(0.15, 0.85 - (waterPhase % 14) / 16)}
-          strokeWidth="2"
-        />
-        {h !== 'heart' && (
-          <>
-            <path
-              d={`M ${target.x - 16} ${target.y - 26 + dropOffset * 0.7} q 4 7 0 11 q -4 -4 0 -11`}
-              fill="#0EA5E9"
-              opacity="0.85"
-            />
-            <path
-              d={`M ${target.x + 18} ${target.y - 22 + ((dropOffset + 10) % 24) * 0.7} q 4 7 0 11 q -4 -4 0 -11`}
-              fill="#0284C7"
-              opacity="0.85"
-            />
-          </>
-        )}
-      </g>
-
-      {/* Bottom Step Label */}
-      <text
-        x="180"
-        y="303"
-        textAnchor="middle"
-        className="fill-slate-600 dark:fill-slate-300 text-[11px] font-medium"
-      >
-        Adım {step.stepNumber}/9 · {step.ruleType} · {step.repeatCount} Kez
-      </text>
     </svg>
   );
 }
 
-/* ---------- 2. ARTICULATED NAMAZ POSTURE SVG STAGE ---------- */
-interface FigureCoords {
-  head: [number, number];
-  shoulder: [number, number];
-  hip: [number, number];
-  knee: [number, number];
-  foot: [number, number];
-  elbow: [number, number];
-  hand: [number, number];
-  label: string;
-}
-
-const POSTURE_MAP: Record<PrayerPostureStep['postureKey'], FigureCoords> = {
-  niyyah: {
-    head: [190, 68],
-    shoulder: [190, 96],
-    hip: [190, 166],
-    knee: [190, 218],
-    foot: [184, 268],
-    elbow: [186, 134],
-    hand: [182, 164],
-    label: 'Kıbleye Yönelme ve Niyet',
-  },
-  takbir: {
-    head: [190, 68],
-    shoulder: [190, 96],
-    hip: [190, 166],
-    knee: [190, 218],
-    foot: [184, 268],
-    elbow: [162, 114],
-    hand: [168, 76],
-    label: 'İftitah Tekbiri (Allâhu Ekber)',
-  },
-  qiyam: {
-    head: [190, 68],
-    shoulder: [190, 96],
-    hip: [190, 166],
-    knee: [190, 218],
-    foot: [184, 268],
-    elbow: [176, 132],
-    hand: [164, 146],
-    label: 'Kıyam ve Kıraat (Eller Bağlı)',
-  },
-  ruku: {
-    head: [118, 146],
-    shoulder: [144, 150],
-    hip: [204, 152],
-    knee: [198, 214],
-    foot: [194, 268],
-    elbow: [166, 184],
-    hand: [194, 212],
-    label: 'Rükû (Sırt Düz, Eller Dizlerde)',
-  },
-  qawmah: {
-    head: [190, 68],
-    shoulder: [190, 96],
-    hip: [190, 166],
-    knee: [190, 218],
-    foot: [184, 268],
-    elbow: [192, 134],
-    hand: [192, 166],
-    label: 'Kavme (Rükûdan Tam Doğrulma)',
-  },
-  sujud1: {
-    head: [108, 254],
-    shoulder: [138, 232],
-    hip: [192, 198],
-    knee: [198, 264],
-    foot: [244, 264],
-    elbow: [132, 256],
-    hand: [118, 266],
-    label: '1. Secde (Alın, Burun, Eller, Dizler Yerde)',
-  },
-  jalsa: {
-    head: [186, 148],
-    shoulder: [186, 174],
-    hip: [196, 234],
-    knee: [152, 262],
-    foot: [232, 266],
-    elbow: [176, 212],
-    hand: [158, 246],
-    label: 'Celse (İki Secde Arası Oturuş)',
-  },
-  sujud2: {
-    head: [108, 254],
-    shoulder: [138, 232],
-    hip: [192, 198],
-    knee: [198, 264],
-    foot: [244, 264],
-    elbow: [132, 256],
-    hand: [118, 266],
-    label: '2. Secde (Sübhâne Rabbiye’l-A’lâ)',
-  },
-  tashahhud: {
-    head: [186, 148],
-    shoulder: [186, 174],
-    hip: [196, 234],
-    knee: [152, 262],
-    foot: [232, 266],
-    elbow: [176, 212],
-    hand: [156, 248],
-    label: 'Ka’de-i Âhire (Ettehiyyâtü & Dualar)',
-  },
-  salam: {
-    head: [186, 148],
-    shoulder: [186, 174],
-    hip: [196, 234],
-    knee: [152, 262],
-    foot: [232, 266],
-    elbow: [176, 212],
-    hand: [156, 248],
-    label: 'Sağa ve Sola Selam',
-  },
-};
-
-function PrayerPostureSvg({ step }: { step: PrayerPostureStep }) {
-  const c = POSTURE_MAP[step.postureKey];
+/* ---------- 1. PHOTOREALISTIC FULL-BODY WUDU STAGE ---------- */
+function WuduPhotoStage({ step, waterPhase }: { step: WuduStep; waterPhase: number }) {
+  const hotspots = WUDU_PHOTO_HOTSPOTS[step.bodyHighlight];
+  const isHeart = step.bodyHighlight === 'heart';
+  const dropOffset = waterPhase % 24;
+  const rippleExpand = waterPhase % 14;
 
   return (
-    <svg
-      viewBox="0 0 360 310"
-      className="w-full h-[290px] sm:h-[320px] select-none"
-      role="img"
-      aria-label={`Namaz Duruşu: ${step.title}`}
-    >
-      <rect x="8" y="8" width="344" height="294" rx="14" fill="rgba(11, 31, 58, 0.04)" />
-
-      {/* Qibla direction arrow on left */}
-      <g opacity="0.75">
-        <line x1="68" y1="42" x2="36" y2="42" stroke="#C89B3C" strokeWidth="2" />
-        <polyline points="44,36 36,42 44,48" fill="none" stroke="#C89B3C" strokeWidth="2" />
-        <text x="76" y="46" className="fill-slate-500 dark:fill-slate-400 text-[10px] font-medium">
-          Kıble Yönü
-        </text>
-      </g>
-
-      {/* Prayer Mat (Seccade) */}
-      <rect x="52" y="268" width="256" height="10" rx="5" fill="#0D9488" fillOpacity="0.85" />
-      <rect x="56" y="271" width="248" height="4" rx="2" fill="#C89B3C" fillOpacity="0.65" />
-
-      {/* Articulated Silhouette with smooth transitions */}
-      <g strokeLinecap="round" strokeLinejoin="round">
-        {/* Back leg / Shin */}
-        <line
-          x1={c.hip[0]}
-          y1={c.hip[1]}
-          x2={c.knee[0]}
-          y2={c.knee[1]}
-          stroke="#0B1F3A"
-          className="dark:stroke-slate-200 transition-all duration-500"
-          strokeWidth="12"
-        />
-        <line
-          x1={c.knee[0]}
-          y1={c.knee[1]}
-          x2={c.foot[0]}
-          y2={c.foot[1]}
-          stroke="#0B1F3A"
-          className="dark:stroke-slate-200 transition-all duration-500"
-          strokeWidth="11"
+    <div className="rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-stone-100 dark:bg-slate-950 max-w-[380px] mx-auto w-full">
+      <div className="relative aspect-[3/4] w-full overflow-hidden">
+        <img
+          src={WUDU_ATHLETE_PHOTO}
+          alt={`Abdest Adım ${step.stepNumber}: ${step.title}`}
+          referrerPolicy="no-referrer"
+          className="w-full h-full object-cover object-center select-none"
         />
 
-        {/* Torso */}
-        <line
-          x1={c.shoulder[0]}
-          y1={c.shoulder[1]}
-          x2={c.hip[0]}
-          y2={c.hip[1]}
-          stroke="#0D9488"
-          className="transition-all duration-500"
-          strokeWidth="18"
+        {/* Animated anatomical highlight & water droplets overlay */}
+        <svg
+          viewBox="0 0 300 400"
+          className="absolute inset-0 w-full h-full pointer-events-none select-none"
+          aria-hidden="true"
+        >
+          {hotspots.map((pt, idx) => (
+            <g key={idx}>
+              {/* Outer expanding ripple */}
+              <ellipse
+                cx={pt.x}
+                cy={pt.y}
+                rx={pt.rx + rippleExpand * 0.9}
+                ry={pt.ry + rippleExpand * 0.9}
+                fill="none"
+                stroke={isHeart ? '#C89B3C' : '#38BDF8'}
+                strokeWidth="2"
+                strokeOpacity={Math.max(0.12, 0.85 - rippleExpand / 16)}
+              />
+              {/* Main glowing highlight ring */}
+              <ellipse
+                cx={pt.x}
+                cy={pt.y}
+                rx={pt.rx}
+                ry={pt.ry}
+                fill={isHeart ? 'rgba(200, 155, 60, 0.24)' : 'rgba(14, 165, 233, 0.24)'}
+                stroke={isHeart ? '#F59E0B' : '#0284C7'}
+                strokeWidth="2.8"
+              />
+              {/* Animated water droplets (for washing / wiping steps) */}
+              {!isHeart && (
+                <>
+                  <path
+                    d={`M ${pt.x - pt.rx * 0.65} ${pt.y - pt.ry - 8 + dropOffset * 0.85} q 4 7 0 11 q -4 -4 0 -11`}
+                    fill="#38BDF8"
+                    stroke="#FFFFFF"
+                    strokeWidth="0.9"
+                  />
+                  <path
+                    d={`M ${pt.x + pt.rx * 0.65} ${pt.y - pt.ry - 4 + ((dropOffset + 12) % 24) * 0.85} q 4 7 0 11 q -4 -4 0 -11`}
+                    fill="#0284C7"
+                    stroke="#FFFFFF"
+                    strokeWidth="0.9"
+                  />
+                </>
+              )}
+            </g>
+          ))}
+        </svg>
+      </div>
+      <div className="px-4 py-2 text-center bg-stone-100/95 dark:bg-slate-900/95 border-t border-slate-200/70 dark:border-slate-800">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+          Yapay zekâyla oluşturulmuş temsili görsel
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/* ---------- 2. PHOTOREALISTIC NAMAZ POSTURE STAGE ---------- */
+function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
+  const photo = NAMAZ_POSTURE_PHOTOS[step.postureKey];
+
+  return (
+    <div className="rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-stone-100 dark:bg-slate-950 max-w-[380px] mx-auto w-full">
+      <div className="relative aspect-[3/4] w-full overflow-hidden">
+        <img
+          src={photo.src}
+          alt={`Namaz Adım ${step.stepNumber}: ${step.title} — ${photo.caption}`}
+          referrerPolicy="no-referrer"
+          className={`w-full h-full object-cover object-center select-none transition-opacity duration-300 ${
+            photo.flipX ? '-scale-x-100' : ''
+          }`}
         />
 
-        {/* Arm */}
-        <line
-          x1={c.shoulder[0]}
-          y1={c.shoulder[1]}
-          x2={c.elbow[0]}
-          y2={c.elbow[1]}
-          stroke="#C89B3C"
-          className="transition-all duration-500"
-          strokeWidth="9"
-        />
-        <line
-          x1={c.elbow[0]}
-          y1={c.elbow[1]}
-          x2={c.hand[0]}
-          y2={c.hand[1]}
-          stroke="#C89B3C"
-          className="transition-all duration-500"
-          strokeWidth="8"
-        />
-
-        {/* Head */}
-        <circle
-          cx={c.head[0]}
-          cy={c.head[1]}
-          r="17"
-          fill="#0B1F3A"
-          className="dark:fill-slate-100 transition-all duration-500"
-        />
-
-        {/* Salam directional cue */}
+        {/* Subtle directional guide overlay only on Salam step */}
         {step.postureKey === 'salam' && (
-          <g>
-            <path d="M 162 132 Q 186 116 210 132" fill="none" stroke="#C89B3C" strokeWidth="2.5" strokeDasharray="3 3" />
-            <text x="186" y="112" textAnchor="middle" className="fill-gold-600 dark:fill-gold-400 text-[10px] font-semibold">
-              Sağa ve Sola Selam
-            </text>
-          </g>
+          <div className="absolute top-3 inset-x-3 flex justify-center pointer-events-none">
+            <span className="px-3 py-1 rounded-lg bg-navy-900/85 text-white text-xs font-medium shadow-xs">
+              Önce Sağ Omuza, Sonra Sol Omuza Selam
+            </span>
+          </div>
         )}
-      </g>
-
-      <text
-        x="180"
-        y="296"
-        textAnchor="middle"
-        className="fill-slate-600 dark:fill-slate-300 text-[11px] font-medium"
-      >
-        {c.label}
-      </text>
-    </svg>
+      </div>
+      <div className="px-4 py-2 text-center bg-stone-100/95 dark:bg-slate-900/95 border-t border-slate-200/70 dark:border-slate-800">
+        <p className="text-[11px] text-slate-600 dark:text-slate-400">
+          Yapay zekâyla oluşturulmuş temsili görsel
+        </p>
+      </div>
+    </div>
   );
 }
 
@@ -483,7 +245,7 @@ function HajjTawafSvg({ angleDeg, shawt }: { angleDeg: number; shawt: number }) 
   // Counter-clockwise orbit around Kaaba (cx=180, cy=135, r=76)
   const px = 180 + Math.cos(-rad) * 76;
   const py = 135 + Math.sin(-rad) * 76;
-  const sayProgress = ((angleDeg % 360) / 360);
+  const sayProgress = (angleDeg % 360) / 360;
   const sayX = 76 + (shawt % 2 === 1 ? sayProgress : 1 - sayProgress) * 208;
 
   return (
@@ -542,17 +304,21 @@ function HajjTawafSvg({ angleDeg, shawt }: { angleDeg: number; shawt: number }) 
 }
 
 /* ---------- MAIN WORSHIP ANIMATIONS LAB ---------- */
-export function WorshipAnimationsLab() {
+export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => void }) {
   const [activeLab, setActiveLab] = useState<WorshipLabTab>('wudu');
 
   // Wudu state
   const [wuduIdx, setWuduIdx] = useState(0);
-  const [wuduPlaying, setWuduPlaying] = useState(true);
+  const [wuduNarrationActive, setWuduNarrationActive] = useState(false);
+  const [showAllWuduSteps, setShowAllWuduSteps] = useState(false);
   const [waterPhase, setWaterPhase] = useState(0);
+  const wuduNarrateCancelRef = useRef(false);
 
   // Prayer state
   const [prayerIdx, setPrayerIdx] = useState(0);
-  const [prayerPlaying, setPrayerPlaying] = useState(false);
+  const [prayerNarrationActive, setPrayerNarrationActive] = useState(false);
+  const [showAllPrayerSteps, setShowAllPrayerSteps] = useState(false);
+  const prayerNarrateCancelRef = useRef(false);
 
   // Hajj state
   const [hajjStageIdx, setHajjStageIdx] = useState(4);
@@ -578,25 +344,85 @@ export function WorshipAnimationsLab() {
     return undefined;
   }, [activeLab, tawafPlaying]);
 
-  // Auto-advance Wudu steps when playing
-  useEffect(() => {
-    if (activeLab !== 'wudu' || !wuduPlaying) return undefined;
-    const id = window.setInterval(() => {
-      setWuduIdx((i) => (i + 1) % WUDU_STEPS.length);
-    }, 3600);
-    return () => window.clearInterval(id);
-  }, [activeLab, wuduPlaying]);
+  const stopAllGuidedNarration = () => {
+    wuduNarrateCancelRef.current = true;
+    prayerNarrateCancelRef.current = true;
+    setWuduNarrationActive(false);
+    setPrayerNarrationActive(false);
+    stopAllSpeech();
+  };
 
-  // Auto-advance Prayer steps when playing
-  useEffect(() => {
-    if (activeLab !== 'prayer' || !prayerPlaying) return undefined;
-    const id = window.setInterval(() => {
-      setPrayerIdx((i) => (i + 1) % PRAYER_POSTURE_STEPS.length);
-    }, 3400);
-    return () => window.clearInterval(id);
-  }, [activeLab, prayerPlaying]);
+  useEffect(() => () => stopAllGuidedNarration(), []);
 
-  useEffect(() => () => stopAllSpeech(), []);
+  const handleListenAllWudu = () => {
+    if (wuduNarrationActive) {
+      stopAllGuidedNarration();
+      return;
+    }
+    stopAllGuidedNarration();
+    wuduNarrateCancelRef.current = false;
+    setWuduNarrationActive(true);
+
+    const runStep = (idx: number) => {
+      if (wuduNarrateCancelRef.current || idx >= WUDU_STEPS.length) {
+        setWuduNarrationActive(false);
+        return;
+      }
+      setWuduIdx(idx);
+      const st = WUDU_STEPS[idx];
+      const ok = speakInstant(
+        `Adım ${st.stepNumber}. ${st.title}. ${st.description}`,
+        {
+          lang: 'tr-TR',
+          rate: 0.94,
+          onEnd: () => {
+            if (!wuduNarrateCancelRef.current) {
+              window.setTimeout(() => runStep(idx + 1), 500);
+            }
+          },
+        }
+      );
+      if (!ok) {
+        setWuduNarrationActive(false);
+      }
+    };
+    runStep(0);
+  };
+
+  const handleListenAllPrayer = () => {
+    if (prayerNarrationActive) {
+      stopAllGuidedNarration();
+      return;
+    }
+    stopAllGuidedNarration();
+    prayerNarrateCancelRef.current = false;
+    setPrayerNarrationActive(true);
+
+    const runStep = (idx: number) => {
+      if (prayerNarrateCancelRef.current || idx >= PRAYER_POSTURE_STEPS.length) {
+        setPrayerNarrationActive(false);
+        return;
+      }
+      setPrayerIdx(idx);
+      const st = PRAYER_POSTURE_STEPS[idx];
+      const ok = speakInstant(
+        `Adım ${st.stepNumber}. ${st.title}. ${st.howToPerform} Okunuşu: ${st.recitationTr}`,
+        {
+          lang: 'tr-TR',
+          rate: 0.94,
+          onEnd: () => {
+            if (!prayerNarrateCancelRef.current) {
+              window.setTimeout(() => runStep(idx + 1), 600);
+            }
+          },
+        }
+      );
+      if (!ok) {
+        setPrayerNarrationActive(false);
+      }
+    };
+    runStep(0);
+  };
 
   const currentWudu = WUDU_STEPS[wuduIdx];
   const currentPrayer = PRAYER_POSTURE_STEPS[prayerIdx];
@@ -649,10 +475,11 @@ export function WorshipAnimationsLab() {
   // Sun/Moon arc coordinates for fasting diagram
   const sunProgress = Math.max(0, Math.min(1, (hourOfDay - 4.5) / (19.75 - 4.5)));
   const isDay = hourOfDay >= 4.5 && hourOfDay <= 19.75;
-  const celestialX = 44 + (isDay ? sunProgress : (hourOfDay < 4.5 ? hourOfDay / 4.5 : (hourOfDay - 19.75) / 4.25)) * 272;
+  const celestialX =
+    44 + (isDay ? sunProgress : hourOfDay < 4.5 ? hourOfDay / 4.5 : (hourOfDay - 19.75) / 4.25) * 272;
   const celestialY = isDay
     ? 175 - Math.sin(sunProgress * Math.PI) * 115
-    : 120 - Math.sin(((hourOfDay < 4.5 ? hourOfDay / 4.5 : (hourOfDay - 19.75) / 4.25)) * Math.PI) * 50;
+    : 120 - Math.sin((hourOfDay < 4.5 ? hourOfDay / 4.5 : (hourOfDay - 19.75) / 4.25) * Math.PI) * 50;
 
   return (
     <div className="space-y-6">
@@ -660,8 +487,8 @@ export function WorshipAnimationsLab() {
       <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 w-fit">
         {(
           [
-            { id: 'wudu', label: 'Abdest Animasyonu (9 Adım)' },
-            { id: 'prayer', label: 'Namaz Hareketleri (10 Aşama)' },
+            { id: 'wudu', label: 'Abdest Rehberi (9 Adım)' },
+            { id: 'prayer', label: 'Namaz Rehberi (10 Aşama)' },
             { id: 'hajj', label: 'Hac & Kâbe Tavaf Animasyonu' },
             { id: 'fasting-zakat', label: 'Oruç Döngüsü & Zekât Hesaplayıcı' },
           ] as { id: WorshipLabTab; label: string }[]
@@ -669,7 +496,10 @@ export function WorshipAnimationsLab() {
           <button
             key={tab.id}
             type="button"
-            onClick={() => setActiveLab(tab.id)}
+            onClick={() => {
+              stopAllGuidedNarration();
+              setActiveLab(tab.id);
+            }}
             className={`px-3.5 py-2 text-xs font-medium rounded-lg transition-colors whitespace-nowrap cursor-pointer ${
               activeLab === tab.id
                 ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
@@ -681,265 +511,319 @@ export function WorshipAnimationsLab() {
         ))}
       </div>
 
-      {/* 1. WUDU ANIMATION LAB */}
+      {/* 1. WUDU STEP-BY-STEP PHOTO GUIDE */}
       {activeLab === 'wudu' && (
-        <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-          {/* Interactive Stage */}
-          <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <div>
-                <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
-                  Abdest Rehberi · 4 Farz + 5 Sünnet Aşaması
-                </p>
-                <h2 className="text-lg font-semibold text-navy-900 dark:text-white">
-                  {currentWudu.stepNumber}. {currentWudu.title}
-                </h2>
-              </div>
-              <div className="flex items-center gap-1.5">
-                <button
-                  type="button"
-                  onClick={() => setWuduPlaying((p) => !p)}
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
-                >
-                  {wuduPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                  <span>{wuduPlaying ? 'Duraklat' : 'Oynat'}</span>
-                </button>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setWuduPlaying(false);
-                    setWuduIdx(0);
-                  }}
-                  aria-label="Başa dön"
-                  className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                >
-                  <RotateCcw className="w-3.5 h-3.5" />
-                </button>
-              </div>
-            </div>
-
-            <WuduSvgStage step={currentWudu} waterPhase={waterPhase} />
-
-            {/* Step Controls */}
-            <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-              <button
-                type="button"
-                onClick={() => {
-                  setWuduPlaying(false);
-                  setWuduIdx((i) => (i - 1 + WUDU_STEPS.length) % WUDU_STEPS.length);
-                }}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer whitespace-nowrap"
-              >
-                <ChevronLeft className="w-3.5 h-3.5" />
-                <span>Önceki Adım</span>
-              </button>
-              <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                Adım {currentWudu.stepNumber} / {WUDU_STEPS.length}
-              </span>
-              <button
-                type="button"
-                onClick={() => {
-                  setWuduPlaying(false);
-                  setWuduIdx((i) => (i + 1) % WUDU_STEPS.length);
-                }}
-                className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
-              >
-                <span>Sonraki Adım</span>
-                <ChevronRight className="w-3.5 h-3.5" />
-              </button>
-            </div>
+        <section className="max-w-4xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-7 space-y-6">
+          {/* Top Step Counter & Progress Bar */}
+          <div className="flex items-center justify-between gap-4">
+            <span className="text-sm font-semibold text-teal-800 dark:text-teal-400 font-mono tabular-nums">
+              Adım {currentWudu.stepNumber} / {WUDU_STEPS.length}
+            </span>
+            <StepProgressBar current={currentWudu.stepNumber} total={WUDU_STEPS.length} />
           </div>
 
-          {/* Control & Concept Deck */}
-          <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-5">
-            <div className="space-y-2">
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Hüküm:{' '}
-                <strong
-                  className={
-                    currentWudu.ruleType === 'Farz'
-                      ? 'text-amber-700 dark:text-gold-400'
-                      : 'text-teal-700 dark:text-teal-400'
-                  }
-                >
-                  {currentWudu.ruleType}
-                </strong>{' '}
-                · Tekrar: <strong className="font-mono tabular-nums">{currentWudu.repeatCount} kez</strong> ·{' '}
-                {currentWudu.arabicOrShort}
-              </p>
-              <p className="text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
-                {currentWudu.description}
-              </p>
-              <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed pt-1">
-                <strong>Not:</strong> {currentWudu.duaOrNote}
-              </p>
-              <button
-                type="button"
-                onClick={() =>
-                  speakInstant(`${currentWudu.title}. ${currentWudu.description}`, { lang: 'tr-TR', rate: 0.95 })
-                }
-                className="inline-flex items-center gap-1.5 px-3 py-1.5 mt-1 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer whitespace-nowrap"
-              >
-                <Volume2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-                <span>Bu Adımı Sesli Dinle</span>
-              </button>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Photorealistic Full-Body Athlete Stage */}
+            <div className="lg:col-span-6">
+              <WuduPhotoStage step={currentWudu} waterPhase={waterPhase} />
             </div>
 
-            <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-1.5">
-              <p className="text-xs font-semibold text-navy-900 dark:text-white mb-2">
-                Tüm Abdest Adımları
-              </p>
-              {WUDU_STEPS.map((st, idx) => (
+            {/* Clean Step Card matching Screenshots */}
+            <div className="lg:col-span-6 flex flex-col justify-between space-y-5">
+              <div className="space-y-3">
+                <p className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+                  Abdest · {currentWudu.ruleType} · {currentWudu.repeatCount} Kez
+                </p>
+                <h2 className="text-2xl sm:text-3xl font-bold text-navy-900 dark:text-white tracking-tight">
+                  {currentWudu.title}
+                </h2>
+                <p className="text-sm sm:text-[15px] text-slate-700 dark:text-slate-200 leading-relaxed">
+                  {currentWudu.description}
+                </p>
+                <p className="text-sm font-semibold text-navy-900 dark:text-slate-100 leading-relaxed">
+                  {currentWudu.duaOrNote}
+                </p>
+
+                <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700">
+                  <p className="text-sm font-semibold text-teal-900 dark:text-teal-300">
+                    {currentWudu.arabicOrShort}
+                  </p>
+                </div>
+              </div>
+
+              {/* Audio Action Row */}
+              <div className="flex flex-wrap items-center gap-2.5">
                 <button
-                  key={st.stepNumber}
                   type="button"
                   onClick={() => {
-                    setWuduPlaying(false);
-                    setWuduIdx(idx);
+                    stopAllGuidedNarration();
+                    speakInstant(
+                      `${currentWudu.title}. ${currentWudu.description} ${currentWudu.duaOrNote}`,
+                      { lang: 'tr-TR', rate: 0.94 }
+                    );
                   }}
-                  className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
-                    idx === wuduIdx
-                      ? 'bg-navy-900 text-white dark:bg-teal-600'
-                      : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer whitespace-nowrap"
+                >
+                  <Volume2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                  <span>Adımı dinle</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={handleListenAllWudu}
+                  className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                    wuduNarrationActive
+                      ? 'bg-teal-700 text-white hover:bg-teal-800'
+                      : 'bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700'
                   }`}
                 >
-                  <span className="truncate">
-                    <span className="font-mono tabular-nums mr-1.5">{st.stepNumber}.</span>
-                    {st.title}
-                  </span>
-                  <span
-                    className={`text-[11px] font-medium shrink-0 ${
-                      idx === wuduIdx
-                        ? 'text-gold-300 dark:text-white/90'
-                        : st.ruleType === 'Farz'
-                          ? 'text-amber-700 dark:text-gold-400'
-                          : 'text-slate-400 dark:text-slate-500'
-                    }`}
-                  >
-                    {st.ruleType}
-                  </span>
+                  {wuduNarrationActive ? (
+                    <>
+                      <Square className="w-3.5 h-3.5" />
+                      <span>Dinlemeyi durdur</span>
+                    </>
+                  ) : (
+                    <>
+                      <Play className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+                      <span>Baştan sona dinle</span>
+                    </>
+                  )}
                 </button>
-              ))}
+              </div>
+
+              {/* Prev / Next Navigation Row */}
+              <div className="flex items-center justify-between gap-3 pt-2">
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopAllGuidedNarration();
+                    setWuduIdx((i) => (i - 1 + WUDU_STEPS.length) % WUDU_STEPS.length);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer whitespace-nowrap"
+                >
+                  <ArrowLeft className="w-4 h-4" />
+                  <span>Önceki</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => {
+                    stopAllGuidedNarration();
+                    setWuduIdx((i) => (i + 1) % WUDU_STEPS.length);
+                  }}
+                  className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
+                >
+                  <span>Sonraki</span>
+                  <ArrowRight className="w-4 h-4" />
+                </button>
+              </div>
+
+              {/* Collapsible All Steps List */}
+              <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                <button
+                  type="button"
+                  onClick={() => setShowAllWuduSteps((v) => !v)}
+                  className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-semibold text-navy-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                >
+                  <span>Tüm adımları göster ({WUDU_STEPS.length})</span>
+                  {showAllWuduSteps ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                </button>
+
+                {showAllWuduSteps && (
+                  <div className="mt-2 space-y-1">
+                    {WUDU_STEPS.map((st, idx) => (
+                      <button
+                        key={st.stepNumber}
+                        type="button"
+                        onClick={() => {
+                          stopAllGuidedNarration();
+                          setWuduIdx(idx);
+                        }}
+                        className={`w-full text-left px-3 py-2 rounded-lg text-xs flex items-center justify-between gap-2 transition-colors cursor-pointer ${
+                          idx === wuduIdx
+                            ? 'bg-navy-900 text-white dark:bg-teal-600'
+                            : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                        }`}
+                      >
+                        <span className="truncate">
+                          <span className="font-mono tabular-nums mr-1.5">{st.stepNumber}.</span>
+                          {st.title}
+                        </span>
+                        <span
+                          className={`text-[11px] font-medium shrink-0 ${
+                            idx === wuduIdx
+                              ? 'text-gold-300 dark:text-white/90'
+                              : st.ruleType === 'Farz'
+                                ? 'text-amber-700 dark:text-gold-400'
+                                : 'text-slate-400 dark:text-slate-500'
+                          }`}
+                        >
+                          {st.ruleType}
+                        </span>
+                      </button>
+                    ))}
+                  </div>
+                )}
+              </div>
             </div>
           </div>
         </section>
       )}
 
-      {/* 2. PRAYER POSTURES ANIMATION + DAILY TABLE */}
+      {/* 2. PRAYER POSTURES STEP-BY-STEP PHOTO GUIDE + DAILY TABLE */}
       {activeLab === 'prayer' && (
         <div className="space-y-6">
-          <section className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
-              <div className="flex flex-wrap items-center justify-between gap-2">
-                <div>
-                  <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
-                    Canlı Rekat Simülasyonu · Namazın Rükünleri
-                  </p>
-                  <h2 className="text-lg font-semibold text-navy-900 dark:text-white">
-                    {currentPrayer.stepNumber}. {currentPrayer.title}
-                  </h2>
-                </div>
-                <div className="flex items-center gap-1.5">
-                  <button
-                    type="button"
-                    onClick={() => setPrayerPlaying((p) => !p)}
-                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
-                  >
-                    {prayerPlaying ? <Pause className="w-3.5 h-3.5" /> : <Play className="w-3.5 h-3.5" />}
-                    <span>{prayerPlaying ? 'Duraklat' : 'Otomatik Oynat'}</span>
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setPrayerPlaying(false);
-                      setPrayerIdx(0);
-                    }}
-                    aria-label="Başa dön"
-                    className="p-2 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                  >
-                    <RotateCcw className="w-3.5 h-3.5" />
-                  </button>
-                </div>
-              </div>
-
-              <PrayerPostureSvg step={currentPrayer} />
-
-              <div className="flex items-center justify-between gap-3 pt-2 border-t border-slate-100 dark:border-slate-800">
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPrayerPlaying(false);
-                    setPrayerIdx((i) => (i - 1 + PRAYER_POSTURE_STEPS.length) % PRAYER_POSTURE_STEPS.length);
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 cursor-pointer whitespace-nowrap"
-                >
-                  <ChevronLeft className="w-3.5 h-3.5" />
-                  <span>Önceki Hareket</span>
-                </button>
-                <span className="text-xs font-mono tabular-nums text-slate-500 dark:text-slate-400">
-                  Aşama {currentPrayer.stepNumber} / {PRAYER_POSTURE_STEPS.length}
-                </span>
-                <button
-                  type="button"
-                  onClick={() => {
-                    setPrayerPlaying(false);
-                    setPrayerIdx((i) => (i + 1) % PRAYER_POSTURE_STEPS.length);
-                  }}
-                  className="inline-flex items-center gap-1 px-3 py-1.5 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
-                >
-                  <span>Sonraki Hareket</span>
-                  <ChevronRight className="w-3.5 h-3.5" />
-                </button>
-              </div>
+          <section className="max-w-4xl mx-auto bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-2xl p-5 sm:p-7 space-y-6">
+            {/* Top Step Counter & Progress Bar */}
+            <div className="flex items-center justify-between gap-4">
+              <span className="text-sm font-semibold text-teal-800 dark:text-teal-400 font-mono tabular-nums">
+                Adım {currentPrayer.stepNumber} / {PRAYER_POSTURE_STEPS.length}
+              </span>
+              <StepProgressBar current={currentPrayer.stepNumber} total={PRAYER_POSTURE_STEPS.length} />
             </div>
 
-            <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
-              <div className="space-y-2">
-                <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Hüküm: <strong className="text-teal-700 dark:text-teal-400">{currentPrayer.ruleType}</strong>
-                </p>
-                <div className="p-3.5 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-1">
-                  <p className="text-xs font-semibold text-navy-900 dark:text-white">Okunan Tesbih / Dua</p>
-                  <p className="text-sm font-medium text-teal-800 dark:text-teal-300">{currentPrayer.recitationTr}</p>
-                  <p className="text-xs text-slate-600 dark:text-slate-400">Anlamı: {currentPrayer.meaningTr}</p>
-                </div>
-                <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-300 leading-relaxed">
-                  {currentPrayer.howToPerform}
-                </p>
-                <button
-                  type="button"
-                  onClick={() =>
-                    speakInstant(
-                      `${currentPrayer.title}. ${currentPrayer.howToPerform} Okunuşu: ${currentPrayer.recitationTr}`,
-                      { lang: 'tr-TR', rate: 0.95 }
-                    )
-                  }
-                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer whitespace-nowrap"
-                >
-                  <Volume2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-                  <span>Anlatımı Sesli Dinle</span>
-                </button>
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Photorealistic Namaz Posture Image */}
+              <div className="lg:col-span-6">
+                <PrayerPhotoStage step={currentPrayer} />
               </div>
 
-              <div className="pt-3 border-t border-slate-100 dark:border-slate-800 grid grid-cols-2 gap-1.5">
-                {PRAYER_POSTURE_STEPS.map((st, idx) => (
+              {/* Clean Step Card matching Screenshots */}
+              <div className="lg:col-span-6 flex flex-col justify-between space-y-5">
+                <div className="space-y-3">
+                  <p className="text-xs font-semibold text-teal-700 dark:text-teal-400">
+                    1. Rekat &amp; Namazın Rükünleri · {currentPrayer.ruleType}
+                  </p>
+                  <h2 className="text-2xl sm:text-3xl font-bold text-navy-900 dark:text-white tracking-tight">
+                    {currentPrayer.title}
+                  </h2>
+                  <p className="text-sm sm:text-[15px] text-slate-700 dark:text-slate-200 leading-relaxed">
+                    {currentPrayer.howToPerform}
+                  </p>
+
+                  {/* Recitation Box */}
+                  <div className="p-3.5 rounded-xl bg-slate-100/90 dark:bg-slate-800/80 border border-slate-200/70 dark:border-slate-700 space-y-1">
+                    <p className="text-sm font-semibold text-teal-900 dark:text-teal-300">
+                      {currentPrayer.recitationTr}
+                    </p>
+                    <p className="text-xs text-slate-600 dark:text-slate-400">
+                      Anlamı: {currentPrayer.meaningTr}
+                    </p>
+                  </div>
+
+                  {/* Direct "Sureleri aç ->" shortcut on Qiyam & Tashahhud */}
+                  {onOpenSurahs &&
+                    (currentPrayer.postureKey === 'qiyam' || currentPrayer.postureKey === 'tashahhud') && (
+                      <button
+                        type="button"
+                        onClick={onOpenSurahs}
+                        className="w-full flex items-center justify-between px-4 py-3 rounded-xl bg-teal-50/90 dark:bg-teal-950/40 border border-teal-200/80 dark:border-teal-800 text-sm font-semibold text-teal-900 dark:text-teal-200 hover:bg-teal-100/80 dark:hover:bg-teal-950/70 transition-colors cursor-pointer"
+                      >
+                        <span>Sureleri ve duaları aç (Gerçek Kâri Tilavet)</span>
+                        <ArrowRight className="w-4 h-4 shrink-0" />
+                      </button>
+                    )}
+                </div>
+
+                {/* Audio Action Row */}
+                <div className="flex flex-wrap items-center gap-2.5">
                   <button
-                    key={st.stepNumber}
                     type="button"
                     onClick={() => {
-                      setPrayerPlaying(false);
-                      setPrayerIdx(idx);
+                      stopAllGuidedNarration();
+                      speakInstant(
+                        `${currentPrayer.title}. ${currentPrayer.howToPerform} Okunuşu: ${currentPrayer.recitationTr}`,
+                        { lang: 'tr-TR', rate: 0.94 }
+                      );
                     }}
-                    className={`text-left px-2.5 py-2 rounded-lg text-xs truncate transition-colors cursor-pointer ${
-                      idx === prayerIdx
-                        ? 'bg-navy-900 text-white dark:bg-teal-600'
-                        : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer whitespace-nowrap"
+                  >
+                    <Volume2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                    <span>Adımı dinle</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleListenAllPrayer}
+                    className={`inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold transition-colors cursor-pointer whitespace-nowrap ${
+                      prayerNarrationActive
+                        ? 'bg-teal-700 text-white hover:bg-teal-800'
+                        : 'bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700'
                     }`}
                   >
-                    <span className="font-mono tabular-nums mr-1">{st.stepNumber}.</span>
-                    {st.title}
+                    {prayerNarrationActive ? (
+                      <>
+                        <Square className="w-3.5 h-3.5" />
+                        <span>Dinlemeyi durdur</span>
+                      </>
+                    ) : (
+                      <>
+                        <Play className="w-3.5 h-3.5 text-teal-700 dark:text-teal-400" />
+                        <span>Baştan sona dinle</span>
+                      </>
+                    )}
                   </button>
-                ))}
+                </div>
+
+                {/* Prev / Next Navigation Row */}
+                <div className="flex items-center justify-between gap-3 pt-2">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopAllGuidedNarration();
+                      setPrayerIdx(
+                        (i) => (i - 1 + PRAYER_POSTURE_STEPS.length) % PRAYER_POSTURE_STEPS.length
+                      );
+                    }}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 cursor-pointer whitespace-nowrap"
+                  >
+                    <ArrowLeft className="w-4 h-4" />
+                    <span>Önceki</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      stopAllGuidedNarration();
+                      setPrayerIdx((i) => (i + 1) % PRAYER_POSTURE_STEPS.length);
+                    }}
+                    className="inline-flex items-center gap-1.5 px-5 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
+                  >
+                    <span>Sonraki</span>
+                    <ArrowRight className="w-4 h-4" />
+                  </button>
+                </div>
+
+                {/* Collapsible All Steps List */}
+                <div className="pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <button
+                    type="button"
+                    onClick={() => setShowAllPrayerSteps((v) => !v)}
+                    className="w-full flex items-center justify-between px-4 py-3 rounded-xl border border-slate-200 dark:border-slate-800 text-xs sm:text-sm font-semibold text-navy-900 dark:text-white hover:bg-slate-50 dark:hover:bg-slate-800/60 cursor-pointer"
+                  >
+                    <span>Tüm adımları göster ({PRAYER_POSTURE_STEPS.length})</span>
+                    {showAllPrayerSteps ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+                  </button>
+
+                  {showAllPrayerSteps && (
+                    <div className="mt-2 grid grid-cols-1 sm:grid-cols-2 gap-1.5">
+                      {PRAYER_POSTURE_STEPS.map((st, idx) => (
+                        <button
+                          key={st.stepNumber}
+                          type="button"
+                          onClick={() => {
+                            stopAllGuidedNarration();
+                            setPrayerIdx(idx);
+                          }}
+                          className={`text-left px-3 py-2 rounded-lg text-xs truncate transition-colors cursor-pointer ${
+                            idx === prayerIdx
+                              ? 'bg-navy-900 text-white dark:bg-teal-600'
+                              : 'text-slate-700 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800'
+                          }`}
+                        >
+                          <span className="font-mono tabular-nums mr-1">{st.stepNumber}.</span>
+                          {st.title}
+                        </button>
+                      ))}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
           </section>

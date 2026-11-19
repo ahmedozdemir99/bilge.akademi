@@ -49,13 +49,71 @@ export interface WisdomStory {
   relatedVerseOrHadith: string;
 }
 
+export interface QariOption {
+  id: 'husary' | 'alafasy' | 'abdulbasit' | 'minshawi';
+  name: string;
+  countryAndStyle: string;
+  surahBaseUrl: string;
+  ayahBaseUrl: string;
+}
+
+export const QARI_OPTIONS: QariOption[] = [
+  {
+    id: 'husary',
+    name: 'Mahmud Halil el-Husarî',
+    countryAndStyle: 'Mısır · Tecvid ve Eğitim Odaklı Murattel',
+    surahBaseUrl: 'https://download.quranicaudio.com/quran/mahmood_khaleel_al-husaree',
+    ayahBaseUrl: 'https://everyayah.com/data/Husary_128kbps',
+  },
+  {
+    id: 'alafasy',
+    name: 'Mişâri Râşid el-Afâsî',
+    countryAndStyle: 'Kuveyt · Akıcı ve Berrak Tilavet',
+    surahBaseUrl: 'https://download.quranicaudio.com/quran/mishaari_raashid_al_3afaasee',
+    ayahBaseUrl: 'https://everyayah.com/data/Alafasy_128kbps',
+  },
+  {
+    id: 'abdulbasit',
+    name: 'Abdülbâsit Abdüssamed',
+    countryAndStyle: 'Mısır · Klasik Murattel Tilavet',
+    surahBaseUrl: 'https://download.quranicaudio.com/quran/abdul_basit_murattal',
+    ayahBaseUrl: 'https://everyayah.com/data/Abdul_Basit_Murattal_192kbps',
+  },
+  {
+    id: 'minshawi',
+    name: 'Muhammed Sıddîk el-Minşâvî',
+    countryAndStyle: 'Mısır · Huşu Dolu Murattel Tilavet',
+    surahBaseUrl: 'https://download.quranicaudio.com/quran/muhammad_siddeeq_al-minshaawee',
+    ayahBaseUrl: 'https://everyayah.com/data/Minshawy_Murattal_128kbps',
+  },
+];
+
 export interface SurahDuaEntry {
   id: string;
   title: string;
   category: 'Namaz Suresi' | 'Namaz Duası' | 'Ayet';
+  audioType: 'surah' | 'ayah' | 'dua';
+  surahNumber?: string;
+  ayahCode?: string;
+  quranApiRef?: { type: 'surah' | 'ayah'; ref: string };
+  staticArabicText?: string;
   transliteration: string;
   turkishMeaning: string;
   keyMessage: string;
+}
+
+export function getQariAudioUrl(
+  entry: SurahDuaEntry,
+  qariId: QariOption['id']
+): string | null {
+  const qari = QARI_OPTIONS.find((q) => q.id === qariId) ?? QARI_OPTIONS[0];
+  if (entry.audioType === 'surah' && entry.surahNumber) {
+    return `${qari.surahBaseUrl}/${entry.surahNumber}.mp3`;
+  }
+  if (entry.audioType === 'ayah' && entry.ayahCode) {
+    return `${qari.ayahBaseUrl}/${entry.ayahCode}.mp3`;
+  }
+  return null;
 }
 
 export const WUDU_STEPS: WuduStep[] = [
@@ -434,6 +492,9 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     id: 'sd-1',
     title: 'Fatiha Suresi',
     category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '001',
+    quranApiRef: { type: 'surah', ref: '1' },
     transliteration:
       'Bismillâhirrahmânirrahîm. Elhamdü lillâhi rabbi’l-âlemîn. Er-rahmânirrahîm. Mâliki yevmiddîn. İyyâke na’büdü ve iyyâke nesta’în. İhdinas-sırâtal müstakîm. Sırâtallezîne en’amte aleyhim ğayril mağdûbi aleyhim veleddâllîn.',
     turkishMeaning:
@@ -444,6 +505,9 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     id: 'sd-2',
     title: 'İhlas Suresi',
     category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '112',
+    quranApiRef: { type: 'surah', ref: '112' },
     transliteration:
       'Kul hüvallâhü ehad. Allâhüs-samed. Lem yelid ve lem yûled. Ve lem yekün lehû küfüven ehad.',
     turkishMeaning:
@@ -451,9 +515,38 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     keyMessage: 'Tevhid inancını (Allah’ın birliğini ve eşsizliğini) en yalın biçimde ifade eder.',
   },
   {
+    id: 'sd-8',
+    title: 'Felak Suresi',
+    category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '113',
+    quranApiRef: { type: 'surah', ref: '113' },
+    transliteration:
+      'Kul eûzü birabbil felak. Min şerri mâ halak. Ve min şerri ğâsikın izâ vekab. Ve min şerrin-neffâsâti fil ukad. Ve min şerri hâsidin izâ hased.',
+    turkishMeaning:
+      'De ki: Yarattığı şeylerin kötülüğünden, karanlığı çöktüğü zaman gecenin kötülüğünden, düğümlere üfleyenlerin kötülüğünden ve haset ettiği zaman hasetçinin kötülüğünden sabah aydınlığının Rabbine sığınırım.',
+    keyMessage: 'Her türlü görünür ve görünmez kötülükten yalnızca Allah’a sığınmayı öğretir.',
+  },
+  {
+    id: 'sd-9',
+    title: 'Nâs Suresi',
+    category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '114',
+    quranApiRef: { type: 'surah', ref: '114' },
+    transliteration:
+      'Kul eûzü birabbin-nâs. Melikin-nâs. İlâhin-nâs. Min şerril vesvâsil hannâs. Ellezî yüvesvisü fî sudûrin-nâs. Minel cinneti ven-nâs.',
+    turkishMeaning:
+      'De ki: Cinlerden ve insanlardan; insanların kalplerine vesvese veren sinsi vesvesecinin kötülüğünden, insanların Rabbine, insanların Melik’ine, insanların İlah’ına sığınırım.',
+    keyMessage: 'İçsel vesveselere ve olumsuz telkinlere karşı Allah’a sığınma duasıdır.',
+  },
+  {
     id: 'sd-3',
     title: 'Asr Suresi',
     category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '103',
+    quranApiRef: { type: 'surah', ref: '103' },
     transliteration:
       'Vel-asr. İnnel insâne lefî husr. İllellezîne âmenû ve amilus-sâlihâti ve tevâsav bil-hakkı ve tevâsav bis-sabr.',
     turkishMeaning:
@@ -464,6 +557,9 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     id: 'sd-4',
     title: 'Kevser Suresi',
     category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '108',
+    quranApiRef: { type: 'surah', ref: '108' },
     transliteration:
       'İnnâ a’taynâkel kevser. Fesalli lirabbike venhar. İnne şânieke hüvel ebter.',
     turkishMeaning:
@@ -474,30 +570,65 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     id: 'sd-5',
     title: 'Ayetel Kürsi (Bakara, 255)',
     category: 'Ayet',
+    audioType: 'ayah',
+    ayahCode: '002255',
+    quranApiRef: { type: 'ayah', ref: '2:255' },
     transliteration:
-      'Allâhü lâ ilâhe illâ hüvel hayyül kayyûm. Lâ te’huzühû sinetün ve lâ nevm. Lehû mâ fis-semâvâti ve mâ fil-ard...',
+      'Allâhü lâ ilâhe illâ hüvel hayyül kayyûm. Lâ te’huzühû sinetün ve lâ nevm. Lehû mâ fis-semâvâti ve mâ fil-ard. Men zellezî yeşfeu indehû illâ bi-iznih. Ya’lemü mâ beyne eydîhim ve mâ halfehüm ve lâ yuhîtûne bişey’in min ilmihî illâ bimâ şâe. Vesia kürsiyyühüs-semâvâti vel-ard ve lâ yeûdühû hıfzuhümâ ve hüvel aliyyül azîm.',
     turkishMeaning:
-      'Allah’tan başka hiçbir ilah yoktur. O daima diridir (Hayy), bütün varlığın idaresini yürütendir (Kayyûm). O’nu ne uyuklama tutar ne de uyku. Göklerde ve yerde ne varsa O’nundur. O’nun izni olmadan katında kim şefaat edebilir?...',
+      'Allah’tan başka hiçbir ilah yoktur. O daima diridir (Hayy), bütün varlığın idaresini yürütendir (Kayyûm). O’nu ne uyuklama tutar ne de uyku. Göklerde ve yerde ne varsa O’nundur. O’nun izni olmadan katında kim şefaat edebilir? O, kullarının yaptıklarını ve yapacaklarını bilir. O’nun kürsüsü gökleri ve yeri içine alır; onları koruyup gözetmek kendisine zor gelmez. O, yücedir, büyüktür.',
     keyMessage: 'Allah’ın sonsuz kudretini, ilmini ve evren üzerindeki hâkimiyetini anlatır.',
+  },
+  {
+    id: 'sd-7a',
+    title: 'Rabbenâ Âtinâ Duası (Bakara, 201)',
+    category: 'Namaz Duası',
+    audioType: 'ayah',
+    ayahCode: '002201',
+    quranApiRef: { type: 'ayah', ref: '2:201' },
+    transliteration:
+      'Rabbenâ âtinâ fid-dünyâ haseneten ve fil-âhirati haseneten ve kınâ azâbennâr.',
+    turkishMeaning:
+      'Rabbimiz! Bize dünyada da iyilik ver, ahirette de iyilik ver ve bizi ateş azabından koru.',
+    keyMessage: 'Namazın son oturuşunda okunan, hem dünya hem ahiret iyiliği dileyen Kur’an duasıdır.',
+  },
+  {
+    id: 'sd-7b',
+    title: 'Rabbenâğfirlî Duası (İbrahim, 41)',
+    category: 'Namaz Duası',
+    audioType: 'ayah',
+    ayahCode: '014041',
+    quranApiRef: { type: 'ayah', ref: '14:41' },
+    transliteration:
+      'Rabbenâğfirlî ve livâlideyye ve lil-mü’minîne yevme yekûmül hisâb.',
+    turkishMeaning:
+      'Rabbimiz! Hesap görülecek günde beni, anne-babamı ve bütün müminleri bağışla.',
+    keyMessage: 'Anne-babaya vefa ve tüm müminler için bağışlanma dileyen Kur’an duasıdır.',
   },
   {
     id: 'sd-6',
     title: 'Sübhaneke Duası',
     category: 'Namaz Duası',
+    audioType: 'dua',
+    staticArabicText:
+      'سُبْحَانَكَ اللَّهُمَّ وَبِحَمْدِكَ وَتَبَارَكَ اسْمُكَ وَتَعَالَى جَدُّكَ وَجَلَّ ثَنَاؤُكَ وَلَا إِلَهَ غَيْرُكَ',
     transliteration:
       'Sübhânekellâhümme ve bihamdik ve tebârakesmük ve teâlâ ceddük (ve celle senâük*) ve lâ ilâhe ğayrük.',
     turkishMeaning:
       'Allah’ım! Sen eksik sıfatlardan uzaksın; seni daima hamd ile anarım. Senin adın mübarektir, şanın yücedir. Senden başka ilah yoktur. (*"ve celle senâük" yalnız cenaze namazında okunur.)',
-    keyMessage: 'Namaza başlarken Allah’ı yüceltmek için okunan ilk duadır.',
+    keyMessage: 'Namaza başlarken Allah’ı yüceltmek için okunan ilk sünnet duasıdır.',
   },
   {
-    id: 'sd-7',
-    title: 'Rabbena Duaları',
+    id: 'sd-10',
+    title: 'Ettehiyyâtü (Tahiyyat) Duası',
     category: 'Namaz Duası',
+    audioType: 'dua',
+    staticArabicText:
+      'التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ ۝ السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ ۝ السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ ۝ أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ',
     transliteration:
-      'Rabbenâ âtinâ fid-dünyâ haseneten ve fil-âhirati haseneten ve kınâ azâbennâr. Rabbenâğfirlî ve livâlideyye ve lil-mü’minîne yevme yekûmül hisâb.',
+      'Ettehiyyâtü lillâhi ves-salevâtü vet-tayyibât. Es-selâmü aleyke eyyühen-nebiyyü ve rahmetullâhi ve berekâtüh. Es-selâmü aleynâ ve alâ ibâdillâhis-sâlihîn. Eşhedü en lâ ilâhe illallâh ve eşhedü enne Muhammeden abdühû ve rasûlüh.',
     turkishMeaning:
-      'Rabbimiz! Bize dünyada da iyilik ver, ahirette de iyilik ver ve bizi ateş azabından koru. Rabbimiz! Hesap görülecek günde beni, anne-babamı ve bütün müminleri bağışla.',
-    keyMessage: 'Hem dünya hem ahiret iyiliği ile anne-baba ve müminler için bağışlanma dileğidir.',
+      'Dil, beden ve mal ile yapılan bütün ibadetler Allah’a mahsustur. Ey Peygamber! Allah’ın selamı, rahmeti ve bereketi senin üzerine olsun. Selam bize ve Allah’ın salih kullarının üzerine olsun. Şahitlik ederim ki Allah’tan başka ilah yoktur ve yine şahitlik ederim ki Hz. Muhammed O’nun kulu ve elçisidir.',
+    keyMessage: 'Namazların ilk ve son oturuşlarında okunan temel şehadet ve selam duasıdır.',
   },
 ];

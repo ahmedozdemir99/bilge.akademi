@@ -22,11 +22,10 @@ import {
 import { useAcademy } from '../../context/AcademyContext';
 import {
   analyzeLinear,
-  analyzeParabola,
   checkMathAnswer,
   generateDeterministicExercise,
   MATH_TOPICS,
-  sampleMathFunction,
+  sampleLinearEquation,
   type MathExerciseItem,
 } from '../../utils/mathEngine';
 import { MATH_TEST_PACKS } from '../../data/tests/mathTestsData';
@@ -37,7 +36,7 @@ import { OneWordOneOperationGame } from './math/OneWordOneOperationGame';
 import { VisualProofsLab } from './math/VisualProofsLab';
 
 type MathTab = 'proofs' | 'game' | 'encyclopedia' | 'tests' | 'solver' | 'graphs' | 'exercises';
-type GraphMode = 'custom' | 'parabola' | 'linear' | 'geometry';
+type GraphMode = 'linear' | 'coordinate' | 'geometry';
 type GeoShape = 'triangle' | 'circle' | 'rectangle' | 'cylinder';
 
 function buildExerciseMcqOptions(acceptedAnswers: string[]): string[] {
@@ -113,17 +112,15 @@ export function MathTutorModule() {
   const [solveError, setSolveError] = useState('');
   const [solution, setSolution] = useState<AIMathSolution | null>(null);
 
-  // 2. Deterministic Graphs & Geometry State
-  const [graphMode, setGraphMode] = useState<GraphMode>('parabola');
-  const [customExpr, setCustomExpr] = useState('x^2 - 2*x - 3');
+  // 2. Deterministic Graphs, Coordinate Plane & Geometry State (MEB 5–8. Sınıf)
+  const [graphMode, setGraphMode] = useState<GraphMode>('linear');
   const [xRange, setXRange] = useState(8);
 
-  const [parA, setParA] = useState(1);
-  const [parB, setParB] = useState(-2);
-  const [parC, setParC] = useState(-3);
-
-  const [linM, setLinM] = useState(1.5);
+  const [linM, setLinM] = useState(2);
   const [linN, setLinN] = useState(-2);
+
+  const [coordX, setCoordX] = useState(4);
+  const [coordY, setCoordY] = useState(3);
 
   const [geoShape, setGeoShape] = useState<GeoShape>('triangle');
   const [geoP1, setGeoP1] = useState(8);
@@ -148,21 +145,22 @@ export function MathTutorModule() {
     [exercise]
   );
 
-  // Graph data memoization (pure deterministic Math.js)
-  const parabolaInfo = useMemo(() => analyzeParabola(parA, parB, parC), [parA, parB, parC]);
+  // Linear equation memoization (MEB 8. Sınıf Doğrusal İlişkiler ve Eğim)
   const linearInfo = useMemo(() => analyzeLinear(linM, linN), [linM, linN]);
-
-  const activeExpression =
-    graphMode === 'custom'
-      ? customExpr
-      : graphMode === 'parabola'
-        ? `${parA}*x^2 + (${parB})*x + (${parC})`
-        : `${linM}*x + (${linN})`;
-
-  const plotResult = useMemo(
-    () => sampleMathFunction(activeExpression, -xRange, xRange, 80),
-    [activeExpression, xRange]
+  const linearPoints = useMemo(
+    () => sampleLinearEquation(linM, linN, -xRange, xRange, 32),
+    [linM, linN, xRange]
   );
+
+  const coordinateRegion = useMemo(() => {
+    if (coordX === 0 && coordY === 0) return 'Orijin (0, 0)';
+    if (coordX === 0) return 'y Ekseni Üzerinde';
+    if (coordY === 0) return 'x Ekseni Üzerinde';
+    if (coordX > 0 && coordY > 0) return 'I. Bölge (+, +)';
+    if (coordX < 0 && coordY > 0) return 'II. Bölge (-, +)';
+    if (coordX < 0 && coordY < 0) return 'III. Bölge (-, -)';
+    return 'IV. Bölge (+, -)';
+  }, [coordX, coordY]);
 
   // Geometry metrics
   const geoMetrics = useMemo(() => {
@@ -464,7 +462,7 @@ export function MathTutorModule() {
                 value={problemText}
                 onChange={(e) => setProblemText(e.target.value)}
                 required
-                placeholder="Örn. 2x^2 - 5x - 3 = 0 denkleminin kökler toplamını ve köklerini bulunuz."
+                placeholder="Örn. 3x + 7 = 25 denklemini sağlayan x değerini adım adım bulunuz."
                 className="w-full px-3.5 py-2.5 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
               />
             </div>
@@ -611,16 +609,15 @@ export function MathTutorModule() {
         </div>
       )}
 
-      {/* TAB 2: DETERMINISTIC INTERACTIVE GRAPHS & GEOMETRY */}
+      {/* TAB 2: MIDDLE-SCHOOL INTERACTIVE GRAPHS, COORDINATE SYSTEM & GEOMETRY */}
       {activeTab === 'graphs' && (
         <div className="space-y-5">
           <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             {(
               [
-                { id: 'parabola', label: 'Parabol (ax² + bx + c)' },
-                { id: 'linear', label: 'Doğru Denklemi (mx + n)' },
-                { id: 'custom', label: 'Serbest Fonksiyon f(x)' },
-                { id: 'geometry', label: 'Geometrik Şekiller' },
+                { id: 'linear', label: 'Doğrusal İlişkiler ve Eğim (y = mx + n)' },
+                { id: 'coordinate', label: 'Koordinat Sistemi ve 4 Bölge' },
+                { id: 'geometry', label: 'Geometrik Şekiller ve Silindir' },
               ] as { id: GraphMode; label: string }[]
             ).map((gm) => (
               <button
@@ -638,55 +635,87 @@ export function MathTutorModule() {
             ))}
           </div>
 
-          {graphMode !== 'geometry' ? (
+          {graphMode === 'linear' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              {/* Interactive Stage (Left 8 cols) */}
+              {/* Interactive Linear Graph Stage (Left 8 cols) */}
               <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-4">
                 <div className="flex flex-wrap items-center justify-between gap-2">
                   <div className="text-base text-navy-900 dark:text-white">
-                    {graphMode === 'parabola' && <MathFormula latex={parabolaInfo.latex} />}
-                    {graphMode === 'linear' && <MathFormula latex={linearInfo.latex} />}
-                    {graphMode === 'custom' && <MathFormula latex={`f(x) = ${customExpr}`} />}
+                    <MathFormula latex={linearInfo.latex} />
                   </div>
                   <span className="text-xs font-mono text-slate-500 tabular-nums">
-                    Aralık: [{-xRange}, {xRange}]
+                    8. Sınıf Doğrusal İlişkiler · Aralık: [{-xRange}, {xRange}]
                   </span>
                 </div>
 
-                {plotResult.error ? (
-                  <p className="text-xs text-red-700 dark:text-red-400 p-4 rounded-lg bg-red-50 dark:bg-red-950/40">
-                    {plotResult.error}
+                <div className="h-[360px] w-full">
+                  <ResponsiveContainer width="100%" height="100%">
+                    <LineChart data={linearPoints} margin={{ top: 12, right: 16, left: -12, bottom: 8 }}>
+                      <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.25} />
+                      <XAxis
+                        dataKey="x"
+                        type="number"
+                        domain={[-xRange, xRange]}
+                        tick={{ fontSize: 11, fill: '#64748b' }}
+                      />
+                      <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
+                      <ReferenceLine x={0} stroke="#0B1F3A" strokeOpacity={0.65} strokeWidth={1.5} />
+                      <ReferenceLine y={0} stroke="#0B1F3A" strokeOpacity={0.65} strokeWidth={1.5} />
+                      <Tooltip
+                        formatter={(val) => [val ?? '—', 'y']}
+                        labelFormatter={(l) => `x = ${l}`}
+                      />
+                      <Line
+                        type="linear"
+                        dataKey="y"
+                        stroke="#0D9488"
+                        strokeWidth={2.5}
+                        dot={false}
+                      />
+                    </LineChart>
+                  </ResponsiveContainer>
+                </div>
+
+                {/* Live (x, y) Value Table for Middle Schoolers */}
+                <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
+                  <p className="text-xs font-medium text-slate-600 dark:text-slate-300 mb-2">
+                    Doğrusal İlişki Değer Tablosu (x → y)
                   </p>
-                ) : (
-                  <div className="h-[380px] w-full">
-                    <ResponsiveContainer width="100%" height="100%">
-                      <LineChart data={plotResult.points} margin={{ top: 12, right: 16, left: -12, bottom: 8 }}>
-                        <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.25} />
-                        <XAxis
-                          dataKey="x"
-                          type="number"
-                          domain={[-xRange, xRange]}
-                          tick={{ fontSize: 11, fill: '#64748b' }}
-                        />
-                        <YAxis tick={{ fontSize: 11, fill: '#64748b' }} />
-                        <ReferenceLine x={0} stroke="#0B1F3A" strokeOpacity={0.65} strokeWidth={1.5} />
-                        <ReferenceLine y={0} stroke="#0B1F3A" strokeOpacity={0.65} strokeWidth={1.5} />
-                        <Tooltip
-                          formatter={(val) => [val ?? 'Tanımsız', 'f(x)']}
-                          labelFormatter={(l) => `x = ${l}`}
-                        />
-                        <Line
-                          type="monotone"
-                          dataKey="y"
-                          stroke="#0D9488"
-                          strokeWidth={2.5}
-                          dot={false}
-                          connectNulls={false}
-                        />
-                      </LineChart>
-                    </ResponsiveContainer>
+                  <div className="overflow-x-auto">
+                    <table className="w-full text-xs text-center border border-slate-200 dark:border-slate-800 rounded-lg">
+                      <thead className="bg-slate-50 dark:bg-slate-950/70">
+                        <tr>
+                          <th className="py-1.5 px-2 font-semibold text-navy-900 dark:text-white border-r border-slate-200 dark:border-slate-800">
+                            x
+                          </th>
+                          {linearInfo.tablePoints.map((pt) => (
+                            <th
+                              key={`x-${pt.x}`}
+                              className="py-1.5 px-2 font-mono tabular-nums text-slate-700 dark:text-slate-300"
+                            >
+                              {pt.x}
+                            </th>
+                          ))}
+                        </tr>
+                      </thead>
+                      <tbody>
+                        <tr className="border-t border-slate-200 dark:border-slate-800">
+                          <td className="py-1.5 px-2 font-semibold text-teal-700 dark:text-teal-400 border-r border-slate-200 dark:border-slate-800">
+                            y
+                          </td>
+                          {linearInfo.tablePoints.map((pt) => (
+                            <td
+                              key={`y-${pt.x}`}
+                              className="py-1.5 px-2 font-mono font-semibold tabular-nums text-navy-900 dark:text-white"
+                            >
+                              {pt.y}
+                            </td>
+                          ))}
+                        </tr>
+                      </tbody>
+                    </table>
                   </div>
-                )}
+                </div>
               </div>
 
               {/* Parameter Control Deck (Right 4 cols) */}
@@ -694,145 +723,62 @@ export function MathTutorModule() {
                 <div className="flex items-center gap-2">
                   <SlidersHorizontal className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                   <h3 className="text-sm font-semibold text-navy-900 dark:text-white">
-                    Parametre Kontrolleri
+                    Doğru Parametreleri
                   </h3>
                 </div>
 
-                {graphMode === 'parabola' && (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Baş Katsayı (a)</span>
-                        <span className="font-mono font-semibold tabular-nums">{parA}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-5}
-                        max={5}
-                        step={0.5}
-                        value={parA}
-                        onChange={(e) => setParA(Number(e.target.value))}
-                        className="w-full accent-teal-600"
-                      />
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Eğim (m = Dikey / Yatay)</span>
+                      <span className="font-mono font-semibold tabular-nums">{linM}</span>
                     </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Lineer Katsayı (b)</span>
-                        <span className="font-mono font-semibold tabular-nums">{parB}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-10}
-                        max={10}
-                        step={0.5}
-                        value={parB}
-                        onChange={(e) => setParB(Number(e.target.value))}
-                        className="w-full accent-teal-600"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Sabit Terim (c)</span>
-                        <span className="font-mono font-semibold tabular-nums">{parC}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-10}
-                        max={10}
-                        step={0.5}
-                        value={parC}
-                        onChange={(e) => setParC(Number(e.target.value))}
-                        className="w-full accent-teal-600"
-                      />
-                    </div>
-
-                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs">
-                      <p>
-                        <strong>Kolların Yönü:</strong> {parabolaInfo.concavity}
-                      </p>
-                      <p className="font-mono tabular-nums">
-                        <strong>Tepe Noktası T(r, k):</strong> ({parabolaInfo.vertexX}, {parabolaInfo.vertexY})
-                      </p>
-                      <p className="font-mono tabular-nums">
-                        <strong>Diskriminant (Δ):</strong> {parabolaInfo.discriminant}
-                      </p>
-                      <p className="font-mono tabular-nums">
-                        <strong>Gerçel Kökler:</strong>{' '}
-                        {parabolaInfo.roots.length > 0 ? parabolaInfo.roots.join(' ve ') : 'Yok (Δ < 0)'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {graphMode === 'linear' && (
-                  <div className="space-y-4">
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>Eğim (m)</span>
-                        <span className="font-mono font-semibold tabular-nums">{linM}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-6}
-                        max={6}
-                        step={0.5}
-                        value={linM}
-                        onChange={(e) => setLinM(Number(e.target.value))}
-                        className="w-full accent-teal-600"
-                      />
-                    </div>
-                    <div>
-                      <div className="flex justify-between text-xs mb-1">
-                        <span>y-Kesen (n)</span>
-                        <span className="font-mono font-semibold tabular-nums">{linN}</span>
-                      </div>
-                      <input
-                        type="range"
-                        min={-10}
-                        max={10}
-                        step={0.5}
-                        value={linN}
-                        onChange={(e) => setLinN(Number(e.target.value))}
-                        className="w-full accent-teal-600"
-                      />
-                    </div>
-                    <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs font-mono tabular-nums">
-                      <p>Eğim Açısı: {linearInfo.angleDeg}°</p>
-                      <p>y-Eksenini Kestiği Nokta: (0, {linearInfo.yIntercept})</p>
-                      <p>
-                        x-Eksenini Kestiği Nokta:{' '}
-                        {linearInfo.xIntercept !== null ? `(${linearInfo.xIntercept}, 0)` : 'Paralel (yok)'}
-                      </p>
-                    </div>
-                  </div>
-                )}
-
-                {graphMode === 'custom' && (
-                  <div className="space-y-3">
-                    <label htmlFor="custom-fn" className="block text-xs font-medium text-slate-600 dark:text-slate-300">
-                      Fonksiyon İfadesi f(x)
-                    </label>
                     <input
-                      id="custom-fn"
-                      type="text"
-                      value={customExpr}
-                      onChange={(e) => setCustomExpr(e.target.value)}
-                      className="w-full px-3 py-2 text-sm font-mono rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                      type="range"
+                      min={-5}
+                      max={5}
+                      step={0.5}
+                      value={linM}
+                      onChange={(e) => setLinM(Number(e.target.value))}
+                      className="w-full accent-teal-600"
                     />
-                    <div className="flex flex-wrap gap-1.5">
-                      {['x^2 - 2*x - 3', 'sin(x) * 4', 'x^3 - 3*x', 'abs(x) - 2'].map((preset) => (
-                        <button
-                          key={preset}
-                          type="button"
-                          onClick={() => setCustomExpr(preset)}
-                          className="px-2.5 py-1 text-[11px] font-mono rounded border border-slate-200 dark:border-slate-700 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
-                        >
-                          {preset}
-                        </button>
-                      ))}
-                    </div>
                   </div>
-                )}
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Sabit Terim / y-Kesen (n)</span>
+                      <span className="font-mono font-semibold tabular-nums">{linN}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-8}
+                      max={8}
+                      step={1}
+                      value={linN}
+                      onChange={(e) => setLinN(Number(e.target.value))}
+                      className="w-full accent-teal-600"
+                    />
+                  </div>
+
+                  <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2 text-xs">
+                    <p>
+                      <strong>Eğim Yönü:</strong> {linearInfo.slopeDirection}
+                    </p>
+                    <p>
+                      <strong>Orijin (0, 0) Durumu:</strong>{' '}
+                      {linearInfo.passesOrigin ? 'Orijinden Geçer (n = 0)' : 'Orijinden Geçmez'}
+                    </p>
+                    <p className="font-mono tabular-nums">
+                      <strong>y-Eksenini Kestiği Nokta:</strong> (0, {linearInfo.yIntercept})
+                    </p>
+                    <p className="font-mono tabular-nums">
+                      <strong>x-Eksenini Kestiği Nokta:</strong>{' '}
+                      {linearInfo.xIntercept !== null ? `(${linearInfo.xIntercept}, 0)` : 'x Eksenine Paralel'}
+                    </p>
+                    <p className="font-mono tabular-nums">
+                      <strong>Eğim Açısı:</strong> {linearInfo.angleDeg}°
+                    </p>
+                  </div>
+                </div>
 
                 <div className="pt-3 border-t border-slate-100 dark:border-slate-800">
                   <div className="flex justify-between text-xs mb-1">
@@ -842,7 +788,7 @@ export function MathTutorModule() {
                   <input
                     type="range"
                     min={4}
-                    max={20}
+                    max={14}
                     step={2}
                     value={xRange}
                     onChange={(e) => setXRange(Number(e.target.value))}
@@ -851,8 +797,177 @@ export function MathTutorModule() {
                 </div>
               </aside>
             </div>
-          ) : (
-            /* Geometry Interactive Visualizer */
+          )}
+
+          {graphMode === 'coordinate' && (
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+              {/* Interactive Coordinate Plane SVG (Left 7 cols) */}
+              <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col items-center">
+                <div className="w-full flex items-center justify-between mb-3">
+                  <p className="text-sm font-semibold text-navy-900 dark:text-white">
+                    A({coordX}, {coordY}) Noktası ve Eksen Yansımaları
+                  </p>
+                  <span className="text-xs font-medium text-teal-700 dark:text-teal-400">
+                    {coordinateRegion}
+                  </span>
+                </div>
+                <svg viewBox="0 0 360 360" className="w-full max-w-[380px] h-auto">
+                  {/* Grid lines (-8 to +8, center 180,180, step 20px) */}
+                  {Array.from({ length: 17 }, (_, i) => i - 8).map((val) => {
+                    const pos = 180 + val * 20;
+                    return (
+                      <g key={val}>
+                        <line
+                          x1={pos}
+                          y1={20}
+                          x2={pos}
+                          y2={340}
+                          stroke={val === 0 ? '#0B1F3A' : '#cbd5e1'}
+                          strokeWidth={val === 0 ? 2 : 0.7}
+                          strokeOpacity={val === 0 ? 0.8 : 0.5}
+                        />
+                        <line
+                          x1={20}
+                          y1={pos}
+                          x2={340}
+                          y2={pos}
+                          stroke={val === 0 ? '#0B1F3A' : '#cbd5e1'}
+                          strokeWidth={val === 0 ? 2 : 0.7}
+                          strokeOpacity={val === 0 ? 0.8 : 0.5}
+                        />
+                      </g>
+                    );
+                  })}
+
+                  {/* Quadrant labels */}
+                  <text x="275" y="42" fill="#94a3b8" fontSize="11" fontWeight="600">I. Bölge (+,+)</text>
+                  <text x="34" y="42" fill="#94a3b8" fontSize="11" fontWeight="600">II. Bölge (-,+)</text>
+                  <text x="34" y="330" fill="#94a3b8" fontSize="11" fontWeight="600">III. Bölge (-,-)</text>
+                  <text x="270" y="330" fill="#94a3b8" fontSize="11" fontWeight="600">IV. Bölge (+,-)</text>
+                  <text x="344" y="176" fill="#0B1F3A" fontSize="12" fontWeight="700">x</text>
+                  <text x="186" y="16" fill="#0B1F3A" fontSize="12" fontWeight="700">y</text>
+
+                  {/* Dashed projections to axes */}
+                  <line
+                    x1={180 + coordX * 20}
+                    y1={180 - coordY * 20}
+                    x2={180 + coordX * 20}
+                    y2={180}
+                    stroke="#0D9488"
+                    strokeDasharray="4 3"
+                    strokeWidth="1.5"
+                  />
+                  <line
+                    x1={180 + coordX * 20}
+                    y1={180 - coordY * 20}
+                    x2={180}
+                    y2={180 - coordY * 20}
+                    stroke="#0D9488"
+                    strokeDasharray="4 3"
+                    strokeWidth="1.5"
+                  />
+
+                  {/* Reflection across x-axis */}
+                  <circle
+                    cx={180 + coordX * 20}
+                    cy={180 + coordY * 20}
+                    r="5"
+                    fill="#C89B3C"
+                    fillOpacity="0.85"
+                  />
+                  {/* Reflection across y-axis */}
+                  <circle
+                    cx={180 - coordX * 20}
+                    cy={180 - coordY * 20}
+                    r="5"
+                    fill="#6366f1"
+                    fillOpacity="0.85"
+                  />
+                  {/* Main Point A(x, y) */}
+                  <circle
+                    cx={180 + coordX * 20}
+                    cy={180 - coordY * 20}
+                    r="7"
+                    fill="#0D9488"
+                    stroke="#ffffff"
+                    strokeWidth="2"
+                  />
+                  <text
+                    x={Math.min(285, Math.max(28, 180 + coordX * 20 + 10))}
+                    y={Math.max(30, 180 - coordY * 20 - 10)}
+                    fill="#0F766E"
+                    fontSize="12"
+                    fontWeight="700"
+                  >
+                    A({coordX}, {coordY})
+                  </text>
+                </svg>
+              </div>
+
+              {/* Coordinate Controls & Analysis (Right 5 cols) */}
+              <aside className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-5">
+                <div className="flex items-center gap-2">
+                  <SlidersHorizontal className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <h3 className="text-sm font-semibold text-navy-900 dark:text-white">
+                    Koordinat ve Yansıma (8. Sınıf LGS)
+                  </h3>
+                </div>
+
+                <div className="space-y-4">
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Apsis (x değeri)</span>
+                      <span className="font-mono font-semibold tabular-nums">{coordX}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-7}
+                      max={7}
+                      step={1}
+                      value={coordX}
+                      onChange={(e) => setCoordX(Number(e.target.value))}
+                      className="w-full accent-teal-600"
+                    />
+                  </div>
+                  <div>
+                    <div className="flex justify-between text-xs mb-1">
+                      <span>Ordinat (y değeri)</span>
+                      <span className="font-mono font-semibold tabular-nums">{coordY}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min={-7}
+                      max={7}
+                      step={1}
+                      value={coordY}
+                      onChange={(e) => setCoordY(Number(e.target.value))}
+                      className="w-full accent-teal-600"
+                    />
+                  </div>
+                </div>
+
+                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5 text-xs">
+                  <p>
+                    <strong>Bulunduğu Konum:</strong> {coordinateRegion}
+                  </p>
+                  <p className="font-mono tabular-nums">
+                    <strong>x Eksenine Uzaklık (|y|):</strong> {Math.abs(coordY)} birim
+                  </p>
+                  <p className="font-mono tabular-nums">
+                    <strong>y Eksenine Uzaklık (|x|):</strong> {Math.abs(coordX)} birim
+                  </p>
+                  <p className="font-mono tabular-nums text-amber-700 dark:text-amber-400">
+                    <strong>x Eksenine Göre Yansıması (Altın):</strong> ({coordX}, {coordY === 0 ? 0 : -coordY})
+                  </p>
+                  <p className="font-mono tabular-nums text-indigo-700 dark:text-indigo-400">
+                    <strong>y Eksenine Göre Yansıması (Mor):</strong> ({coordX === 0 ? 0 : -coordX}, {coordY})
+                  </p>
+                </div>
+              </aside>
+            </div>
+          )}
+
+          {graphMode === 'geometry' && (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
               <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center min-h-[340px]">
                 <svg viewBox="0 0 360 260" className="w-full max-w-md h-auto">

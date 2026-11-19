@@ -1,6 +1,6 @@
 {
   "name": "BİLGE AKADEMİ",
   "description": "Yapay Zekâ Destekli Türkçe Eğitim, Öğrenci Takip, Edebiyat, Tarih, Matematik ve Felsefe Platformu",
-  "requestFramePermissions": [],
+  "requestFramePermissions": ["microphone"],
   "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
 }

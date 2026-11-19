@@ -1,22 +1,29 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
   Bot,
   ClipboardCheck,
+  Headphones,
   HeartHandshake,
   Loader2,
   MoonStar,
+  Pause,
+  Play,
   Send,
   Volume2,
 } from 'lucide-react';
 import { useAcademy } from '../../context/AcademyContext';
 import {
+  getQariAudioUrl,
+  QARI_OPTIONS,
   SURAH_DUA_LIBRARY,
   WISDOM_STORIES,
+  type QariOption,
+  type SurahDuaEntry,
   type WisdomStory,
 } from '../../data/religionRichData';
 import { RELIGION_TEST_PACKS } from '../../data/tests/religionTestsData';
-import { speakInstant, stopAllSpeech } from '../../utils/englishAudio';
+import { playStudioAudio, speakInstant, stopAllSpeech } from '../../utils/englishAudio';
 import { MultiTestQuizEngine } from '../ui/MultiTestQuizEngine';
 import { WorshipAnimationsLab } from './religion/WorshipAnimationsLab';
 
@@ -63,8 +70,15 @@ export function ReligionModule() {
   const [themeFilter, setThemeFilter] = useState<'Tümü' | WisdomStory['theme']>('Tümü');
   const [selectedStoryId, setSelectedStoryId] = useState<string>(WISDOM_STORIES[0].id);
 
-  // Surah/Dua filter
+  // Surah/Dua filter, Real Qari audio player & Arabic mushaf text cache
   const [surahCategory, setSurahCategory] = useState<'Tümü' | 'Namaz Suresi' | 'Namaz Duası' | 'Ayet'>('Tümü');
+  const [selectedQariId, setSelectedQariId] = useState<QariOption['id']>('husary');
+  const [playingEntryId, setPlayingEntryId] = useState<string | null>(null);
+  const [loadingAudioEntryId, setLoadingAudioEntryId] = useState<string | null>(null);
+  const [arabicScriptMap, setArabicScriptMap] = useState<
+    Record<string, { arabicText: string; basmala?: string }>
+  >({});
+  const qariAudioRef = useRef<HTMLAudioElement | null>(null);
 
   // AI Tutor state
   const [aiInput, setAiInput] = useState('');
@@ -72,9 +86,140 @@ export function ReligionModule() {
   const [aiHistory, setAiHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
     {
       role: 'assistant',
-      text: 'Merhaba! Ben BİLGE AKADEMİ Din Kültürü ve Ahlak Bilgisi Öğretmeniyim. 5–8. sınıf ve LGS konuları, ibadetlerin yapılışı, sure mealleri veya ahlaki kıssalar hakkında her sorunuzu yanıtlayabilirim.',
+      text: 'Merhaba! Ben BİLGE AKADEMİ Din Kültürü ve Ahlak Bilgisi Öğretmeniyim. 5–8. sınıf ve LGS konuları, ibadetlerin yapılışı, surelerin Arapça metinleri, mealleri veya ahlaki kıssalar hakkında her sorunuzu yanıtlayabilirim.',
     },
   ]);
+
+  const stopQariPlayback = () => {
+    if (qariAudioRef.current) {
+      qariAudioRef.current.pause();
+      qariAudioRef.current.currentTime = 0;
+      qariAudioRef.current = null;
+    }
+    setPlayingEntryId(null);
+    setLoadingAudioEntryId(null);
+  };
+
+  const stopEveryAudio = () => {
+    stopQariPlayback();
+    stopAllSpeech();
+  };
+
+  useEffect(() => {
+    return () => {
+      stopEveryAudio();
+    };
+  }, []);
+
+  // Load vocalized Uthmani Arabic texts for Quranic surahs & ayahs when Surahs tab opens
+  useEffect(() => {
+    if (activeTab !== 'surahs') return;
+    let cancelled = false;
+
+    const entriesToFetch = SURAH_DUA_LIBRARY.filter(
+      (entry) => entry.quranApiRef && !arabicScriptMap[entry.id]
+    );
+    if (entriesToFetch.length === 0) return;
+
+    void Promise.all(
+      entriesToFetch.map(async (entry) => {
+        if (!entry.quranApiRef) return;
+        try {
+          const { type, ref } = entry.quranApiRef;
+          const res = await fetch(`/api/quran/arabic?type=${encodeURIComponent(type)}&ref=${encodeURIComponent(ref)}`);
+          if (!res.ok) return;
+          const data = (await res.json()) as { arabicText?: string; basmala?: string };
+          if (!cancelled && data.arabicText) {
+            setArabicScriptMap((prev) => ({
+              ...prev,
+              [entry.id]: { arabicText: data.arabicText!, basmala: data.basmala },
+            }));
+          }
+        } catch {
+          // Non-fatal: transliteration and Turkish meaning remain visible
+        }
+      })
+    );
+
+    return () => {
+      cancelled = true;
+    };
+  }, [activeTab, arabicScriptMap]);
+
+  const activeQari = QARI_OPTIONS.find((q) => q.id === selectedQariId) ?? QARI_OPTIONS[0];
+
+  const handleToggleRecitation = async (entry: SurahDuaEntry) => {
+    if (playingEntryId === entry.id) {
+      stopEveryAudio();
+      return;
+    }
+
+    stopEveryAudio();
+
+    const qariUrl = getQariAudioUrl(entry, selectedQariId);
+    if (qariUrl) {
+      setLoadingAudioEntryId(entry.id);
+      const audio = new Audio(qariUrl);
+      qariAudioRef.current = audio;
+
+      audio.oncanplay = () => {
+        setLoadingAudioEntryId((cur) => (cur === entry.id ? null : cur));
+      };
+      audio.onplay = () => {
+        setLoadingAudioEntryId(null);
+        setPlayingEntryId(entry.id);
+      };
+      audio.onended = () => {
+        if (qariAudioRef.current === audio) qariAudioRef.current = null;
+        setPlayingEntryId((cur) => (cur === entry.id ? null : cur));
+      };
+      audio.onerror = () => {
+        if (qariAudioRef.current === audio) qariAudioRef.current = null;
+        setLoadingAudioEntryId(null);
+        setPlayingEntryId(null);
+        notify(
+          'error',
+          'Tilavet Yüklenemedi',
+          `${activeQari.name} ses kaydına şu an ulaşılamadı. Farklı bir kâri seçerek tekrar deneyebilirsiniz.`
+        );
+      };
+
+      try {
+        await audio.play();
+      } catch {
+        setLoadingAudioEntryId(null);
+        setPlayingEntryId(null);
+      }
+      return;
+    }
+
+    // Non-Quranic Sunnah namaz duas (Sübhaneke, Ettehiyyâtü): play Arabic studio recitation via Gemini TTS
+    if (entry.staticArabicText) {
+      setLoadingAudioEntryId(entry.id);
+      try {
+        await playStudioAudio(entry.staticArabicText, {
+          voiceName: 'Charon',
+          rate: 0.94,
+          style: 'Calm, respectful, slow classical Arabic pronunciation of an Islamic namaz prayer',
+          onStart: () => {
+            setLoadingAudioEntryId(null);
+            setPlayingEntryId(entry.id);
+          },
+          onEnd: () => {
+            setPlayingEntryId((cur) => (cur === entry.id ? null : cur));
+          },
+        });
+      } catch (err) {
+        setLoadingAudioEntryId(null);
+        setPlayingEntryId(null);
+        notify(
+          'error',
+          'Dua Seslendirilemedi',
+          err instanceof Error ? err.message : 'Ses dosyası hazırlanamadı.'
+        );
+      }
+    }
+  };
 
   const filteredStories =
     themeFilter === 'Tümü'
@@ -127,23 +272,23 @@ export function ReligionModule() {
       <header className="flex flex-col md:flex-row md:items-end justify-between gap-4">
         <div>
           <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
-            Ortaokul (5–8. Sınıf &amp; LGS) · İbadet Animasyonları, Hikmetli Kıssalar ve 5×10 Test
+            Ortaokul (5–8. Sınıf &amp; LGS) · İbadet Animasyonları, Gerçek Kâri Tilavet ve 5×10 Test
           </p>
           <h1 className="mt-1 text-2xl sm:text-3xl font-semibold text-navy-900 dark:text-white tracking-tight">
             Din Kültürü ve Ahlak Bilgisi Akademisi
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400 max-w-3xl">
             Adım adım abdest ve namaz hareketleri animasyonları, Kâbe tavaf ve oruç-zekât simülatörleri,
-            hikmetli hikâyeler, sure mealleri ve 50 soruluk LGS test bankası.
+            Arapça harekeli sure ve dualar, dünyaca ünlü kârilerden tilavet ve 50 soruluk LGS test bankası.
           </p>
         </div>
 
         <button
           type="button"
-          onClick={() => stopAllSpeech()}
+          onClick={() => stopEveryAudio()}
           className="self-start md:self-auto px-3.5 py-2 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer whitespace-nowrap"
         >
-          Seslendirmeyi Durdur
+          Tilaveti / Sesi Durdur
         </button>
       </header>
 
@@ -182,7 +327,9 @@ export function ReligionModule() {
       </nav>
 
       {/* TAB 1: WORSHIP ANIMATIONS */}
-      {activeTab === 'worship' && <WorshipAnimationsLab />}
+      {activeTab === 'worship' && (
+        <WorshipAnimationsLab onOpenSurahs={() => setActiveTab('surahs')} />
+      )}
 
       {/* TAB 2: WISDOM STORIES */}
       {activeTab === 'stories' && (
@@ -334,15 +481,15 @@ export function ReligionModule() {
             </div>
           </section>
 
-          {/* Surahs & Duas Library */}
-          <section className="space-y-4">
+          {/* Surahs & Duas Library with Arabic Text & Real Qari Recitation */}
+          <section className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
               <div>
                 <h2 className="text-lg font-semibold text-navy-900 dark:text-white">
-                  Namaz Sureleri, Dualar ve Türkçe Mealleri
+                  Arapça Sure ve Dualar · Gerçek Kâri Tilavet Dinleme
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Okunuş, Türkçe meal ve ana mesajları inceleyip sesli dinleyebilirsiniz.
+                  Harekeli Arapça metinleri takip ederek seçtiğiniz dünyaca ünlü kâriden tecvidli tilavet dinleyebilirsiniz.
                 </p>
               </div>
               <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
@@ -363,46 +510,153 @@ export function ReligionModule() {
               </div>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
-              {filteredSurahs.map((entry) => (
-                <article
-                  key={entry.id}
-                  className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between gap-4"
-                >
-                  <div className="space-y-2.5">
-                    <div className="flex items-start justify-between gap-2">
-                      <div>
-                        <p className="text-xs text-teal-700 dark:text-teal-400">{entry.category}</p>
-                        <h3 className="text-base font-semibold text-navy-900 dark:text-white">
-                          {entry.title}
-                        </h3>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() =>
-                          speakInstant(`${entry.title} Türkçe meali: ${entry.turkishMeaning}`, {
-                            lang: 'tr-TR',
-                            rate: 0.92,
-                          })
-                        }
-                        className="inline-flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer whitespace-nowrap"
+            {/* Real Qari Selector Bar */}
+            <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="inline-flex items-center gap-2">
+                  <Headphones className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                  <h3 className="text-sm font-semibold text-navy-900 dark:text-white">
+                    Kâri (Hafız) Seçimi — Gerçek Tilavet Kayıtları
+                  </h3>
+                </div>
+                <span className="text-xs text-slate-500 dark:text-slate-400">
+                  Seçili Kâri: <strong className="text-navy-900 dark:text-white">{activeQari.name}</strong>
+                </span>
+              </div>
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-2.5">
+                {QARI_OPTIONS.map((qari) => {
+                  const isSelected = qari.id === selectedQariId;
+                  return (
+                    <button
+                      key={qari.id}
+                      type="button"
+                      onClick={() => {
+                        stopQariPlayback();
+                        setSelectedQariId(qari.id);
+                      }}
+                      className={`text-left p-3 rounded-lg border transition-colors cursor-pointer ${
+                        isSelected
+                          ? 'border-navy-900 bg-navy-900 text-white dark:border-teal-500 dark:bg-teal-600'
+                          : 'border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-950/60 hover:border-teal-500/60'
+                      }`}
+                    >
+                      <p
+                        className={`text-xs font-semibold ${
+                          isSelected ? 'text-white' : 'text-navy-900 dark:text-white'
+                        }`}
                       >
-                        <Volume2 className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-                        <span>Meali Dinle</span>
-                      </button>
+                        {qari.name}
+                      </p>
+                      <p
+                        className={`mt-0.5 text-[11px] ${
+                          isSelected ? 'text-slate-200' : 'text-slate-500 dark:text-slate-400'
+                        }`}
+                      >
+                        {qari.countryAndStyle}
+                      </p>
+                    </button>
+                  );
+                })}
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-5">
+              {filteredSurahs.map((entry) => {
+                const isPlaying = playingEntryId === entry.id;
+                const isLoadingAudio = loadingAudioEntryId === entry.id;
+                const fetchedArabic = arabicScriptMap[entry.id];
+                const arabicText = entry.staticArabicText || fetchedArabic?.arabicText;
+                const basmala = fetchedArabic?.basmala;
+                const isQuranicAudio = entry.audioType === 'surah' || entry.audioType === 'ayah';
+
+                return (
+                  <article
+                    key={entry.id}
+                    className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 flex flex-col justify-between gap-4"
+                  >
+                    <div className="space-y-3.5">
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div>
+                          <p className="text-xs text-teal-700 dark:text-teal-400">
+                            {entry.category}
+                            {isQuranicAudio ? ` · ${activeQari.name}` : ' · Sünnet Namaz Duası'}
+                          </p>
+                          <h3 className="text-base font-semibold text-navy-900 dark:text-white">
+                            {entry.title}
+                          </h3>
+                        </div>
+
+                        <button
+                          type="button"
+                          onClick={() => void handleToggleRecitation(entry)}
+                          disabled={isLoadingAudio}
+                          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60 ${
+                            isPlaying
+                              ? 'bg-teal-600 text-white hover:bg-teal-700'
+                              : 'bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500'
+                          }`}
+                        >
+                          {isLoadingAudio ? (
+                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                          ) : isPlaying ? (
+                            <Pause className="w-3.5 h-3.5" />
+                          ) : (
+                            <Play className="w-3.5 h-3.5" />
+                          )}
+                          <span>
+                            {isLoadingAudio
+                              ? 'Yükleniyor...'
+                              : isPlaying
+                                ? 'Tilaveti Durdur'
+                                : isQuranicAudio
+                                  ? 'Kâriden Dinle'
+                                  : 'Arapça Okunuşu Dinle'}
+                          </span>
+                        </button>
+                      </div>
+
+                      {/* Vocalized Arabic Text (RTL) */}
+                      <div
+                        dir="rtl"
+                        lang="ar"
+                        className="p-4 sm:p-5 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200/80 dark:border-slate-800 text-right space-y-2"
+                      >
+                        {basmala && (
+                          <p className="font-arabic text-lg sm:text-xl text-teal-700 dark:text-teal-400 text-center pb-1">
+                            {basmala}
+                          </p>
+                        )}
+                        {arabicText ? (
+                          <p className="font-arabic text-2xl sm:text-[26px] text-navy-900 dark:text-slate-100">
+                            {arabicText}
+                          </p>
+                        ) : (
+                          <div className="flex items-center justify-end gap-2 text-xs text-slate-500 dark:text-slate-400" dir="ltr">
+                            <Loader2 className="w-3.5 h-3.5 animate-spin text-teal-600" />
+                            <span>Harekeli Arapça metin yükleniyor...</span>
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Latin Transliteration */}
+                      <p className="text-xs sm:text-sm text-slate-700 dark:text-slate-200 leading-relaxed">
+                        <strong className="text-navy-900 dark:text-white">Okunuşu:</strong>{' '}
+                        {entry.transliteration}
+                      </p>
+
+                      {/* Turkish Meaning (read-only, no Turkish TTS button) */}
+                      <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
+                        <strong className="text-navy-900 dark:text-white">Türkçe Meali:</strong>{' '}
+                        {entry.turkishMeaning}
+                      </p>
                     </div>
-                    <p className="text-xs sm:text-sm text-navy-900 dark:text-slate-100 leading-relaxed bg-slate-50 dark:bg-slate-950/60 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
-                      {entry.transliteration}
+
+                    <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-800">
+                      <strong>Temel Mesaj:</strong> {entry.keyMessage}
                     </p>
-                    <p className="text-xs sm:text-sm text-slate-600 dark:text-slate-300 leading-relaxed">
-                      <strong>Meali:</strong> {entry.turkishMeaning}
-                    </p>
-                  </div>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 pt-3 border-t border-slate-100 dark:border-slate-800">
-                    <strong>Temel Mesaj:</strong> {entry.keyMessage}
-                  </p>
-                </article>
-              ))}
+                  </article>
+                );
+              })}
             </div>
           </section>
         </div>

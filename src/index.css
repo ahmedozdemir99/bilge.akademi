@@ -6,6 +6,7 @@
   --font-display: "Fraunces", Georgia, "Times New Roman", serif;
   --font-sans: "Plus Jakarta Sans", ui-sans-serif, system-ui, -apple-system, sans-serif;
   --font-mono: "JetBrains Mono", ui-monospace, SFMono-Regular, monospace;
+  --font-arabic: "Amiri", "Traditional Arabic", "Scheherazade New", Georgia, serif;
 
   --color-navy-950: #061224;
   --color-navy-900: #0B1F3A;
@@ -28,6 +29,11 @@
   h1, h2, .font-display {
     font-family: var(--font-display);
     text-wrap: balance;
+  }
+
+  .font-arabic {
+    font-family: var(--font-arabic);
+    line-height: 2.15;
   }
 
   .tabular-nums {

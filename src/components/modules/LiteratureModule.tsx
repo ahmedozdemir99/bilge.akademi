@@ -29,8 +29,9 @@ import { analyzePoemAlgorithmically } from '../../utils/poetryUtils';
 import { ConfirmDialog } from '../ui/Modal';
 import { MultiTestQuizEngine } from '../ui/MultiTestQuizEngine';
 import { LiteratureTreasuryPanel } from './literature/LiteratureTreasuryPanel';
+import { PoemVoiceRecorder } from './literature/PoemVoiceRecorder';
 
-type LiteratureTab = 'treasury' | 'editor' | 'generator' | 'library' | 'quiz';
+type LiteratureTab = 'treasury' | 'editor' | 'recorder' | 'generator' | 'library' | 'quiz';
 type LibrarySubTab = 'periods' | 'movements' | 'authors' | 'devices' | 'works';
 
 interface AIPoemAnalysis {
@@ -222,6 +223,7 @@ export function LiteratureModule() {
             [
               { id: 'treasury', label: 'Veciz Sözler, Şiirler & Hiciv' },
               { id: 'editor', label: `Şiir Editörü (${poems.length})` },
+              { id: 'recorder', label: 'Sesli Şiir Kaydı' },
               { id: 'generator', label: 'Şiir Oluşturucu' },
               { id: 'library', label: 'Edebiyat Kütüphanesi' },
               { id: 'quiz', label: 'Testler (5×10)' },
@@ -421,6 +423,9 @@ export function LiteratureModule() {
               </p>
             </section>
 
+            {/* Voice Recorder right below Poem Editor */}
+            <PoemVoiceRecorder poemTitle={title} poemContent={content} onNotify={notify} />
+
             {/* AI Analysis Result */}
             {aiError && (
               <div className="flex items-start gap-2.5 p-4 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-300">
@@ -615,6 +620,59 @@ export function LiteratureModule() {
               ))}
             </div>
           </aside>
+        </div>
+      )}
+
+      {/* TAB 1.5: DEDICATED POEM VOICE RECORDING STUDIO */}
+      {activeTab === 'recorder' && (
+        <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+          <div className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
+            <div>
+              <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
+                Sesli Okuma Metni (Prompter)
+              </p>
+              <h2 className="mt-1 text-lg font-semibold text-navy-900 dark:text-white">
+                {title || 'Başlıksız Şiir'}
+              </h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Kayıt yaparken aşağıdan kendi şiirinizi veya kayıtlı şiirlerinizden birini seçip okuyabilirsiniz.
+              </p>
+            </div>
+
+            {poems.length > 0 && (
+              <div>
+                <label htmlFor="rec-poem-select" className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1">
+                  Kayıtlı Şiir Seç
+                </label>
+                <select
+                  id="rec-poem-select"
+                  value={editingId ?? ''}
+                  onChange={(e) => {
+                    const found = poems.find((p) => p.id === e.target.value);
+                    if (found) handleSelectSavedPoem(found);
+                  }}
+                  className="w-full px-3 py-2 text-xs rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
+                >
+                  <option value="">Mevcut Editördeki Şiir</option>
+                  {poems.map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.title} ({p.genre})
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+
+            <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800">
+              <pre className="font-display text-sm sm:text-base leading-8 text-slate-800 dark:text-slate-100 whitespace-pre-wrap">
+                {content || 'Okumak istediğiniz dizeleri Şiir Editörü sekmesine yazabilir veya doğrudan kayda başlayabilirsiniz.'}
+              </pre>
+            </div>
+          </div>
+
+          <div className="lg:col-span-7">
+            <PoemVoiceRecorder poemTitle={title} poemContent={content} onNotify={notify} />
+          </div>
         </div>
       )}
 

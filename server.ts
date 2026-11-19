@@ -327,7 +327,7 @@ app.post('/api/ai/history-tutor', async (req, res) => {
   if (!ai) return;
 
   const { mode, level, topic, periodA, periodB } = req.body ?? {};
-  const safeLevel = String(level || 'Lise').slice(0, 40);
+  const safeLevel = String(level || 'Ortaokul (5–8. Sınıf)').slice(0, 40);
 
   let prompt = '';
   if (mode === 'compare') {
@@ -392,12 +392,12 @@ app.post('/api/ai/math-solve', async (req, res) => {
   }
 
   const prompt = `
-Sen BİLGE AKADEMİ Matematik Öğretmenisin. Aşağıdaki matematik problemini 6 aşamalı bilimsel yöntemle Türkçe çöz.
-Matematiksel ifadeler için geçerli LaTeX sözdizimi kullan (ör. x^2 - 5x + 6 = 0, \\frac{-b \\pm \\sqrt{\\Delta}}{2a}).
-Her adımın hem Türkçe açıklamasını hem de saf LaTeX formülünü (dolar işareti olmadan) ver.
+Sen BİLGE AKADEMİ Ortaokul (5–8. Sınıf & LGS) Matematik Öğretmenisin. Aşağıdaki matematik problemini MEB ortaokul müfredatına uygun 6 aşamalı yöntemle Türkçe çöz.
+Matematiksel ifadeler için geçerli LaTeX sözdizimi kullan (ör. 3x + 5 = 20, a^2 + b^2 = c^2, \\sqrt{64} = 8, \\text{EBOB}(36, 48) = 12).
+Her adımın hem Türkçe açıklamasını hem de saf LaTeX formülünü (dolar işareti olmadan) ver. Lise düzeyinde kapsam dışı kavramlar (parabol, fonksiyon, türev, integral, trigonometri) kullanma.
 
-Konu: ${String(topic || 'Genel Matematik').slice(0, 60)}
-Seviye: ${String(gradeLevel || 'Lise').slice(0, 40)}
+Konu: ${String(topic || 'Ortaokul Matematik').slice(0, 60)}
+Seviye: ${String(gradeLevel || '8. Sınıf (LGS)').slice(0, 40)}
 Problem: ${problem.slice(0, 1200)}
 `;
 
@@ -461,7 +461,8 @@ app.post('/api/ai/math-exercise', async (req, res) => {
   const { gradeLevel, topic, difficulty } = req.body ?? {};
 
   const prompt = `
-"${String(gradeLevel || '10. Sınıf').slice(0, 30)}" seviyesinde, "${String(topic || 'Denklem Çözme').slice(0, 60)}" konusunda, "${String(difficulty || 'orta').slice(0, 20)}" zorluk derecesinde TEK bir özgün Türkçe matematik alıştırma sorusu üret.
+MEB Ortaokul müfredatına (5–8. Sınıf & LGS) tam uyumlu olacak şekilde "${String(gradeLevel || '8. Sınıf (LGS)').slice(0, 30)}" seviyesinde, "${String(topic || 'Birinci Dereceden Denklemler').slice(0, 60)}" konusunda, "${String(difficulty || 'orta').slice(0, 20)}" zorluk derecesinde TEK bir özgün Türkçe matematik alıştırma sorusu üret.
+Lise konularına (parabol, fonksiyon, ikinci dereceden denklem, trigonometri) kesinlikle girme.
 Cevabı net sayısal veya kısa cebirsel ifade olsun.
 Ayrıca öğrenci yanlış cevap verirse aşamalı gösterilecek 3 kademeli ipucu (1. ipucu genel yönlendirme, 2. ipucu formül/yöntem, 3. ipucu son adıma yaklaştıran rehberlik) ve eksiksiz adım adım çözüm açıklaması üret.
 `;
@@ -713,6 +714,87 @@ app.post('/api/ai/tts', async (req, res) => {
   } catch (error) {
     const formatted = formatGeminiError(error);
     res.status(formatted.status).json({ error: formatted.message });
+  }
+});
+
+/* ---------------- QURAN ARABIC SCRIPT PROXY (ALQURAN CLOUD) ---------------- */
+
+const quranTextCache = new Map<string, { arabicText: string; basmala?: string }>();
+const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
+
+function toArabicIndicNumber(n: number): string {
+  return String(n)
+    .split('')
+    .map((ch) => ARABIC_DIGITS[Number(ch)] ?? ch)
+    .join('');
+}
+
+app.get('/api/quran/arabic', async (req, res) => {
+  const type = String(req.query.type || '');
+  const ref = String(req.query.ref || '');
+
+  if (type !== 'surah' && type !== 'ayah') {
+    res.status(400).json({ error: 'Geçersiz tür. surah veya ayah bekleniyor.' });
+    return;
+  }
+  if (!/^\d+(:\d+)?$/.test(ref)) {
+    res.status(400).json({ error: 'Geçersiz sure/ayet referansı.' });
+    return;
+  }
+
+  const cacheKey = `${type}:${ref}`;
+  const cached = quranTextCache.get(cacheKey);
+  if (cached) {
+    res.json(cached);
+    return;
+  }
+
+  try {
+    const endpoint =
+      type === 'surah'
+        ? `https://api.alquran.cloud/v1/surah/${ref}/quran-uthmani`
+        : `https://api.alquran.cloud/v1/ayah/${ref}/quran-uthmani`;
+    const upstream = await fetch(endpoint);
+    if (!upstream.ok) {
+      res.status(502).json({ error: 'Arapça mushaf metni alınamadı.' });
+      return;
+    }
+    const payload = (await upstream.json()) as {
+      data?: {
+        number?: number;
+        text?: string;
+        ayahs?: Array<{ numberInSurah: number; text: string }>;
+      };
+    };
+
+    if (type === 'ayah' && payload.data?.text) {
+      const result = { arabicText: payload.data.text.trim() };
+      quranTextCache.set(cacheKey, result);
+      res.json(result);
+      return;
+    }
+
+    if (type === 'surah' && Array.isArray(payload.data?.ayahs)) {
+      const surahNo = Number(ref);
+      const basmalaPrefix = 'بِسْمِ ٱللَّهِ ٱلرَّحْمَٰنِ ٱلرَّحِيمِ';
+      let basmala: string | undefined;
+      const formattedAyahs = payload.data.ayahs.map((a, idx) => {
+        let text = a.text.trim();
+        if (surahNo !== 1 && surahNo !== 9 && idx === 0 && text.startsWith(basmalaPrefix)) {
+          basmala = basmalaPrefix;
+          text = text.slice(basmalaPrefix.length).trim();
+        }
+        return `${text} ﴿${toArabicIndicNumber(a.numberInSurah)}﴾`;
+      });
+      const result = { arabicText: formattedAyahs.join(' '), basmala };
+      quranTextCache.set(cacheKey, result);
+      res.json(result);
+      return;
+    }
+
+    res.status(502).json({ error: 'Beklenmeyen API yanıtı.' });
+  } catch {
+    res.status(502).json({ error: 'Arapça metin sunucusuna ulaşılamadı.' });
   }
 });
 
