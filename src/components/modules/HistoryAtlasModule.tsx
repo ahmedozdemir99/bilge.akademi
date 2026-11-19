@@ -525,106 +525,191 @@ export function HistoryAtlasModule() {
                 </div>
               </div>
 
-              {/* Zoomable Cartographic SVG Canvas */}
-              <div className="overflow-auto rounded-lg border border-slate-200 dark:border-slate-800 bg-[#0D213B]">
-                <svg
-                  viewBox="0 0 1000 500"
-                  className="block transition-transform duration-200 origin-center"
-                  style={{ width: `${mapZoom * 100}%`, minWidth: '100%', height: 'auto' }}
-                  role="img"
-                  aria-label="Tarihî olayların yaklaşık coğrafi konum haritası"
-                >
-                  {/* Cartographic Grid */}
-                  <defs>
-                    <pattern id="atlasGrid" width="50" height="50" patternUnits="userSpaceOnUse">
-                      <path
-                        d="M 50 0 L 0 0 0 50"
-                        fill="none"
-                        stroke="#38BDF8"
-                        strokeOpacity="0.10"
-                        strokeWidth="1"
-                      />
-                    </pattern>
-                  </defs>
-                  <rect width="1000" height="500" fill="url(#atlasGrid)" />
+              {/* Zoomable Colorful Cartographic SVG Canvas */}
+              <div className="overflow-hidden rounded-xl border border-slate-300 dark:border-slate-700 bg-[#0B6A94] shadow-xs">
+                {(() => {
+                  const vbW = 1000 / mapZoom;
+                  const vbH = 500 / mapZoom;
+                  const focusX = mapZoom > 1 ? selectedEvent.mapX : 500;
+                  const focusY = mapZoom > 1 ? selectedEvent.mapY : 250;
+                  const vbX = Math.max(0, Math.min(1000 - vbW, focusX - vbW / 2));
+                  const vbY = Math.max(0, Math.min(500 - vbH, focusY - vbH / 2));
+                  return (
+                    <svg
+                      viewBox={`${vbX.toFixed(1)} ${vbY.toFixed(1)} ${vbW.toFixed(1)} ${vbH.toFixed(1)}`}
+                      className="block w-full h-auto select-none transition-all duration-300"
+                      role="img"
+                      aria-label="Tarihî olayların yaklaşık coğrafi konum haritası"
+                    >
+                      <defs>
+                        <linearGradient id="worldSeaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#0C7AA8" />
+                          <stop offset="50%" stopColor="#0E88B8" />
+                          <stop offset="100%" stopColor="#085C84" />
+                        </linearGradient>
+                        <linearGradient id="worldEurasiaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#D3E2B7" />
+                          <stop offset="50%" stopColor="#E5D5A6" />
+                          <stop offset="100%" stopColor="#D9BE88" />
+                        </linearGradient>
+                        <linearGradient id="worldAfricaGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#F0E0B6" />
+                          <stop offset="60%" stopColor="#E4C892" />
+                          <stop offset="100%" stopColor="#D4B77E" />
+                        </linearGradient>
+                        <linearGradient id="worldAmericasGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                          <stop offset="0%" stopColor="#C9DFB0" />
+                          <stop offset="100%" stopColor="#DECFA0" />
+                        </linearGradient>
+                        <pattern id="atlasGrid" width="50" height="50" patternUnits="userSpaceOnUse">
+                          <path
+                            d="M 50 0 L 0 0 0 50"
+                            fill="none"
+                            stroke="#BAE6FD"
+                            strokeOpacity="0.18"
+                            strokeWidth="0.8"
+                          />
+                        </pattern>
+                        <filter id="worldCoastHalo" x="-4%" y="-4%" width="108%" height="108%">
+                          <feDropShadow dx="0" dy="0" stdDeviation="3" floodColor="#67E8F9" floodOpacity="0.45" />
+                        </filter>
+                      </defs>
 
-                  {/* Stylized Natural Landmasses (No Modern Political Borders) */}
-                  {/* Americas (West simplified contour) */}
-                  <path
-                    d="M 55 110 L 185 115 L 220 190 L 180 265 L 225 340 L 195 450 L 145 435 L 125 320 L 85 240 Z"
-                    fill="#1C395E"
-                    stroke="#C89B3C"
-                    strokeOpacity="0.35"
-                    strokeWidth="1.2"
-                  />
-                  {/* Europe & Anatolia & Asia */}
-                  <path
-                    d="M 290 135 L 355 110 L 445 95 L 610 85 L 815 95 L 920 150 L 895 245 L 820 310 L 735 320 L 665 345 L 615 295 L 555 325 L 500 280 L 455 240 L 410 218 L 360 220 L 300 205 Z"
-                    fill="#1C395E"
-                    stroke="#C89B3C"
-                    strokeOpacity="0.45"
-                    strokeWidth="1.4"
-                  />
-                  {/* Africa */}
-                  <path
-                    d="M 310 245 L 435 248 L 495 280 L 535 345 L 485 455 L 415 455 L 370 365 L 305 315 Z"
-                    fill="#183254"
-                    stroke="#C89B3C"
-                    strokeOpacity="0.35"
-                    strokeWidth="1.2"
-                  />
+                      {/* Ocean & Graticule */}
+                      <rect width="1000" height="500" fill="url(#worldSeaGrad)" />
+                      <rect width="1000" height="500" fill="url(#atlasGrid)" />
 
-                  {/* Geographic Region Labels */}
-                  <text x="485" y="203" fill="#94A3B8" fontSize="11" fontFamily="sans-serif">
-                    Anadolu
-                  </text>
-                  <text x="695" y="150" fill="#94A3B8" fontSize="11" fontFamily="sans-serif">
-                    Orta Asya Bozkırları
-                  </text>
-                  <text x="345" y="150" fill="#94A3B8" fontSize="11" fontFamily="sans-serif">
-                    Avrupa
-                  </text>
-                  <text x="548" y="308" fill="#94A3B8" fontSize="11" fontFamily="sans-serif">
-                    Mezopotamya
-                  </text>
-                  <text x="405" y="236" fill="#38BDF8" fontSize="10" opacity="0.6" fontFamily="sans-serif">
-                    Akdeniz
-                  </text>
-
-                  {/* Historical Event Markers */}
-                  {mapEvents.map((ev) => {
-                    const isSelected = ev.id === selectedEvent.id;
-                    const fill = CATEGORY_FILL[ev.category];
-                    return (
-                      <g
-                        key={ev.id}
-                        transform={`translate(${ev.mapX}, ${ev.mapY})`}
-                        onClick={() => setSelectedEventId(ev.id)}
-                        className="cursor-pointer"
-                      >
-                        {isSelected && (
-                          <circle r="15" fill="#DDB75F" fillOpacity="0.28" stroke="#DDB75F" strokeWidth="1.5" />
-                        )}
-                        <circle
-                          r={isSelected ? 8 : 6}
-                          fill={fill}
-                          stroke="#FFFFFF"
-                          strokeWidth="2"
+                      {/* Distinct Continental Landmasses (No Modern Political Borders) */}
+                      <g filter="url(#worldCoastHalo)">
+                        {/* Americas */}
+                        <path
+                          d="M 55 110 L 185 115 L 220 190 L 180 265 L 225 340 L 195 450 L 145 435 L 125 320 L 85 240 Z"
+                          fill="url(#worldAmericasGrad)"
+                          stroke="#6E5D3E"
+                          strokeWidth="1.4"
+                          strokeLinejoin="round"
                         />
-                        <text
-                          x="11"
-                          y="4"
-                          fill="#F8FAFC"
-                          fontSize="11"
-                          fontWeight={isSelected ? '700' : '500'}
-                          fontFamily="sans-serif"
-                        >
-                          {ev.displayDate}
+                        {/* Europe, Anatolia, Middle East & Asia (with Black Sea & Mediterranean indented clearly) */}
+                        <path
+                          d="M 290 135 L 355 110 L 445 95 L 610 85 L 815 95 L 920 150 L 895 245 L 820 310 L 735 320 L 665 345 L 615 295 L 555 325 L 512 280 L 502 246 L 456 238 L 446 214 L 454 198 L 442 198 L 418 224 L 398 206 L 364 218 L 300 205 Z"
+                          fill="url(#worldEurasiaGrad)"
+                          stroke="#6E5D3E"
+                          strokeWidth="1.5"
+                          strokeLinejoin="round"
+                        />
+                        {/* Black Sea Cutout */}
+                        <path
+                          d="M 454 176 Q 478 152 522 158 Q 554 166 558 184 Q 515 190 462 188 Z"
+                          fill="#0D82B2"
+                          stroke="#6E5D3E"
+                          strokeWidth="1.1"
+                        />
+                        {/* Africa */}
+                        <path
+                          d="M 310 250 L 438 252 L 494 276 L 535 345 L 485 455 L 415 455 L 370 365 L 305 315 Z"
+                          fill="url(#worldAfricaGrad)"
+                          stroke="#6E5D3E"
+                          strokeWidth="1.4"
+                          strokeLinejoin="round"
+                        />
+                        {/* Cyprus & Crete */}
+                        <ellipse cx="492" cy="252" rx="7" ry="3.2" fill="#E2D2A2" stroke="#6E5D3E" strokeWidth="0.9" />
+                        <ellipse cx="436" cy="233" rx="9" ry="2.8" fill="#E2D2A2" stroke="#6E5D3E" strokeWidth="0.9" />
+                      </g>
+
+                      {/* Geographic Region & Ocean Labels */}
+                      <g className="pointer-events-none select-none">
+                        <text x="505" y="177" fill="#E0F2FE" fontSize="9.5" fontStyle="italic" fontWeight="600" textAnchor="middle">
+                          Karadeniz
+                        </text>
+                        <text x="415" y="244" fill="#E0F2FE" fontSize="11" fontStyle="italic" fontWeight="600" textAnchor="middle">
+                          AKDENİZ
+                        </text>
+                        <text x="250" y="340" fill="#E0F2FE" fontSize="12" fontStyle="italic" fontWeight="600" opacity="0.8" textAnchor="middle">
+                          ATLAS OKYANUSU
+                        </text>
+                        <text x="640" y="405" fill="#E0F2FE" fontSize="12" fontStyle="italic" fontWeight="600" opacity="0.8" textAnchor="middle">
+                          HİNT OKYANUSU
+                        </text>
+                        <text x="488" y="213" fill="#6B5634" fontSize="11" fontWeight="700" opacity="0.8">
+                          Anadolu
+                        </text>
+                        <text x="695" y="150" fill="#6B5634" fontSize="11.5" fontWeight="700" opacity="0.78">
+                          Orta Asya Bozkırları
+                        </text>
+                        <text x="345" y="150" fill="#52603C" fontSize="11.5" fontWeight="700" opacity="0.78">
+                          Avrupa
+                        </text>
+                        <text x="548" y="302" fill="#785E33" fontSize="11" fontWeight="700" opacity="0.78">
+                          Mezopotamya
+                        </text>
+                        <text x="418" y="355" fill="#785E33" fontSize="12" fontWeight="700" opacity="0.72">
+                          Afrika
                         </text>
                       </g>
-                    );
-                  })}
-                </svg>
+
+                      {/* Historical Event Markers */}
+                      {mapEvents.map((ev) => {
+                        const isSelected = ev.id === selectedEvent.id;
+                        const fill = CATEGORY_FILL[ev.category];
+                        return (
+                          <g
+                            key={ev.id}
+                            transform={`translate(${ev.mapX}, ${ev.mapY})`}
+                            onClick={() => setSelectedEventId(ev.id)}
+                            className="cursor-pointer"
+                          >
+                            {isSelected && (
+                              <circle r="15" fill="#F59E0B" fillOpacity="0.32" stroke="#FCD34D" strokeWidth="1.8" />
+                            )}
+                            <circle
+                              r={isSelected ? 8.5 : 6.2}
+                              fill={fill}
+                              stroke="#FFFFFF"
+                              strokeWidth="2"
+                            />
+                            <text
+                              x="11"
+                              y="4"
+                              fill="#0B1F3A"
+                              stroke="#FFFFFF"
+                              strokeWidth="3.2"
+                              paintOrder="stroke"
+                              strokeLinejoin="round"
+                              fontSize="11"
+                              fontWeight={isSelected ? '700' : '600'}
+                            >
+                              {ev.displayDate}
+                            </text>
+                          </g>
+                        );
+                      })}
+                    </svg>
+                  );
+                })()}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-x-4 gap-y-1 text-[11px] text-slate-600 dark:text-slate-300 px-1">
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs bg-[#E2D2A2] border border-[#6E5D3E]" />
+                  <span>Kara Kütleleri</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-3 h-3 rounded-xs bg-[#0E88B8] border border-[#085C84]" />
+                  <span>Denizler &amp; Okyanuslar</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#DC2626]" />
+                  <span>Savaş</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0B1F3A]" />
+                  <span>Devlet</span>
+                </span>
+                <span className="inline-flex items-center gap-1.5">
+                  <span className="w-2.5 h-2.5 rounded-full bg-[#0D9488]" />
+                  <span>Kültür &amp; Bilim</span>
+                </span>
               </div>
             </div>
 

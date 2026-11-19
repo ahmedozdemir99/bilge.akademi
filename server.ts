@@ -2,7 +2,7 @@ import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
-import { GoogleGenAI, Type } from '@google/genai';
+import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -12,6 +12,7 @@ app.use(express.json({ limit: '1.5mb' }));
 
 const PORT = Number(process.env.PORT) || 3000;
 const MODEL_NAME = 'gemini-4-hydrogen';
+const FALLBACK_MODEL_NAME = 'gemini-3.1-flash-lite';
 
 function getGenAIClient(): GoogleGenAI | null {
   const apiKey = process.env.GEMINI_API_KEY;
@@ -28,11 +29,29 @@ function getGenAIClient(): GoogleGenAI | null {
   });
 }
 
-function formatGeminiError(error: unknown): { status: number; message: string } {
+function getGenAITtsClient(): GoogleGenAI | null {
+  const apiKey = process.env.GEMINI_API_KEY;
+  if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
+    return null;
+  }
+  return new GoogleGenAI({
+    apiKey,
+    apiVersion: 'v1beta',
+    httpOptions: {
+      headers: {
+        'User-Agent': 'aistudio-build',
+      },
+    },
+  });
+}
+
+function formatGeminiError(error: unknown): { status: number; message: string; code?: string } {
   const raw = error instanceof Error ? error.message : String(error);
+  console.error('[BİLGE AKADEMİ Gemini Hatası]:', raw.slice(0, 600));
   if (raw.includes('API_KEY_INVALID') || raw.includes('PERMISSION_DENIED') || raw.includes('403')) {
     return {
       status: 403,
+      code: 'AUTH_ERROR',
       message:
         'Gemini API anahtarı geçersiz veya yetkisiz görünüyor. Lütfen Ayarlar > Gizli Anahtarlar (Secrets) panelinden API anahtarınızı kontrol edin.',
     };
@@ -40,15 +59,116 @@ function formatGeminiError(error: unknown): { status: number; message: string } 
   if (raw.includes('RESOURCE_EXHAUSTED') || raw.includes('429')) {
     return {
       status: 429,
+      code: 'QUOTA_EXHAUSTED',
       message:
-        'Yapay zekâ kullanım kotası geçici olarak doldu. Kısa bir süre sonra tekrar deneyin veya faturalandırmalı bir anahtar seçin.',
+        'Yapay zekâ kullanım kotası geçici olarak doldu. Kısa bir süre sonra tekrar deneyin veya Ayarlar > Gizli Anahtarlar (Secrets) panelinden faturalandırmalı bir anahtar seçin.',
+    };
+  }
+  if (raw.includes('NOT_FOUND') || raw.includes('404')) {
+    return {
+      status: 404,
+      code: 'MODEL_NOT_FOUND',
+      message: 'İstenen yapay zekâ modeli geçici olarak erişilemiyor.',
     };
   }
   return {
     status: 500,
+    code: raw.slice(0, 180).replace(/AIza[0-9A-Za-z_-]+/g, '[REDACTED]'),
     message:
       'Yapay zekâ servisine bağlanırken bir hata oluştu. Lütfen birkaç saniye sonra tekrar deneyin.',
   };
+}
+
+function isPermanentGeminiError(err: unknown): boolean {
+  const msg = err instanceof Error ? err.message : String(err);
+  return (
+    msg.includes('API_KEY_INVALID') ||
+    msg.includes('PERMISSION_DENIED') ||
+    msg.includes('INVALID_ARGUMENT')
+  );
+}
+
+async function withGeminiRetry<T>(fn: () => Promise<T>, maxAttempts = 2): Promise<T> {
+  let lastError: unknown;
+  for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+    try {
+      return await fn();
+    } catch (err) {
+      lastError = err;
+      if (isPermanentGeminiError(err) || attempt === maxAttempts) {
+        throw err;
+      }
+      await new Promise((r) => setTimeout(r, 450 * attempt));
+    }
+  }
+  throw lastError;
+}
+
+function withTimeout<T>(promise: Promise<T>, timeoutMs = 24000): Promise<T> {
+  return new Promise<T>((resolve, reject) => {
+    const timer = setTimeout(() => reject(new Error('GEMINI_TIMEOUT: Yanıt süresi aşıldı.')), timeoutMs);
+    promise
+      .then((val) => {
+        clearTimeout(timer);
+        resolve(val);
+      })
+      .catch((err) => {
+        clearTimeout(timer);
+        reject(err);
+      });
+  });
+}
+
+async function generateResilientContent(
+  ai: GoogleGenAI,
+  contents: string,
+  config?: Record<string, unknown>
+) {
+  const primaryConfig = {
+    ...(config ?? {}),
+    thinkingConfig: { thinkingLevel: ThinkingLevel.LOW },
+  };
+  try {
+    return await withGeminiRetry(
+      () =>
+        withTimeout(
+          ai.models.generateContent({
+            model: MODEL_NAME,
+            contents,
+            config: primaryConfig,
+          }),
+          22000
+        ),
+      2
+    );
+  } catch (primaryErr) {
+    if (isPermanentGeminiError(primaryErr)) {
+      throw primaryErr;
+    }
+    const rawMsg = primaryErr instanceof Error ? primaryErr.message : String(primaryErr);
+    console.warn(`[BİLGE AKADEMİ] ${MODEL_NAME} geçici hata (${rawMsg.slice(0, 120)}), ${FALLBACK_MODEL_NAME} ile deneniyor...`);
+    return await withGeminiRetry(
+      () =>
+        withTimeout(
+          ai.models.generateContent({
+            model: FALLBACK_MODEL_NAME,
+            contents,
+            config: config ?? {},
+          }),
+          22000
+        ),
+      2
+    );
+  }
+}
+
+function safeParseJson<T = Record<string, unknown>>(rawText: string | undefined): T {
+  const cleaned = (rawText ?? '{}')
+    .trim()
+    .replace(/^```(?:json)?\s*/i, '')
+    .replace(/\s*```$/i, '')
+    .trim();
+  return JSON.parse(cleaned || '{}') as T;
 }
 
 function ensureClient(res: express.Response): GoogleGenAI | null {
@@ -65,7 +185,7 @@ function ensureClient(res: express.Response): GoogleGenAI | null {
 
 app.get('/api/health', (_req, res) => {
   const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY');
-  res.json({ ok: true, aiConfigured: hasKey, model: MODEL_NAME });
+  res.json({ ok: true, aiConfigured: hasKey, model: MODEL_NAME, fallbackModel: FALLBACK_MODEL_NAME });
 });
 
 /* ---------------- MODULE 1: STUDENT & CLASS AI ANALYSIS ---------------- */
@@ -110,38 +230,34 @@ Devam Özeti:
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: sanitizedPrompt,
-      config: {
-        systemInstruction:
-          'Yalnızca istenen JSON şemasına uygun, yapıcı, bilimsel ve Türkçe pedagojik değerlendirme üret. Kesin tanı veya yargılayıcı ifadeler kullanma.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            summary: { type: Type.STRING },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            growthAreas: { type: Type.ARRAY, items: { type: Type.STRING } },
-            studyRecommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
-            attendanceNote: { type: Type.STRING },
-            pedagogicalDisclaimer: { type: Type.STRING },
-          },
-          required: [
-            'summary',
-            'strengths',
-            'growthAreas',
-            'studyRecommendations',
-            'attendanceNote',
-            'pedagogicalDisclaimer',
-          ],
+    const response = await generateResilientContent(ai, sanitizedPrompt, {
+      systemInstruction:
+        'Yalnızca istenen JSON şemasına uygun, yapıcı, bilimsel ve Türkçe pedagojik değerlendirme üret. Kesin tanı veya yargılayıcı ifadeler kullanma.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          summary: { type: Type.STRING },
+          strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+          growthAreas: { type: Type.ARRAY, items: { type: Type.STRING } },
+          studyRecommendations: { type: Type.ARRAY, items: { type: Type.STRING } },
+          attendanceNote: { type: Type.STRING },
+          pedagogicalDisclaimer: { type: Type.STRING },
         },
+        required: [
+          'summary',
+          'strengths',
+          'growthAreas',
+          'studyRecommendations',
+          'attendanceNote',
+          'pedagogicalDisclaimer',
+        ],
       },
     });
-    res.json({ analysis: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ analysis: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -174,30 +290,26 @@ Toplam Devam Özeti: Katılım ${Number(attendanceTotals?.present || 0)}, Mazere
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction:
-          'Öğretmene yönelik, somut, yapıcı, Türkçe pedagojik sınıf raporu üret. Yalnızca JSON şemasına uy.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            overview: { type: Type.STRING },
-            strongSubjects: { type: Type.ARRAY, items: { type: Type.STRING } },
-            focusSubjects: { type: Type.ARRAY, items: { type: Type.STRING } },
-            teachingStrategies: { type: Type.ARRAY, items: { type: Type.STRING } },
-            disclaimer: { type: Type.STRING },
-          },
-          required: ['overview', 'strongSubjects', 'focusSubjects', 'teachingStrategies', 'disclaimer'],
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction:
+        'Öğretmene yönelik, somut, yapıcı, Türkçe pedagojik sınıf raporu üret. Yalnızca JSON şemasına uy.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          overview: { type: Type.STRING },
+          strongSubjects: { type: Type.ARRAY, items: { type: Type.STRING } },
+          focusSubjects: { type: Type.ARRAY, items: { type: Type.STRING } },
+          teachingStrategies: { type: Type.ARRAY, items: { type: Type.STRING } },
+          disclaimer: { type: Type.STRING },
         },
+        required: ['overview', 'strongSubjects', 'focusSubjects', 'teachingStrategies', 'disclaimer'],
       },
     });
-    res.json({ analysis: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ analysis: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -226,51 +338,47 @@ ${content.slice(0, 4000)}
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction:
-          'Türk edebiyatı terminolojisine uygun, yapıcı, şiiri zenginleştirmeye odaklı JSON çıktısı üret. Belirsiz kafiye veya redif durumlarını dürüstçe belirt.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            themeAndEmotion: { type: Type.STRING },
-            imageryAnalysis: { type: Type.ARRAY, items: { type: Type.STRING } },
-            literaryDevices: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  device: { type: Type.STRING },
-                  example: { type: Type.STRING },
-                  explanation: { type: Type.STRING },
-                },
-                required: ['device', 'example', 'explanation'],
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction:
+        'Türk edebiyatı terminolojisine uygun, yapıcı, şiiri zenginleştirmeye odaklı JSON çıktısı üret. Belirsiz kafiye veya redif durumlarını dürüstçe belirt.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          themeAndEmotion: { type: Type.STRING },
+          imageryAnalysis: { type: Type.ARRAY, items: { type: Type.STRING } },
+          literaryDevices: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                device: { type: Type.STRING },
+                example: { type: Type.STRING },
+                explanation: { type: Type.STRING },
               },
+              required: ['device', 'example', 'explanation'],
             },
-            rhymeAndRedifComment: { type: Type.STRING },
-            meterComment: { type: Type.STRING },
-            strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
-            suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
           },
-          required: [
-            'themeAndEmotion',
-            'imageryAnalysis',
-            'literaryDevices',
-            'rhymeAndRedifComment',
-            'meterComment',
-            'strengths',
-            'suggestions',
-          ],
+          rhymeAndRedifComment: { type: Type.STRING },
+          meterComment: { type: Type.STRING },
+          strengths: { type: Type.ARRAY, items: { type: Type.STRING } },
+          suggestions: { type: Type.ARRAY, items: { type: Type.STRING } },
         },
+        required: [
+          'themeAndEmotion',
+          'imageryAnalysis',
+          'literaryDevices',
+          'rhymeAndRedifComment',
+          'meterComment',
+          'strengths',
+          'suggestions',
+        ],
       },
     });
-    res.json({ analysis: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ analysis: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -296,27 +404,23 @@ Her dizenin hece sayısını seçilen ölçüye mümkün olduğunca tam uydur.
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction: 'Yalnızca JSON şemasına uygun özgün Türkçe şiir ve kısa edebi not üret.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            poem: { type: Type.STRING },
-            poeticNote: { type: Type.STRING },
-          },
-          required: ['title', 'poem', 'poeticNote'],
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction: 'Yalnızca JSON şemasına uygun özgün Türkçe şiir ve kısa edebi not üret.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          poem: { type: Type.STRING },
+          poeticNote: { type: Type.STRING },
         },
+        required: ['title', 'poem', 'poeticNote'],
       },
     });
-    res.json({ result: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ result: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -342,40 +446,36 @@ Nedenler, gelişim süreci, kısa ve uzun vadeli sonuçlar, tarihsel önem ve g�
   }
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction:
-          'Sen nesnel, bilimsel ve Türkçe çalışan bir tarih öğretmenisin. Kaynaklarla kesin doğrulanmayan veya tarihçiler arasında tartışmalı olan noktaları kesin gerçek gibi sunma; akademik ihtiyatla belirt. Yalnızca JSON şemasına uy.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            title: { type: Type.STRING },
-            overview: { type: Type.STRING },
-            causesAndContext: { type: Type.ARRAY, items: { type: Type.STRING } },
-            keyDevelopments: { type: Type.ARRAY, items: { type: Type.STRING } },
-            consequences: { type: Type.ARRAY, items: { type: Type.STRING } },
-            historicalCaution: { type: Type.STRING },
-            recommendedSources: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: [
-            'title',
-            'overview',
-            'causesAndContext',
-            'keyDevelopments',
-            'consequences',
-            'historicalCaution',
-            'recommendedSources',
-          ],
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction:
+        'Sen nesnel, bilimsel ve Türkçe çalışan bir tarih öğretmenisin. Kaynaklarla kesin doğrulanmayan veya tarihçiler arasında tartışmalı olan noktaları kesin gerçek gibi sunma; akademik ihtiyatla belirt. Yalnızca JSON şemasına uy.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          title: { type: Type.STRING },
+          overview: { type: Type.STRING },
+          causesAndContext: { type: Type.ARRAY, items: { type: Type.STRING } },
+          keyDevelopments: { type: Type.ARRAY, items: { type: Type.STRING } },
+          consequences: { type: Type.ARRAY, items: { type: Type.STRING } },
+          historicalCaution: { type: Type.STRING },
+          recommendedSources: { type: Type.ARRAY, items: { type: Type.STRING } },
         },
+        required: [
+          'title',
+          'overview',
+          'causesAndContext',
+          'keyDevelopments',
+          'consequences',
+          'historicalCaution',
+          'recommendedSources',
+        ],
       },
     });
-    res.json({ lesson: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ lesson: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -402,55 +502,51 @@ Problem: ${problem.slice(0, 1200)}
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction:
-          'İşlem hatası yapma; sonucu mutlaka yerine koyarak doğrula. Saf LaTeX ifadelerini $ veya $$ sarmalayıcısı olmadan latex alanına yaz. Yalnızca JSON döndür.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            analysis: { type: Type.STRING },
-            givens: { type: Type.ARRAY, items: { type: Type.STRING } },
-            targets: { type: Type.ARRAY, items: { type: Type.STRING } },
-            method: { type: Type.STRING },
-            steps: {
-              type: Type.ARRAY,
-              items: {
-                type: Type.OBJECT,
-                properties: {
-                  title: { type: Type.STRING },
-                  explanation: { type: Type.STRING },
-                  latex: { type: Type.STRING },
-                },
-                required: ['title', 'explanation', 'latex'],
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction:
+        'İşlem hatası yapma; sonucu mutlaka yerine koyarak doğrula. Saf LaTeX ifadelerini $ veya $$ sarmalayıcısı olmadan latex alanına yaz. Yalnızca JSON döndür.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          analysis: { type: Type.STRING },
+          givens: { type: Type.ARRAY, items: { type: Type.STRING } },
+          targets: { type: Type.ARRAY, items: { type: Type.STRING } },
+          method: { type: Type.STRING },
+          steps: {
+            type: Type.ARRAY,
+            items: {
+              type: Type.OBJECT,
+              properties: {
+                title: { type: Type.STRING },
+                explanation: { type: Type.STRING },
+                latex: { type: Type.STRING },
               },
+              required: ['title', 'explanation', 'latex'],
             },
-            finalAnswerLatex: { type: Type.STRING },
-            finalAnswerText: { type: Type.STRING },
-            verification: { type: Type.STRING },
-            alternativeMethod: { type: Type.STRING },
           },
-          required: [
-            'analysis',
-            'givens',
-            'targets',
-            'method',
-            'steps',
-            'finalAnswerLatex',
-            'finalAnswerText',
-            'verification',
-            'alternativeMethod',
-          ],
+          finalAnswerLatex: { type: Type.STRING },
+          finalAnswerText: { type: Type.STRING },
+          verification: { type: Type.STRING },
+          alternativeMethod: { type: Type.STRING },
         },
+        required: [
+          'analysis',
+          'givens',
+          'targets',
+          'method',
+          'steps',
+          'finalAnswerLatex',
+          'finalAnswerText',
+          'verification',
+          'alternativeMethod',
+        ],
       },
     });
-    res.json({ solution: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ solution: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -468,38 +564,34 @@ Ayrıca öğrenci yanlış cevap verirse aşamalı gösterilecek 3 kademeli ipuc
 `;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction:
-          'Doğru cevabın kesin doğruluğunu kontrol et. expressionLatex alanına $ işareti olmadan geçerli LaTeX yaz. Yalnızca JSON döndür.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            questionText: { type: Type.STRING },
-            expressionLatex: { type: Type.STRING },
-            acceptedAnswers: { type: Type.ARRAY, items: { type: Type.STRING } },
-            answerDisplayLatex: { type: Type.STRING },
-            hints: { type: Type.ARRAY, items: { type: Type.STRING } },
-            fullSolution: { type: Type.STRING },
-          },
-          required: [
-            'questionText',
-            'expressionLatex',
-            'acceptedAnswers',
-            'answerDisplayLatex',
-            'hints',
-            'fullSolution',
-          ],
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction:
+        'Doğru cevabın kesin doğruluğunu kontrol et. expressionLatex alanına $ işareti olmadan geçerli LaTeX yaz. Yalnızca JSON döndür.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          questionText: { type: Type.STRING },
+          expressionLatex: { type: Type.STRING },
+          acceptedAnswers: { type: Type.ARRAY, items: { type: Type.STRING } },
+          answerDisplayLatex: { type: Type.STRING },
+          hints: { type: Type.ARRAY, items: { type: Type.STRING } },
+          fullSolution: { type: Type.STRING },
         },
+        required: [
+          'questionText',
+          'expressionLatex',
+          'acceptedAnswers',
+          'answerDisplayLatex',
+          'hints',
+          'fullSolution',
+        ],
       },
     });
-    res.json({ exercise: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ exercise: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -530,22 +622,18 @@ app.post('/api/ai/socratic-dialogue', async (req, res) => {
 ${historyLines ? `Önceki Diyalog:\n${historyLines}\n\n` : ''}Katılımcının Yeni Argümanı: ${message.slice(0, 1500)}`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction: `${personaText}
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction: `${personaText}
 Türkçe yanıt ver. Görevlerin:
 1. Katılımcının argümanındaki temel varsayımı nazikçe özetle.
 2. Varsa gizli bir çelişkiyi veya sınır durumunu kibar biçimde işaret et.
 3. Farklı bir felsefi akımdan kısa bir karşıt bakış açısı sun.
 4. Katılımcıyı daha derine düşünmeye davet eden 1–2 güçlü Sokratik soru sor.`,
-      },
     });
     res.json({ reply: response.text ?? 'Yanıt oluşturulamadı.' });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -567,37 +655,33 @@ app.post('/api/ai/philosopher-compare', async (req, res) => {
 5. Ortak ve farklı düşünceleri`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: prompt,
-      config: {
-        systemInstruction: 'Nesnel, akademik ve anlaşılır Türkçe felsefe karşılaştırması yap. Yalnızca JSON döndür.',
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            epistemology: { type: Type.STRING },
-            ontology: { type: Type.STRING },
-            ethics: { type: Type.STRING },
-            politicsAndSociety: { type: Type.STRING },
-            commonalities: { type: Type.ARRAY, items: { type: Type.STRING } },
-            differences: { type: Type.ARRAY, items: { type: Type.STRING } },
-          },
-          required: [
-            'epistemology',
-            'ontology',
-            'ethics',
-            'politicsAndSociety',
-            'commonalities',
-            'differences',
-          ],
+    const response = await generateResilientContent(ai, prompt, {
+      systemInstruction: 'Nesnel, akademik ve anlaşılır Türkçe felsefe karşılaştırması yap. Yalnızca JSON döndür.',
+      responseMimeType: 'application/json',
+      responseSchema: {
+        type: Type.OBJECT,
+        properties: {
+          epistemology: { type: Type.STRING },
+          ontology: { type: Type.STRING },
+          ethics: { type: Type.STRING },
+          politicsAndSociety: { type: Type.STRING },
+          commonalities: { type: Type.ARRAY, items: { type: Type.STRING } },
+          differences: { type: Type.ARRAY, items: { type: Type.STRING } },
         },
+        required: [
+          'epistemology',
+          'ontology',
+          'ethics',
+          'politicsAndSociety',
+          'commonalities',
+          'differences',
+        ],
       },
     });
-    res.json({ comparison: JSON.parse((response.text ?? '{}').trim()) });
+    res.json({ comparison: safeParseJson(response.text) });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
@@ -639,25 +723,28 @@ Görevlerin:
     : message.slice(0, 2000);
 
   try {
-    const response = await ai.models.generateContent({
-      model: MODEL_NAME,
-      contents: fullPrompt,
-      config: { systemInstruction },
-    });
+    const response = await generateResilientContent(ai, fullPrompt, { systemInstruction });
     res.json({ reply: response.text ?? 'Yanıt oluşturulamadı.' });
   } catch (error) {
     const formatted = formatGeminiError(error);
-    res.status(formatted.status).json({ error: formatted.message });
+    res.status(formatted.status).json({ error: formatted.message, code: formatted.code });
   }
 });
 
 /* ---------------- TEXT-TO-SPEECH AUDIO GENERATION (GEMINI TTS) ---------------- */
 
 const ALLOWED_TTS_VOICES = new Set(['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr']);
+const ttsCache = new Map<string, { audioBase64: string; mimeType: string; voiceName: string }>();
 
 app.post('/api/ai/tts', async (req, res) => {
-  const ai = ensureClient(res);
-  if (!ai) return;
+  const ai = getGenAITtsClient();
+  if (!ai) {
+    res.status(503).json({
+      error:
+        'Gemini API anahtarı sunucuda yapılandırılmamış. Sunucu ortam değişkenlerinde GEMINI_API_KEY tanımlı olduğunda seslendirme çalışır.',
+    });
+    return;
+  }
 
   const { text, voiceName, style } = req.body ?? {};
   if (!text || typeof text !== 'string' || text.trim().length === 0) {
@@ -668,36 +755,43 @@ app.post('/api/ai/tts', async (req, res) => {
   const cleanText = text.trim().slice(0, 1200);
   const selectedVoice =
     typeof voiceName === 'string' && ALLOWED_TTS_VOICES.has(voiceName) ? voiceName : 'Kore';
-  const styleInstruction =
-    typeof style === 'string' && style.trim().length > 0
-      ? style.trim().slice(0, 140)
-      : 'Clear, natural educational teacher voice with articulate pronunciation';
+  const styleKey = typeof style === 'string' ? style.trim().slice(0, 140) : '';
+  const cacheKey = `${selectedVoice}::${styleKey}::${cleanText}`;
+  const cached = ttsCache.get(cacheKey);
+  if (cached) {
+    res.json(cached);
+    return;
+  }
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.8-flash-lite-tts',
-      contents: [
-        {
-          role: 'user',
-          parts: [
-            {
-              text: cleanText,
-              speechMetadata: {
-                style: styleInstruction,
-              },
+    const response = await withGeminiRetry(() =>
+      ai.models.generateContent({
+        model: 'gemini-3.8-flash-lite-tts',
+        contents: [
+          {
+            role: 'user',
+            parts: [
+              styleKey
+                ? {
+                    text: cleanText,
+                    speechMetadata: {
+                      style: styleKey,
+                    },
+                  }
+                : { text: cleanText },
+            ],
+          },
+        ],
+        config: {
+          responseModalities: ['AUDIO'],
+          speechConfig: {
+            voiceConfig: {
+              prebuiltVoiceConfig: { voiceName: selectedVoice },
             },
-          ],
-        },
-      ],
-      config: {
-        responseModalities: ['AUDIO'],
-        speechConfig: {
-          voiceConfig: {
-            prebuiltVoiceConfig: { voiceName: selectedVoice },
           },
         },
-      },
-    });
+      })
+    );
 
     const audioPart = response.candidates?.[0]?.content?.parts?.[0]?.inlineData;
     const base64Audio = audioPart?.data;
@@ -706,11 +800,19 @@ app.post('/api/ai/tts', async (req, res) => {
       return;
     }
 
-    res.json({
+    const payload = {
       audioBase64: base64Audio,
       mimeType: audioPart?.mimeType || 'audio/wav',
       voiceName: selectedVoice,
-    });
+    };
+
+    if (ttsCache.size >= 80) {
+      const oldestKey = ttsCache.keys().next().value;
+      if (oldestKey) ttsCache.delete(oldestKey);
+    }
+    ttsCache.set(cacheKey, payload);
+
+    res.json(payload);
   } catch (error) {
     const formatted = formatGeminiError(error);
     res.status(formatted.status).json({ error: formatted.message });

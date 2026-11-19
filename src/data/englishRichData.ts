@@ -426,6 +426,134 @@ export const ENGLISH_VOCAB_CARDS: EnglishVocabCard[] = [
     exampleEn: 'During an earthquake, drop, cover, and hold on until the shaking stops.',
     exampleTr: 'Deprem sırasında sarsıntı durana kadar çök, kapan ve tutun.',
   },
+
+  // Unit 7: Tourism & Heritage
+  {
+    id: 'v37',
+    unit: 'Unit 7: Tourism',
+    word: 'accommodation',
+    phonetic: '/əˌkɒməˈdeɪʃn/',
+    partOfSpeech: 'noun',
+    turkish: 'konaklama',
+    exampleEn: 'All-inclusive resorts offer comfortable accommodation for families.',
+    exampleTr: 'Her şey dâhil tatil köyleri aileler için rahat konaklama sunar.',
+  },
+  {
+    id: 'v38',
+    unit: 'Unit 7: Tourism',
+    word: 'souvenir',
+    phonetic: '/ˌsuːvəˈnɪər/',
+    partOfSpeech: 'noun',
+    turkish: 'hediyelik eşya, hatıra',
+    exampleEn: 'I bought a tiny ceramic magnet as a souvenir from Safranbolu.',
+    exampleTr: 'Safranbolu’dan hatıra olarak küçük bir seramik magnet aldım.',
+  },
+  {
+    id: 'v39',
+    unit: 'Unit 7: Tourism',
+    word: 'breathtaking',
+    phonetic: '/ˈbreθteɪkɪŋ/',
+    partOfSpeech: 'adjective',
+    turkish: 'nefes kesici, olağanüstü',
+    exampleEn: 'The view of Pamukkale travertines at sunset is breathtaking.',
+    exampleTr: 'Gün batımında Pamukkale travertenlerinin manzarası nefes kesicidir.',
+  },
+
+  // Unit 8: Chores
+  {
+    id: 'v40',
+    unit: 'Unit 8: Chores',
+    word: 'responsibility',
+    phonetic: '/rɪˌspɒnsəˈbɪləti/',
+    partOfSpeech: 'noun',
+    turkish: 'sorumluluk',
+    exampleEn: 'Setting the dinner table every evening is my responsibility at home.',
+    exampleTr: 'Her akşam yemek masasını kurmak evdeki benim sorumluluğumdur.',
+  },
+  {
+    id: 'v41',
+    unit: 'Unit 8: Chores',
+    word: 'do the laundry',
+    phonetic: '/duː ðə ˈlɔːndri/',
+    partOfSpeech: 'verb phrase',
+    turkish: 'çamaşır yıkamak',
+    exampleEn: 'My father usually does the laundry and hangs out the clothes on Sundays.',
+    exampleTr: 'Babam genellikle pazar günleri çamaşır yıkar ve kıyafetleri asar.',
+  },
+  {
+    id: 'v42',
+    unit: 'Unit 8: Chores',
+    word: 'tidy up',
+    phonetic: '/ˈtaɪdi ʌp/',
+    partOfSpeech: 'phrasal verb',
+    turkish: 'ortalığı toplamak, düzenlemek',
+    exampleEn: 'Before playing chess, we have to tidy up our study desk.',
+    exampleTr: 'Satranç oynamadan önce çalışma masamızı toplamak zorundayız.',
+  },
+
+  // Unit 9: Science
+  {
+    id: 'v43',
+    unit: 'Unit 9: Science',
+    word: 'vaccination',
+    phonetic: '/ˌvæksɪˈneɪʃn/',
+    partOfSpeech: 'noun',
+    turkish: 'aşılama',
+    exampleEn: 'Vaccination protects millions of children from serious illnesses.',
+    exampleTr: 'Aşılama milyonlarca çocuğu ciddi hastalıklardan korur.',
+  },
+  {
+    id: 'v44',
+    unit: 'Unit 9: Science',
+    word: 'discover',
+    phonetic: '/dɪˈskʌvər/',
+    partOfSpeech: 'verb',
+    turkish: 'keşfetmek',
+    exampleEn: 'Marie Curie discovered two radioactive elements: polonium and radium.',
+    exampleTr: 'Marie Curie iki radyoaktif element keşfetti: polonyum ve radyum.',
+  },
+  {
+    id: 'v45',
+    unit: 'Unit 9: Science',
+    word: 'microscope',
+    phonetic: '/ˈmaɪkrəskəʊp/',
+    partOfSpeech: 'noun',
+    turkish: 'mikroskop',
+    exampleEn: 'Students examined onion cells under the microscope in biology class.',
+    exampleTr: 'Öğrenciler biyoloji dersinde soğan hücrelerini mikroskop altında inceledi.',
+  },
+
+  // Unit 10: Natural Forces
+  {
+    id: 'v46',
+    unit: 'Unit 10: Natural Forces',
+    word: 'drought',
+    phonetic: '/draʊt/',
+    partOfSpeech: 'noun',
+    turkish: 'kuraklık',
+    exampleEn: 'If we waste fresh water, severe droughts may happen in the future.',
+    exampleTr: 'Tatlı suyu israf edersek gelecekte şiddetli kuraklıklar yaşanabilir.',
+  },
+  {
+    id: 'v47',
+    unit: 'Unit 10: Natural Forces',
+    word: 'avalanche',
+    phonetic: '/ˈævəlɑːntʃ/',
+    partOfSpeech: 'noun',
+    turkish: 'çığ',
+    exampleEn: 'Heavy snowfall on steep mountain slopes can trigger an avalanche.',
+    exampleTr: 'Dik dağ yamaçlarındaki yoğun kar yağışı çığı tetikleyebilir.',
+  },
+  {
+    id: 'v48',
+    unit: 'Unit 10: Natural Forces',
+    word: 'eco-friendly',
+    phonetic: '/ˌiːkəʊ ˈfrendli/',
+    partOfSpeech: 'adjective',
+    turkish: 'çevre dostu',
+    exampleEn: 'Using cloth bags instead of plastic ones is an eco-friendly habit.',
+    exampleTr: 'Plastik yerine bez çanta kullanmak çevre dostu bir alışkanlıktır.',
+  },
 ];
 
 export const ENGLISH_LISTENING_TRACKS: EnglishListeningTrack[] = [
@@ -768,6 +896,109 @@ export const ENGLISH_LISTENING_TRACKS: EnglishListeningTrack[] = [
       },
     ],
   },
+  {
+    id: 'track-7',
+    trackNumber: 7,
+    unit: 'Unit 8: Chores',
+    title: 'Sharing Responsibilities at Home',
+    subtitle: 'Ev işleri paylaşımı, must / have to ve sorumluluk diyaloğu',
+    level: '8. Sınıf / LGS',
+    durationLabel: '~36 sn',
+    lines: [
+      {
+        speaker: 'Defne',
+        en: 'Do you help your parents with the household chores on weekends, Emir?',
+        tr: 'Hafta sonları ev işlerinde anne-babana yardım eder misin Emir?',
+      },
+      {
+        speaker: 'Emir',
+        en: 'Yes, of course! In our family, everyone shares the tasks. I am in charge of vacuuming the carpet and watering the plants.',
+        tr: 'Evet, elbette! Bizim ailemizde herkes görevleri paylaşır. Ben halıyı süpürmekten ve çiçekleri sulamaktan sorumluyum.',
+      },
+      {
+        speaker: 'Defne',
+        en: 'That is great! I have to tidy up my room and empty the dishwasher, while my little sister feeds our cat.',
+        tr: 'Bu harika! Ben odamı toplamak ve bulaşık makinesini boşaltmak zorundayım, küçük kız kardeşim de kedimizi besliyor.',
+      },
+    ],
+    questions: [
+      {
+        id: 't7-q1',
+        question: 'Which two chores is Emir responsible for?',
+        options: [
+          'Cooking dinner and ironing',
+          'Vacuuming the carpet and watering the plants',
+          'Washing the car and shopping',
+          'Emptying the dishwasher and dusting',
+        ],
+        correctIndex: 1,
+        explanation: 'Emir halıyı süpürmekten ve çiçekleri sulamaktan ("vacuuming the carpet and watering the plants") sorumlu olduğunu söylüyor.',
+      },
+      {
+        id: 't7-q2',
+        question: 'Who feeds the cat in Defne’s family?',
+        options: ['Emir', 'Defne’s father', 'Defne’s little sister', 'Defne’s brother'],
+        correctIndex: 2,
+        explanation: 'Defne küçük kız kardeşinin ("my little sister") kediyi beslediğini belirtiyor.',
+      },
+      {
+        id: 't7-q3',
+        question: 'Which phrase means "responsible for"?',
+        options: ['in charge of', 'of course', 'on weekends', 'at home'],
+        correctIndex: 0,
+        explanation: '"Be in charge of" bir görevden sorumlu olmak anlamına gelir (LGS Unit 8 anahtar kalıbı!).',
+      },
+    ],
+  },
+  {
+    id: 'track-8',
+    trackNumber: 8,
+    unit: 'Unit 9: Science',
+    title: 'Inspiring Scientists in History',
+    subtitle: 'Bilim insanları, icatlar ve Simple Past Tense dinleme metni',
+    level: '8. Sınıf / LGS',
+    durationLabel: '~40 sn',
+    lines: [
+      {
+        speaker: 'Host',
+        en: 'Welcome to Science Radio! Today we are talking about two remarkable scientists who changed the world.',
+        tr: 'Bilim Radyosuna hoş geldiniz! Bugün dünyayı değiştiren iki olağanüstü bilim insanından bahsediyoruz.',
+      },
+      {
+        speaker: 'Host',
+        en: 'In the thirteenth century, Ismail al-Jazari designed amazing water clocks and mechanical machines in Cizre.',
+        tr: 'On üçüncü yüzyılda İsmail el-Cezerî, Cizre’de şaşırtıcı su saatleri ve mekanik makineler tasarladı.',
+      },
+      {
+        speaker: 'Host',
+        en: 'Centuries later, Turkish scientist Aziz Sancar won the 2015 Nobel Prize in Chemistry for his research on DNA repair.',
+        tr: 'Yüzyıllar sonra Türk bilim insanı Aziz Sancar, DNA onarımı üzerine yaptığı araştırmayla 2015 Nobel Kimya Ödülü’nü kazandı.',
+      },
+    ],
+    questions: [
+      {
+        id: 't8-q1',
+        question: 'What did Ismail al-Jazari design in Cizre?',
+        options: ['Space rockets', 'Water clocks and mechanical machines', 'Smartphones', 'Submarines'],
+        correctIndex: 1,
+        explanation: 'Metinde El-Cezerî’nin su saatleri ve mekanik makineler ("water clocks and mechanical machines") tasarladığı anlatılıyor.',
+      },
+      {
+        id: 't8-q2',
+        question: 'In which field did Aziz Sancar win the Nobel Prize in 2015?',
+        options: ['Literature', 'Physics', 'Chemistry', 'Medicine'],
+        correctIndex: 2,
+        explanation: 'Aziz Sancar 2015 yılında Nobel Kimya Ödülü’nü ("Nobel Prize in Chemistry") kazandı.',
+      },
+      {
+        id: 't8-q3',
+        question: 'What was Aziz Sancar’s Nobel-winning research about?',
+        options: ['Solar panels', 'DNA repair', 'Weather prediction', 'Ancient maps'],
+        correctIndex: 1,
+        explanation: 'Araştırması DNA onarımı ("DNA repair") üzerinedir.',
+      },
+    ],
+  },
 ];
 
 export const ENGLISH_GRAMMAR_GUIDES: GrammarTopicGuide[] = [
@@ -850,6 +1081,32 @@ export const ENGLISH_GRAMMAR_GUIDES: GrammarTopicGuide[] = [
     ],
     tipTr: 'Modal fiillerden (must, should, can, will) sonra fiile hiçbir ek (-s, -ed, -ing) getirilmez.',
   },
+  {
+    id: 'g7',
+    title: 'Life Experiences (Present Perfect Tense)',
+    unitFocus: 'Unit 7: Tourism (LGS)',
+    formula: 'Have / Has + Subject + ever + V3? | Subject + have / has + (never) + V3',
+    explanationTr:
+      'Geçmişte tam zamanı belirtmeden hayatımız boyunca yaşadığımız deneyimleri ("Hiç ... yaptın mı?") sorarken Present Perfect Tense kullanılır.',
+    examples: [
+      { en: 'Have you ever visited Göbeklitepe in Şanlıurfa?', tr: 'Şanlıurfa’daki Göbeklitepe’yi hiç ziyaret ettin mi?' },
+      { en: 'She has never tried scuba diving, but she wants to try it.', tr: 'O hiç tüplü dalış denemedi ama denemek istiyor.' },
+    ],
+    tipTr: 'Cümlede "yesterday, last year, in 2015" gibi KESİN geçmiş zaman varsa Present Perfect değil, Simple Past (V2) kullanılır!',
+  },
+  {
+    id: 'g8',
+    title: 'Simple Past Tense (Inventions & Biographies)',
+    unitFocus: 'Unit 9: Science & 7. Sınıf Biographies',
+    formula: 'Subject + V2 (-ed / irregular) | Did + Subject + V1?',
+    explanationTr:
+      'Geçmişte belirli bir zamanda tamamlanmış olayları, bilim insanlarının yaşamlarını ve icatlarını anlatırken Simple Past Tense kullanılır.',
+    examples: [
+      { en: 'Alexander Fleming discovered penicillin in 1928.', tr: 'Alexander Fleming 1928’de penisilini keşfetti.' },
+      { en: 'Did Graham Bell invent the telephone in 1876?', tr: 'Graham Bell telefonu 1876’da mı icat etti?' },
+    ],
+    tipTr: 'Olumsuz ("didn’t") ve soru ("Did...?") cümlelerinde fiil 2. hâlden çıkıp YALIN (V1) hâline döner!',
+  },
 ];
 
 export const SENTENCE_BUILDER_CHALLENGES: SentenceBuilderChallenge[] = [
@@ -900,5 +1157,21 @@ export const SENTENCE_BUILDER_CHALLENGES: SentenceBuilderChallenge[] = [
     correctSentence: 'We should plant more trees and save water to protect nature.',
     scrambledWords: ['more', 'save', 'We', 'trees', 'plant', 'to', 'should', 'water', 'nature.', 'and', 'protect'],
     hint: '"We should..." öneri yapısıyla cümleyi kur.',
+  },
+  {
+    id: 'sb7',
+    unit: 'Unit 7: Tourism',
+    turkishPrompt: 'Hayatında hiç Kapadokya’da sıcak hava balonuna bindin mi?',
+    correctSentence: 'Have you ever tried a hot air balloon in Cappadocia?',
+    scrambledWords: ['a', 'Have', 'balloon', 'ever', 'Cappadocia?', 'you', 'hot', 'tried', 'in', 'air'],
+    hint: 'Deneyim sorusu "Have you ever + V3..." ile başlar.',
+  },
+  {
+    id: 'sb8',
+    unit: 'Unit 8: Chores',
+    turkishPrompt: 'Hafta sonları odamı toplamak ve çiçekleri sulamakla sorumluyum.',
+    correctSentence: 'I am responsible for tidying my room and watering plants.',
+    scrambledWords: ['room', 'responsible', 'am', 'watering', 'I', 'for', 'my', 'tidying', 'and', 'plants.'],
+    hint: '"I am responsible for + V-ing..." yapısını kullan.',
   },
 ];

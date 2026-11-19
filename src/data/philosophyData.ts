@@ -471,6 +471,54 @@ export const PHILOSOPHERS: PhilosopherProfile[] = [
     politicsAndSociety: 'Eğitimde fırsat eşitliği, kadınların toplumsal saygınlığı, zanaat ve dayanışma odaklı barış toplumu.',
     notableThought: '“Hararet nardadır, sacda değildir; keramet baştadır, tacda değildir. Her ne arar isen kendinde ara!”',
   },
+  {
+    id: 'ibn-rusd',
+    name: 'İbn Rüşd (Averroes)',
+    lifespan: '1126 – 1198',
+    era: 'İslam Felsefesi',
+    tradition: 'Endülüs Rasyonalizmi · Aristoteles Şârihi',
+    bio: 'Endülüs’ün Kurtuba şehrinde yetişen; felsefe, hukuk, tıp ve astronomi alanlarında eserler veren ve Avrupa’da Rönesans’ın doğuşuna büyük etki eden büyük İslam filozofudur.',
+    coreViews: [
+      'Akıl (felsefe) ile vahiy (din) aynı hakikatin iki kardeş yoludur; hakikat hakikatle çelişmez.',
+      'Evreni ve doğayı akıl yürütmeyle incelemek insanın temel sorumluluğudur.',
+      'Kadınlar ve erkekler akıl ve erdem bakımından aynı potansiyele sahiptir; kadınlar toplum hayatına katılmalıdır.',
+    ],
+    keyWorks: ['Faslü’l-Makâl (Felsefe-Din İlişkisi)', 'Tehâfütü’t-Tehâfüt', 'Aristoteles Şerhleri'],
+    contributions: [
+      'Aristoteles’in eserlerine yazdığı şerhlerle Batı Avrupa üniversitelerinde akılcı bilimin yeniden canlanmasını sağladı.',
+      'Akılcı yorumlama (te’vil) yöntemiyle bilim ve inanç uyumunu savundu.',
+    ],
+    relations: 'Gazâlî’nin filozoflara yönelttiği eleştirilere Tehâfütü’t-Tehâfüt ile yanıt verdi; Aquinolu Thomas ve Avrupa skolastiğini derinden etkiledi.',
+    epistemology: 'Kesin bilgi mantıksal kanıtlama (burhan) ve akıl yürütmeyle elde edilir.',
+    ontology: 'Doğa yasaları düzenli nedensellik taşır; nedenselliği inkâr etmek bilimi imkânsız kılar.',
+    ethics: 'Akıl ve adalet rehberliğinde erdemli yaşam; toplumsal faydayı gözetme.',
+    politicsAndSociety: 'Hukukun üstünlüğü, eğitim hakkı ve kadınların kamusal yaşama katılımı.',
+    notableThought: '“Hakikat, hakikatle çelişmez; bilakis ona uygun düşer ve onun lehine şahitlik eder.”',
+  },
+  {
+    id: 'hypatia-phil',
+    name: 'İskenderiyeli Hypatia',
+    lifespan: 'y. 355 – 415',
+    era: 'İlk Çağ Felsefesi',
+    tradition: 'Yeni Platonculuk · Matematik ve Bilim Felsefesi',
+    bio: 'Antik İskenderiye’de felsefe, matematik ve astronomi dersleri veren; özgür düşünceyi, bilimsel gözlemi ve hoşgörülü diyaloğu savunan ilk büyük kadın filozoflardandır.',
+    coreViews: [
+      'İnsanların sorgulama ve düşünme özgürlüğü her türlü önyargıdan üstündür.',
+      'Matematik ve astronomi, evrendeki uyumu ve mantıksal düzeni anlamanın anahtarıdır.',
+      'Farklı inanç ve kültürlerden öğrenciler aynı çatı altında bilimsel hakikati birlikte arayabilir.',
+    ],
+    keyWorks: ['Diophantos’un Aritmetik’ine Şerh', 'Apollonios’un Konikler’ine Şerh (tarihî kaynaklarda kayıtlı)'],
+    contributions: [
+      'Gök bilimi ve fizik ölçümleri için usturlap ve hidrometre tasarımına katkı sağladı.',
+      'Bilim tarihinde özgür düşüncenin ve eleştirel pedagojinin simgesi oldu.',
+    ],
+    relations: 'Platon ve Plotinos’un düşüncesini matematiksel bilim geleneğiyle buluşturdu.',
+    epistemology: 'Gözlem, matematiksel tutarlılık ve önyargısız akıl yürütme bilginin ölçütüdür.',
+    ontology: 'Evren matematiksel oranlar ve akılsal birlik içinde kavranabilir.',
+    ethics: 'Önyargıdan uzak bilgelik, hoşgörü, entelektüel cesaret ve özdenetim.',
+    politicsAndSociety: 'Farklı düşüncelerin barış içinde yaşadığı bilimsel ve çoğulcu kent kültürü.',
+    notableThought: '“Düşünme hakkını koru; çünkü yanlış düşünmek bile hiç düşünmemekten iyidir.”',
+  },
 ];
 
 export const PHILOSOPHICAL_SCHOOLS: PhilosophicalSchool[] = [
@@ -652,6 +700,33 @@ export const PHILOSOPHY_QUIZ_QUESTIONS: PhilosophyQuizQuestion[] = [
     explanation:
       'William James ve John Dewey’nin öncülük ettiği Pragmatizm (Faydacılık), düşüncelerin değerini pratik sonuçlarıyla sınar.',
   },
+  {
+    id: 'pq-9',
+    category: 'Filozof–Eser',
+    question: '“Mukaddime” adlı eseriyle sosyolojinin (Umran İlmi) ve eleştirel tarih felsefesinin kurucusu kabul edilen düşünür kimdir?',
+    options: ['Fârâbî', 'İbn Haldun', 'İbn Rüşd', 'Mevlânâ'],
+    correctIndex: 1,
+    explanation:
+      'İbn Haldun, Mukaddime eserinde toplumların yükselişini, dayanışma ruhunu (asabiyet) ve coğrafyanın etkisini bilimsel neden-sonuç ilişkisiyle incelemiştir.',
+  },
+  {
+    id: 'pq-10',
+    category: 'Kavram Eşleştirme',
+    question: '“Hakikat, hakikatle çelişmez” diyerek akıl (felsefe) ile vahiy (din) arasındaki uyumu savunan Endülüslü filozof kimdir?',
+    options: ['İbn Rüşd', 'David Hume', 'Jean-Paul Sartre', 'Demokritos'],
+    correctIndex: 0,
+    explanation:
+      'İbn Rüşd (Averroes), Faslü’l-Makâl eserinde akıl ile inancın çelişmediğini, bilakis aynı hakikate işaret ettiğini savunmuştur.',
+  },
+  {
+    id: 'pq-11',
+    category: 'Kavram Eşleştirme',
+    question: '“Eline, beline, diline sahip ol” ve “İlimden gidilmeyen yolun sonu karanlıktır” ilkeleri hangi Anadolu bilgesine aittir?',
+    options: ['Ziya Gökalp', 'Hacı Bektaş-ı Velî', 'Aquinolu Thomas', 'René Descartes'],
+    correctIndex: 1,
+    explanation:
+      'Hacı Bektaş-ı Velî, Makâlât eserinde ve öğretilerinde bilimi, insan sevgisini, kadınların eğitimini ve ahlaki özdenetimi merkeze almıştır.',
+  },
 ];
 
 export const OPEN_ENDED_THOUGHT_PROMPTS: OpenEndedThoughtPrompt[] = [
@@ -704,6 +779,26 @@ export const OPEN_ENDED_THOUGHT_PROMPTS: OpenEndedThoughtPrompt[] = [
     guidingHints: [
       'Eşitlik ile hakkaniyet arasındaki farkı somut bir okul örneğiyle (ör. farklı boylardaki öğrencilerin tahtayı görmesi) açıklayın.',
       'Aristoteles’in veya Fârâbî’nin adalet anlayışına atıfta bulunun.',
+    ],
+  },
+  {
+    id: 'oe-6',
+    title: 'İbn Haldun ve Toplumsal Dayanışma (Asabiyet)',
+    question:
+      'İbn Haldun bir toplumu ayakta tutan en güçlü bağın “dayanışma ve ortak sorumluluk ruhu (asabiyet)” olduğunu söyler. Okulunuzda veya mahallenizde dayanışmayı artırmak için hangi somut ilkeler gereklidir?',
+    guidingHints: [
+      'Bireysel rekabet ile ortak başarı arasındaki dengeyi açıklayın.',
+      'Somut bir sınıf projesi veya yardımlaşma örneği verin.',
+    ],
+  },
+  {
+    id: 'oe-7',
+    title: 'Hata Yapmak ve Özgür Düşünce (Hypatia & Sokrates)',
+    question:
+      'Hypatia “Yanlış düşünmek bile hiç düşünmemekten iyidir” der. Sizce bir derste yanlış cevap vermekten korkmak öğrenmeyi nasıl etkiler? Eleştirel sorgulama kültürü nasıl geliştirilir?',
+    guidingHints: [
+      'Hata yapmanın bilimsel deney ve keşif sürecindeki yerini değerlendirin.',
+      'Sokrates’in soru sorma yönteminden örnek verin.',
     ],
   },
 ];

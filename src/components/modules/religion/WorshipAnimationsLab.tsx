@@ -4,6 +4,7 @@ import {
   ArrowRight,
   ChevronDown,
   ChevronUp,
+  Loader2,
   Pause,
   Play,
   RotateCcw,
@@ -19,9 +20,18 @@ import {
   type PrayerPostureStep,
   type WuduStep,
 } from '../../../data/religionRichData';
-import { speakInstant, stopAllSpeech } from '../../../utils/englishAudio';
+import {
+  generateOrGetStudioWav,
+  playStudioAudio,
+  speakInstant,
+  stopAllSpeech,
+} from '../../../utils/englishAudio';
 
 type WorshipLabTab = 'wudu' | 'prayer' | 'hajj' | 'fasting-zakat';
+
+const TURKISH_WORSHIP_VOICE = 'Charon' as const;
+const TURKISH_WORSHIP_STYLE =
+  'Calm, warm, articulate native Turkish teacher voice with crisp pronunciation of Turkish and Islamic terms';
 
 const WUDU_ATHLETE_PHOTO = '/src/assets/images/wudu_athlete_fullbody_1795091471521.jpg';
 
@@ -38,12 +48,11 @@ const NAMAZ_POSTURE_PHOTOS: Record<
     caption: 'İftitah tekbiri (Allâhu Ekber)',
   },
   qiyam: {
-    src: '/src/assets/images/namaz_athlete_qiyam_1795091452731.jpg',
-    flipX: true,
-    caption: 'Kıyam ve kıraat (eller bağlı)',
+    src: '/src/assets/images/namaz_athlete_qiyam_low_1795093345509.jpg',
+    caption: 'Kıyam ve kıraat (eller göbek altında bağlı)',
   },
   ruku: {
-    src: '/src/assets/images/namaz_athlete_ruku_1795091453221.jpg',
+    src: '/src/assets/images/namaz_athlete_ruku_match_1795093346239.jpg',
     caption: 'Rükû (sırt düz, eller dizlerde)',
   },
   qawmah: {
@@ -51,26 +60,39 @@ const NAMAZ_POSTURE_PHOTOS: Record<
     caption: 'Kavme (rükûdan tam doğrulma)',
   },
   sujud1: {
-    src: '/src/assets/images/namaz_athlete_sujud_1795091454999.jpg',
-    caption: 'Birinci secde',
+    src: '/src/assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg',
+    caption: 'Birinci secde (tüm vücut seccade sınırları içinde)',
   },
   jalsa: {
-    src: '/src/assets/images/namaz_athlete_tashahhud_1795091521021.jpg',
+    src: '/src/assets/images/namaz_athlete_tashahhud_inrug_1795096355811.jpg',
     caption: 'Celse (iki secde arası oturuş)',
   },
   sujud2: {
-    src: '/src/assets/images/namaz_athlete_sujud_1795091454999.jpg',
-    caption: 'İkinci secde',
+    src: '/src/assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg',
+    caption: 'İkinci secde (tüm vücut seccade sınırları içinde)',
   },
   tashahhud: {
-    src: '/src/assets/images/namaz_athlete_tashahhud_1795091521021.jpg',
+    src: '/src/assets/images/namaz_athlete_tashahhud_inrug_1795096355811.jpg',
     caption: 'Ka’de-i Âhire (son oturuş)',
   },
   salam: {
-    src: '/src/assets/images/namaz_athlete_tashahhud_1795091521021.jpg',
+    src: '/src/assets/images/namaz_athlete_salam_right_1795096355282.jpg',
     caption: 'Sağa ve sola selam verme',
   },
 };
+
+const SALAM_PHOTOS = {
+  right: {
+    src: '/src/assets/images/namaz_athlete_salam_right_1795096355282.jpg',
+    label: '1. Sağa Selam',
+    detail: 'Baş sağ omuza çevrilir: “Es-selâmü aleyküm ve rahmetullâh”',
+  },
+  left: {
+    src: '/src/assets/images/namaz_athlete_salam_left_1795096355274.jpg',
+    label: '2. Sola Selam',
+    detail: 'Baş sol omuza çevrilir: “Es-selâmü aleyküm ve rahmetullâh”',
+  },
+} as const;
 
 /* Precision hotspot targets on 300x400 (3:4) full-body tracksuit athlete photo */
 interface HotspotPoint {
@@ -207,29 +229,93 @@ function WuduPhotoStage({ step, waterPhase }: { step: WuduStep; waterPhase: numb
 
 /* ---------- 2. PHOTOREALISTIC NAMAZ POSTURE STAGE ---------- */
 function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
+  const [salamSide, setSalamSide] = useState<'right' | 'left'>('right');
+  const [salamAuto, setSalamAuto] = useState(true);
+
+  useEffect(() => {
+    if (step.postureKey !== 'salam') {
+      setSalamSide('right');
+      setSalamAuto(true);
+      return;
+    }
+    if (!salamAuto) return;
+    const timer = window.setInterval(() => {
+      setSalamSide((prev) => (prev === 'right' ? 'left' : 'right'));
+    }, 2400);
+    return () => window.clearInterval(timer);
+  }, [step.postureKey, salamAuto]);
+
   const photo = NAMAZ_POSTURE_PHOTOS[step.postureKey];
+  const isSalam = step.postureKey === 'salam';
+  const activeSrc = isSalam ? SALAM_PHOTOS[salamSide].src : photo.src;
+  const activeAlt = isSalam
+    ? `Namaz Adım ${step.stepNumber}: ${SALAM_PHOTOS[salamSide].label}`
+    : `Namaz Adım ${step.stepNumber}: ${step.title} — ${photo.caption}`;
 
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-stone-100 dark:bg-slate-950 max-w-[380px] mx-auto w-full">
       <div className="relative aspect-[3/4] w-full overflow-hidden">
         <img
-          src={photo.src}
-          alt={`Namaz Adım ${step.stepNumber}: ${step.title} — ${photo.caption}`}
+          key={activeSrc}
+          src={activeSrc}
+          alt={activeAlt}
           referrerPolicy="no-referrer"
           className={`w-full h-full object-cover object-center select-none transition-opacity duration-300 ${
             photo.flipX ? '-scale-x-100' : ''
           }`}
         />
 
-        {/* Subtle directional guide overlay only on Salam step */}
-        {step.postureKey === 'salam' && (
+        {/* Live Salam Direction Indicator on Step 10 */}
+        {isSalam && (
           <div className="absolute top-3 inset-x-3 flex justify-center pointer-events-none">
-            <span className="px-3 py-1 rounded-lg bg-navy-900/85 text-white text-xs font-medium shadow-xs">
-              Önce Sağ Omuza, Sonra Sol Omuza Selam
+            <span className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-navy-900/90 text-white text-xs font-semibold shadow-sm">
+              {salamSide === 'right' ? (
+                <>
+                  <span>1. Sağ Omuza Selam</span>
+                  <ArrowRight className="w-3.5 h-3.5 text-gold-400" />
+                </>
+              ) : (
+                <>
+                  <ArrowLeft className="w-3.5 h-3.5 text-gold-400" />
+                  <span>2. Sol Omuza Selam</span>
+                </>
+              )}
             </span>
           </div>
         )}
       </div>
+
+      {/* Interactive Right / Left Salam Toggle on Step 10 */}
+      {isSalam && (
+        <div className="px-3 py-2.5 bg-white dark:bg-slate-900 border-t border-slate-200/80 dark:border-slate-800 space-y-1.5">
+          <div className="grid grid-cols-2 gap-1.5">
+            {(['right', 'left'] as const).map((side) => {
+              const active = salamSide === side;
+              return (
+                <button
+                  key={side}
+                  type="button"
+                  onClick={() => {
+                    setSalamAuto(false);
+                    setSalamSide(side);
+                  }}
+                  className={`px-2.5 py-1.5 rounded-lg text-xs font-semibold transition-colors cursor-pointer ${
+                    active
+                      ? 'bg-navy-900 text-white dark:bg-teal-600'
+                      : 'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-700'
+                  }`}
+                >
+                  {SALAM_PHOTOS[side].label}
+                </button>
+              );
+            })}
+          </div>
+          <p className="text-[11px] text-center text-slate-600 dark:text-slate-300">
+            {SALAM_PHOTOS[salamSide].detail}
+          </p>
+        </div>
+      )}
+
       <div className="px-4 py-2 text-center bg-stone-100/95 dark:bg-slate-900/95 border-t border-slate-200/70 dark:border-slate-800">
         <p className="text-[11px] text-slate-600 dark:text-slate-400">
           Yapay zekâyla oluşturulmuş temsili görsel
@@ -331,6 +417,9 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
   const [goldGramPrice, setGoldGramPrice] = useState(3200);
   const [cropMode, setCropMode] = useState<'cash' | 'rainCrop' | 'irrigatedCrop'>('cash');
 
+  // Audio loading state for Studio TTS
+  const [stepAudioLoading, setStepAudioLoading] = useState(false);
+
   // Subtle animation loop for water droplets & Tawaf orbit
   useEffect(() => {
     if (activeLab === 'wudu') {
@@ -349,10 +438,47 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
     prayerNarrateCancelRef.current = true;
     setWuduNarrationActive(false);
     setPrayerNarrationActive(false);
+    setStepAudioLoading(false);
     stopAllSpeech();
   };
 
   useEffect(() => () => stopAllGuidedNarration(), []);
+
+  const buildWuduSpeechText = (st: WuduStep) =>
+    `Adım ${st.stepNumber}. ${st.title}. ${st.description} ${st.duaOrNote}`;
+
+  const buildPrayerSpeechText = (st: PrayerPostureStep) =>
+    `Adım ${st.stepNumber}. ${st.title}. ${st.howToPerform} Okunuşu: ${st.recitationTr}.`;
+
+  const speakTurkishStudio = async (text: string, onEnd?: () => void) => {
+    setStepAudioLoading(true);
+    try {
+      await playStudioAudio(text, {
+        voiceName: TURKISH_WORSHIP_VOICE,
+        rate: 0.98,
+        style: TURKISH_WORSHIP_STYLE,
+        onStart: () => setStepAudioLoading(false),
+        onEnd: () => {
+          setStepAudioLoading(false);
+          onEnd?.();
+        },
+      });
+    } catch {
+      setStepAudioLoading(false);
+      // Graceful fallback to browser TTS only if server TTS is unavailable
+      speakInstant(text, { lang: 'tr-TR', rate: 0.94, onEnd });
+    }
+  };
+
+  const handleListenSingleWudu = () => {
+    stopAllGuidedNarration();
+    void speakTurkishStudio(buildWuduSpeechText(WUDU_STEPS[wuduIdx]));
+  };
+
+  const handleListenSinglePrayer = () => {
+    stopAllGuidedNarration();
+    void speakTurkishStudio(buildPrayerSpeechText(PRAYER_POSTURE_STEPS[prayerIdx]));
+  };
 
   const handleListenAllWudu = () => {
     if (wuduNarrationActive) {
@@ -370,21 +496,19 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
       }
       setWuduIdx(idx);
       const st = WUDU_STEPS[idx];
-      const ok = speakInstant(
-        `Adım ${st.stepNumber}. ${st.title}. ${st.description}`,
-        {
-          lang: 'tr-TR',
-          rate: 0.94,
-          onEnd: () => {
-            if (!wuduNarrateCancelRef.current) {
-              window.setTimeout(() => runStep(idx + 1), 500);
-            }
-          },
-        }
-      );
-      if (!ok) {
-        setWuduNarrationActive(false);
+      // Prefetch next step WAV in background for seamless flow
+      if (idx + 1 < WUDU_STEPS.length) {
+        void generateOrGetStudioWav(
+          buildWuduSpeechText(WUDU_STEPS[idx + 1]),
+          TURKISH_WORSHIP_VOICE,
+          TURKISH_WORSHIP_STYLE
+        ).catch(() => undefined);
       }
+      void speakTurkishStudio(buildWuduSpeechText(st), () => {
+        if (!wuduNarrateCancelRef.current) {
+          window.setTimeout(() => runStep(idx + 1), 450);
+        }
+      });
     };
     runStep(0);
   };
@@ -405,21 +529,18 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
       }
       setPrayerIdx(idx);
       const st = PRAYER_POSTURE_STEPS[idx];
-      const ok = speakInstant(
-        `Adım ${st.stepNumber}. ${st.title}. ${st.howToPerform} Okunuşu: ${st.recitationTr}`,
-        {
-          lang: 'tr-TR',
-          rate: 0.94,
-          onEnd: () => {
-            if (!prayerNarrateCancelRef.current) {
-              window.setTimeout(() => runStep(idx + 1), 600);
-            }
-          },
-        }
-      );
-      if (!ok) {
-        setPrayerNarrationActive(false);
+      if (idx + 1 < PRAYER_POSTURE_STEPS.length) {
+        void generateOrGetStudioWav(
+          buildPrayerSpeechText(PRAYER_POSTURE_STEPS[idx + 1]),
+          TURKISH_WORSHIP_VOICE,
+          TURKISH_WORSHIP_STYLE
+        ).catch(() => undefined);
       }
+      void speakTurkishStudio(buildPrayerSpeechText(st), () => {
+        if (!prayerNarrateCancelRef.current) {
+          window.setTimeout(() => runStep(idx + 1), 500);
+        }
+      });
     };
     runStep(0);
   };
@@ -555,17 +676,16 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
               <div className="flex flex-wrap items-center gap-2.5">
                 <button
                   type="button"
-                  onClick={() => {
-                    stopAllGuidedNarration();
-                    speakInstant(
-                      `${currentWudu.title}. ${currentWudu.description} ${currentWudu.duaOrNote}`,
-                      { lang: 'tr-TR', rate: 0.94 }
-                    );
-                  }}
-                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer whitespace-nowrap"
+                  disabled={stepAudioLoading && !wuduNarrationActive}
+                  onClick={handleListenSingleWudu}
+                  className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60"
                 >
-                  <Volume2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-                  <span>Adımı dinle</span>
+                  {stepAudioLoading && !wuduNarrationActive ? (
+                    <Loader2 className="w-4 h-4 animate-spin text-teal-700 dark:text-teal-400" />
+                  ) : (
+                    <Volume2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                  )}
+                  <span>{stepAudioLoading && !wuduNarrationActive ? 'Ses hazırlanıyor...' : 'Adımı dinle'}</span>
                 </button>
                 <button
                   type="button"
@@ -727,17 +847,16 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
                 <div className="flex flex-wrap items-center gap-2.5">
                   <button
                     type="button"
-                    onClick={() => {
-                      stopAllGuidedNarration();
-                      speakInstant(
-                        `${currentPrayer.title}. ${currentPrayer.howToPerform} Okunuşu: ${currentPrayer.recitationTr}`,
-                        { lang: 'tr-TR', rate: 0.94 }
-                      );
-                    }}
-                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer whitespace-nowrap"
+                    disabled={stepAudioLoading && !prayerNarrationActive}
+                    onClick={handleListenSinglePrayer}
+                    className="inline-flex items-center gap-1.5 px-4 py-2.5 rounded-xl text-xs sm:text-sm font-semibold bg-slate-100 dark:bg-slate-800 text-navy-900 dark:text-white hover:bg-slate-200 dark:hover:bg-slate-700 transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60"
                   >
-                    <Volume2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
-                    <span>Adımı dinle</span>
+                    {stepAudioLoading && !prayerNarrationActive ? (
+                      <Loader2 className="w-4 h-4 animate-spin text-teal-700 dark:text-teal-400" />
+                    ) : (
+                      <Volume2 className="w-4 h-4 text-teal-700 dark:text-teal-400" />
+                    )}
+                    <span>{stepAudioLoading && !prayerNarrationActive ? 'Ses hazırlanıyor...' : 'Adımı dinle'}</span>
                   </button>
                   <button
                     type="button"

@@ -83,6 +83,8 @@ export function ReligionModule() {
   // AI Tutor state
   const [aiInput, setAiInput] = useState('');
   const [aiLoading, setAiLoading] = useState(false);
+  const [aiError, setAiError] = useState('');
+  const [storyAudioLoading, setStoryAudioLoading] = useState(false);
   const [aiHistory, setAiHistory] = useState<Array<{ role: 'user' | 'assistant'; text: string }>>([
     {
       role: 'assistant',
@@ -241,6 +243,7 @@ export function ReligionModule() {
     const next = [...aiHistory, { role: 'user' as const, text: trimmed }];
     setAiHistory(next);
     setAiInput('');
+    setAiError('');
     setAiLoading(true);
     try {
       const response = await fetch('/api/ai/assistant', {
@@ -255,12 +258,16 @@ export function ReligionModule() {
       });
       const data = await response.json();
       if (!response.ok) {
-        notify('error', 'Yapay Zekâ Yanıtı Alınamadı', data.error || 'Lütfen tekrar deneyin.');
+        const msg = data.error || 'Yapay zekâ yanıtı alınamadı. Lütfen tekrar deneyin.';
+        setAiError(msg);
+        notify('error', 'Yapay Zekâ Yanıtı Alınamadı', msg);
         return;
       }
       setAiHistory((prev) => [...prev, { role: 'assistant', text: String(data.reply || '') }]);
     } catch {
-      notify('error', 'Bağlantı Hatası', 'Sunucuya ulaşılamadı.');
+      const msg = 'Sunucuya ulaşılamadı. Bağlantınızı kontrol edip tekrar deneyin.';
+      setAiError(msg);
+      notify('error', 'Bağlantı Hatası', msg);
     } finally {
       setAiLoading(false);
     }
@@ -300,8 +307,8 @@ export function ReligionModule() {
         {(
           [
             { id: 'worship', label: 'İbadet Animasyonları', icon: MoonStar },
-            { id: 'stories', label: 'Hikmetli Hikâyeler (8)', icon: HeartHandshake },
-            { id: 'surahs', label: 'Sure, Dua & İnanç', icon: BookOpen },
+            { id: 'stories', label: `Hikmetli Hikâyeler (${WISDOM_STORIES.length})`, icon: HeartHandshake },
+            { id: 'surahs', label: `Sure, Dua & İnanç (${SURAH_DUA_LIBRARY.length})`, icon: BookOpen },
             { id: 'tests', label: 'Testler (5×10)', icon: ClipboardCheck },
             { id: 'ai-tutor', label: 'YZ Din Kültürü Öğretmeni', icon: Bot },
           ] as { id: ReligionTab; label: string; icon: React.ComponentType<{ className?: string }> }[]
@@ -405,16 +412,30 @@ export function ReligionModule() {
                   </div>
                   <button
                     type="button"
-                    onClick={() =>
-                      speakInstant(
-                        `${activeStory.title}. ${activeStory.storyParagraphs.join(' ')} Hikmet ve ders: ${activeStory.moralLesson}`,
-                        { lang: 'tr-TR', rate: 0.94 }
-                      )
-                    }
-                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 cursor-pointer whitespace-nowrap"
+                    disabled={storyAudioLoading}
+                    onClick={() => {
+                      stopEveryAudio();
+                      const storyText = `${activeStory.title}. ${activeStory.storyParagraphs.join(' ')} Hikmet ve ders: ${activeStory.moralLesson}`;
+                      setStoryAudioLoading(true);
+                      void playStudioAudio(storyText, {
+                        voiceName: 'Charon',
+                        rate: 0.98,
+                        style: 'Warm, expressive native Turkish storyteller teacher voice',
+                        onStart: () => setStoryAudioLoading(false),
+                        onEnd: () => setStoryAudioLoading(false),
+                      }).catch(() => {
+                        setStoryAudioLoading(false);
+                        speakInstant(storyText, { lang: 'tr-TR', rate: 0.94 });
+                      });
+                    }}
+                    className="inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 cursor-pointer whitespace-nowrap disabled:opacity-60"
                   >
-                    <Volume2 className="w-3.5 h-3.5" />
-                    <span>Hikâyeyi Sesli Dinle</span>
+                    {storyAudioLoading ? (
+                      <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                    ) : (
+                      <Volume2 className="w-3.5 h-3.5" />
+                    )}
+                    <span>{storyAudioLoading ? 'Ses hazırlanıyor...' : 'Hikâyeyi Sesli Dinle'}</span>
                   </button>
                 </div>
 
@@ -705,6 +726,24 @@ export function ReligionModule() {
                 <div className="inline-flex items-center gap-2 px-4 py-2.5 rounded-xl bg-slate-100 dark:bg-slate-800 text-xs text-slate-600 dark:text-slate-300">
                   <Loader2 className="w-4 h-4 animate-spin text-teal-600" />
                   <span>Yanıt hazırlanıyor...</span>
+                </div>
+              )}
+              {aiError && !aiLoading && (
+                <div className="p-3.5 rounded-xl bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-300 space-y-2">
+                  <p>{aiError}</p>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const lastUser = [...aiHistory].reverse().find((m) => m.role === 'user');
+                      if (lastUser) {
+                        setAiHistory((prev) => prev.slice(0, -1));
+                        void handleAskAI(lastUser.text);
+                      }
+                    }}
+                    className="px-3 py-1.5 rounded-lg bg-red-600 text-white font-medium hover:bg-red-700 cursor-pointer"
+                  >
+                    Tekrar Dene
+                  </button>
                 </div>
               )}
             </div>

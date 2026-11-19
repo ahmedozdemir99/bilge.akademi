@@ -238,6 +238,54 @@ export const APHORISMS_DATA: AphorismItem[] = [
     category: 'Dil ve Sanat',
     reflection: 'Dünyaya anlam ve güzellik katan şeyin insanın içindeki sevgi, bakış açısı ve gönül zenginliği olduğunu gösterir.',
   },
+  {
+    id: 'vec-25',
+    quote: 'Hak ile sabır dileyip bize gelen bizdendir; akıl ve ahlak ile çalışıp bizi geçen bizdendir.',
+    author: 'Ahî Evran-ı Velî',
+    era: '13. Yüzyıl',
+    category: 'Sabır ve Emek',
+    reflection: 'Gerçek ustalığın yalnızca eskiyi tekrar etmek değil; ahlak ve akılla daha iyisini üretmek olduğunu öğretir.',
+  },
+  {
+    id: 'vec-26',
+    quote: 'İlimsiz şiir, temeli olmayan bir duvar gibidir.',
+    author: 'Fuzûlî',
+    era: '16. Yüzyıl',
+    category: 'Dil ve Sanat',
+    reflection: 'Sanat ve edebiyatın kalıcı olabilmesi için sağlam bir bilgi, kültür ve düşünce temeline yaslanması gerektiğini vurgular.',
+  },
+  {
+    id: 'vec-27',
+    quote: 'Kitap, zekâyı kibarlaştırır; okumak iki ruh arasında kurulan en derin köprüdür.',
+    author: 'Cemil Meriç (Kültürel Özdeyiş)',
+    era: '20. Yüzyıl',
+    category: 'Bilim ve Eğitim',
+    reflection: 'Düzenli kitap okumanın empati gücünü, söz varlığını ve düşüncedeki inceliği geliştirdiğini anlatır.',
+  },
+  {
+    id: 'vec-28',
+    quote: 'Barika-i hakikat, müsademe-i efkârdan doğar (Gerçeğin şimşeği, fikirlerin çarpışmasından doğar).',
+    author: 'Nâmık Kemal',
+    era: '19. Yüzyıl',
+    category: 'Bilim ve Eğitim',
+    reflection: 'Farklı görüşleri saygıyla tartışmanın ve eleştirel düşünmenin doğruya ulaşmadaki rolünü belirtir.',
+  },
+  {
+    id: 'vec-29',
+    quote: 'Kişi noksanını bilmek gibi irfan olmaz.',
+    author: 'Bursalı İsmail Hakkı / Anadolu İrfanı',
+    era: '17.–18. Yüzyıl',
+    category: 'Erdem ve Adalet',
+    reflection: 'Kendi eksiklerini görebilmenin ve öz eleştiri yapabilmenin en büyük bilgelik olduğunu öğretir.',
+  },
+  {
+    id: 'vec-30',
+    quote: 'Bir milleti yaşatan, kendi diline ve tarihine duyduğu sevgidir.',
+    author: 'Ömer Seyfettin (Millî Edebiyat Geleneği)',
+    era: '20. Yüzyıl Başı',
+    category: 'Vatan ve Özgürlük',
+    reflection: 'Sade ve güzel Türkçeye sahip çıkmanın kültürel bağımsızlıktaki yerini vurgular.',
+  },
 ];
 
 export const CLASSIC_POEMS_ANTHOLOGY: ClassicPoemEntry[] = [
@@ -465,6 +513,64 @@ Merdüm-i dîde-i ekvân olan âdemsin sen`,
     explanation:
       '“Kendine değer ver ve güzel bak; çünkü sen kâinatın özü ve bütün varlığın gözbebeği olan insansın!” anlamına gelen bu beyit, insan onurunu yücelten en ünlü klasik dizelerdendir.',
   },
+  {
+    id: 'poem-yunus-gelin-tanisalim',
+    title: 'Gelin Tanış Olalım',
+    poet: 'Yunus Emre',
+    era: '13. Yüzyıl · Tasavvuf Halk Şiiri',
+    genre: 'Lirik',
+    meterInfo: '8’li Hece Ölçüsü (İlahi)',
+    theme: 'Sevgi, Barış ve Kardeşlik',
+    content: `Gelin tanış olalım
+İşi kolay kılalım
+Sevelim sevilelim
+Dünya kimseye kalmaz
+
+Ben gelmedim dava için
+Benim işim sevi için
+Dostun evi gönüllerdir
+Gönüller yapmaya geldim`,
+    explanation:
+      'Yunus Emre’nin barış, sevgi ve gönül kırmama felsefesini en sade, en ezberlenebilir Türkçeyle özetleyen ölümsüz dörtlükleridir.',
+  },
+  {
+    id: 'poem-akif-zulmu-alkislayamam',
+    title: 'Zulmü Alkışlayamam (Seçme Dizeler)',
+    poet: 'Mehmet Âkif Ersoy',
+    era: '20. Yüzyıl Başı · Safahat',
+    genre: 'Didaktik',
+    meterInfo: 'Aruz Ölçüsü',
+    theme: 'Dürüstlük, İlkeli Duruş ve Hakkaniyet',
+    content: `Zulmü alkışlayamam, zâlimi asla sevemem;
+Gelenin keyfi için geçmişe kalkıp sövemem.
+Üç buçuk soysuzun ardından zağarlık yapamam;
+Hele hak nâmına haksızlığa ölsem tapamam.
+
+Yumuşak başlı isem, kim dedi uysal koyunum?
+Kesilir belki, fakat çekmeye gelmez boyunum!`,
+    explanation:
+      'Mehmet Âkif Ersoy, karakter sağlamlığını, haksızlık karşısında susmamayı ve ilkeli duruşu güçlü bir hitabetle ifade eder.',
+  },
+  {
+    id: 'poem-karacaoglan-yuru-bre-yalan-dunya',
+    title: 'Üryan Geldim Yine Üryan Giderim',
+    poet: 'Karacaoğlan',
+    era: '17. Yüzyıl · Âşık Tarzı Halk Şiiri',
+    genre: 'Didaktik',
+    meterInfo: '11’li Hece Ölçüsü (Koşma)',
+    theme: 'Tevazu ve Yaşamın Değeri',
+    content: `Üryan geldim yine üryan giderim
+Ölmemeğe elde fermanım mı var
+Azrail gelmiş de can talep eyler
+Benim can vermeğe dermanım mı var
+
+Karac’oğlan der ki ismim öğerler
+Ağu oldu yediğimiz şekerler
+Güzel sever deyi isnad ederler
+Benim Hak’tan özge sevdiğim mi var`,
+    explanation:
+      'İnsanın geçici dünya malına kibirle bağlanmaması gerektiğini akıcı 11’li hece ölçüsüyle işleyen klasik bir halk koşmasıdır.',
+  },
 ];
 
 export const SATIRE_TASLAMA_EXAMPLES: SatireExample[] = [
@@ -600,5 +706,33 @@ Kadı gibi haram yemez
       '“Müzik ve saz insana zarar vermez, kimsenin hakkını yemez; onu yasaklamaya çalışan bağnazlık asıl sorgulanması gerekendir.”',
     critiqueTarget:
       'Sanata ve müziğe karşı ön yargılı, dar görüşlü tutumları mizahi ve akıcı bir halk şiiri diliyle eleştirir.',
+  },
+  {
+    id: 'sat-kaygusuz-abdal',
+    title: 'Kaplu Kaplu Bağalar — Mizahi Şathiye & Taşlama',
+    poet: 'Kaygusuz Abdal',
+    century: '14.–15. Yüzyıl (Tekke Halk Edebiyatı · Mizahi Hiciv)',
+    workTitle: 'Şathiyeler',
+    excerpt: `Kaplu kaplu bağalar
+Kanatlanmış uçmağa
+Kertenkele derilmiş
+Kırım suyun geçmeğe`,
+    modernMeaning:
+      '“Kaplumbağalar kanatlanıp uçmaya kalkmış, kertenkeleler toplanıp koca denizi geçmeye soyunmuş!”',
+    critiqueTarget:
+      'Yeteneği ve birikimi olmadığı hâlde büyük iddialarda bulunanları eğlenceli, masalsı bir abartma (mübalağa) sanatı ile hicveder.',
+  },
+  {
+    id: 'sat-nabi-hayriyye',
+    title: 'Hayriyye — Liyakat ve Cehalet Eleştirisi',
+    poet: 'Nâbî',
+    century: '17. Yüzyıl (Divan Edebiyatı · Hikemî Hiciv)',
+    workTitle: 'Hayriyye (Oğluna Öğütler)',
+    excerpt: `Câhilin sohbeti zehr-i kâtildir
+Âlimin meclisi bâğ-ı fâzıldır`,
+    modernMeaning:
+      '“Bilgisiz ve önyargılı meclisler zihni zehirler; bilgi ve erdem sahiplerinin sohbeti ise insanı büyüten bir bahçedir.”',
+    critiqueTarget:
+      'Oğlu Ebulhayr’a hitaben yazdığı eserde dönemin tembelliğini, rüşveti ve ilimden uzaklaşmayı hikmetli bir dille eleştirir.',
   },
 ];

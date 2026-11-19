@@ -31,13 +31,13 @@ import {
 import { MATH_TEST_PACKS } from '../../data/tests/mathTestsData';
 import { MathFormula } from '../ui/MathFormula';
 import { MultiTestQuizEngine } from '../ui/MultiTestQuizEngine';
+import { Geometry3DNetLab } from './math/Geometry3DNetLab';
 import { MathEncyclopediaPanel } from './math/MathEncyclopediaPanel';
 import { OneWordOneOperationGame } from './math/OneWordOneOperationGame';
 import { VisualProofsLab } from './math/VisualProofsLab';
 
 type MathTab = 'proofs' | 'game' | 'encyclopedia' | 'tests' | 'solver' | 'graphs' | 'exercises';
-type GraphMode = 'linear' | 'coordinate' | 'geometry';
-type GeoShape = 'triangle' | 'circle' | 'rectangle' | 'cylinder';
+type GraphMode = 'geometry' | 'linear' | 'coordinate';
 
 function buildExerciseMcqOptions(acceptedAnswers: string[]): string[] {
   const correct = (acceptedAnswers[0] ?? '0').trim();
@@ -112,8 +112,8 @@ export function MathTutorModule() {
   const [solveError, setSolveError] = useState('');
   const [solution, setSolution] = useState<AIMathSolution | null>(null);
 
-  // 2. Deterministic Graphs, Coordinate Plane & Geometry State (MEB 5–8. Sınıf)
-  const [graphMode, setGraphMode] = useState<GraphMode>('linear');
+  // 2. Deterministic Graphs, Coordinate Plane & 3D Geometry Net State (MEB 5–8. Sınıf)
+  const [graphMode, setGraphMode] = useState<GraphMode>('geometry');
   const [xRange, setXRange] = useState(8);
 
   const [linM, setLinM] = useState(2);
@@ -121,10 +121,6 @@ export function MathTutorModule() {
 
   const [coordX, setCoordX] = useState(4);
   const [coordY, setCoordY] = useState(3);
-
-  const [geoShape, setGeoShape] = useState<GeoShape>('triangle');
-  const [geoP1, setGeoP1] = useState(8);
-  const [geoP2, setGeoP2] = useState(6);
 
   // 3. Smart Exercises + Progressive Hint Tutor Mode
   const [exGrade, setExGrade] = useState('8. Sınıf (LGS)');
@@ -161,62 +157,6 @@ export function MathTutorModule() {
     if (coordX < 0 && coordY < 0) return 'III. Bölge (-, -)';
     return 'IV. Bölge (+, -)';
   }, [coordX, coordY]);
-
-  // Geometry metrics
-  const geoMetrics = useMemo(() => {
-    if (geoShape === 'triangle') {
-      const hyp = Math.sqrt(geoP1 * geoP1 + geoP2 * geoP2);
-      return {
-        title: 'Dik Üçgen',
-        p1Label: 'Taban (a)',
-        p2Label: 'Yükseklik (b)',
-        items: [
-          { label: 'Alan', latex: `A = \\frac{a \\cdot b}{2} = ${((geoP1 * geoP2) / 2).toFixed(2)}` },
-          { label: 'Hipotenüs', latex: `c = \\sqrt{a^2 + b^2} = ${hyp.toFixed(2)}` },
-          { label: 'Çevre', latex: `\\text{Ç} = ${(geoP1 + geoP2 + hyp).toFixed(2)}` },
-        ],
-      };
-    }
-    if (geoShape === 'circle') {
-      return {
-        title: 'Daire / Çember',
-        p1Label: 'Yarıçap (r)',
-        p2Label: 'Merkez Açı (°)',
-        items: [
-          { label: 'Alan', latex: `A = \\pi r^2 \\approx ${(Math.PI * geoP1 * geoP1).toFixed(2)}` },
-          { label: 'Çevre', latex: `\\text{Ç} = 2\\pi r \\approx ${(2 * Math.PI * geoP1).toFixed(2)}` },
-          {
-            label: 'Daire Dilimi Alanı',
-            latex: `A_{\\text{dilim}} \\approx ${((Math.PI * geoP1 * geoP1 * Math.min(360, geoP2 * 30)) / 360).toFixed(2)}`,
-          },
-        ],
-      };
-    }
-    if (geoShape === 'rectangle') {
-      const diag = Math.sqrt(geoP1 * geoP1 + geoP2 * geoP2);
-      return {
-        title: 'Dikdörtgen',
-        p1Label: 'Uzun Kenar (a)',
-        p2Label: 'Kısa Kenar (b)',
-        items: [
-          { label: 'Alan', latex: `A = a \\cdot b = ${(geoP1 * geoP2).toFixed(2)}` },
-          { label: 'Çevre', latex: `\\text{Ç} = 2(a+b) = ${(2 * (geoP1 + geoP2)).toFixed(2)}` },
-          { label: 'Köşegen', latex: `d = \\sqrt{a^2+b^2} = ${diag.toFixed(2)}` },
-        ],
-      };
-    }
-    const vol = Math.PI * geoP1 * geoP1 * geoP2;
-    const surf = 2 * Math.PI * geoP1 * (geoP1 + geoP2);
-    return {
-      title: 'Dik Dairesel Silindir',
-      p1Label: 'Taban Yarıçapı (r)',
-      p2Label: 'Yükseklik (h)',
-      items: [
-        { label: 'Hacim', latex: `V = \\pi r^2 h \\approx ${vol.toFixed(2)}` },
-        { label: 'Yüzey Alanı', latex: `S = 2\\pi r(r + h) \\approx ${surf.toFixed(2)}` },
-      ],
-    };
-  }, [geoP1, geoP2, geoShape]);
 
   const handleSolveProblem = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -615,9 +555,9 @@ export function MathTutorModule() {
           <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             {(
               [
+                { id: 'geometry', label: 'Prizma, Piramit & Açınım Animasyonları' },
                 { id: 'linear', label: 'Doğrusal İlişkiler ve Eğim (y = mx + n)' },
                 { id: 'coordinate', label: 'Koordinat Sistemi ve 4 Bölge' },
-                { id: 'geometry', label: 'Geometrik Şekiller ve Silindir' },
               ] as { id: GraphMode; label: string }[]
             ).map((gm) => (
               <button
@@ -967,200 +907,7 @@ export function MathTutorModule() {
             </div>
           )}
 
-          {graphMode === 'geometry' && (
-            <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-              <div className="lg:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col items-center justify-center min-h-[340px]">
-                <svg viewBox="0 0 360 260" className="w-full max-w-md h-auto">
-                  {geoShape === 'triangle' && (
-                    <g>
-                      <polygon
-                        points={`60,220 ${60 + geoP1 * 18},220 60,${220 - geoP2 * 14}`}
-                        fill="#0D9488"
-                        fillOpacity="0.18"
-                        stroke="#0D9488"
-                        strokeWidth="2.5"
-                      />
-                      <rect x="60" y="206" width="14" height="14" fill="none" stroke="#C89B3C" strokeWidth="1.5" />
-                      <text x={60 + geoP1 * 9} y="242" fill="#64748b" fontSize="13" textAnchor="middle">
-                        a = {geoP1}
-                      </text>
-                      <text x="34" y={220 - geoP2 * 7} fill="#64748b" fontSize="13" textAnchor="middle">
-                        b = {geoP2}
-                      </text>
-                    </g>
-                  )}
-                  {geoShape === 'circle' && (
-                    <g>
-                      <circle
-                        cx="180"
-                        cy="130"
-                        r={Math.min(100, geoP1 * 8)}
-                        fill="#0D9488"
-                        fillOpacity="0.18"
-                        stroke="#0D9488"
-                        strokeWidth="2.5"
-                      />
-                      <line
-                        x1="180"
-                        y1="130"
-                        x2={180 + Math.min(100, geoP1 * 8)}
-                        y2="130"
-                        stroke="#C89B3C"
-                        strokeWidth="2"
-                      />
-                      <text x="180" y="120" fill="#64748b" fontSize="13">
-                        r = {geoP1}
-                      </text>
-                    </g>
-                  )}
-                  {geoShape === 'rectangle' && (
-                    <g>
-                      <rect
-                        x="60"
-                        y={210 - geoP2 * 13}
-                        width={geoP1 * 18}
-                        height={geoP2 * 13}
-                        fill="#0D9488"
-                        fillOpacity="0.18"
-                        stroke="#0D9488"
-                        strokeWidth="2.5"
-                      />
-                      <line
-                        x1="60"
-                        y1="210"
-                        x2={60 + geoP1 * 18}
-                        y2={210 - geoP2 * 13}
-                        stroke="#C89B3C"
-                        strokeDasharray="4 4"
-                        strokeWidth="1.8"
-                      />
-                      <text x={60 + geoP1 * 9} y="232" fill="#64748b" fontSize="13" textAnchor="middle">
-                        a = {geoP1}
-                      </text>
-                      <text x="40" y={210 - geoP2 * 6.5} fill="#64748b" fontSize="13" textAnchor="middle">
-                        b = {geoP2}
-                      </text>
-                    </g>
-                  )}
-                  {geoShape === 'cylinder' && (
-                    <g>
-                      <ellipse
-                        cx="180"
-                        cy={200 - geoP2 * 11}
-                        rx={geoP1 * 8}
-                        ry={geoP1 * 2.6}
-                        fill="#0D9488"
-                        fillOpacity="0.24"
-                        stroke="#0D9488"
-                        strokeWidth="2"
-                      />
-                      <line
-                        x1={180 - geoP1 * 8}
-                        y1={200 - geoP2 * 11}
-                        x2={180 - geoP1 * 8}
-                        y2="200"
-                        stroke="#0D9488"
-                        strokeWidth="2"
-                      />
-                      <line
-                        x1={180 + geoP1 * 8}
-                        y1={200 - geoP2 * 11}
-                        x2={180 + geoP1 * 8}
-                        y2="200"
-                        stroke="#0D9488"
-                        strokeWidth="2"
-                      />
-                      <ellipse
-                        cx="180"
-                        cy="200"
-                        rx={geoP1 * 8}
-                        ry={geoP1 * 2.6}
-                        fill="#0D9488"
-                        fillOpacity="0.12"
-                        stroke="#0D9488"
-                        strokeWidth="2"
-                      />
-                      <text x={192 + geoP1 * 8} y={200 - geoP2 * 5.5} fill="#64748b" fontSize="13">
-                        h = {geoP2}
-                      </text>
-                    </g>
-                  )}
-                </svg>
-              </div>
-
-              <aside className="lg:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-5">
-                <div className="grid grid-cols-2 gap-2">
-                  {(
-                    [
-                      { id: 'triangle', label: 'Dik Üçgen' },
-                      { id: 'circle', label: 'Daire' },
-                      { id: 'rectangle', label: 'Dikdörtgen' },
-                      { id: 'cylinder', label: 'Silindir' },
-                    ] as { id: GeoShape; label: string }[]
-                  ).map((sh) => (
-                    <button
-                      key={sh.id}
-                      type="button"
-                      onClick={() => setGeoShape(sh.id)}
-                      className={`px-3 py-2 text-xs font-medium rounded-lg border cursor-pointer ${
-                        geoShape === sh.id
-                          ? 'border-teal-600 bg-teal-50 dark:bg-teal-950/50 text-navy-900 dark:text-white'
-                          : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                      }`}
-                    >
-                      {sh.label}
-                    </button>
-                  ))}
-                </div>
-
-                <div className="space-y-3">
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>{geoMetrics.p1Label}</span>
-                      <span className="font-mono font-semibold tabular-nums">{geoP1}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={2}
-                      max={12}
-                      value={geoP1}
-                      onChange={(e) => setGeoP1(Number(e.target.value))}
-                      className="w-full accent-teal-600"
-                    />
-                  </div>
-                  <div>
-                    <div className="flex justify-between text-xs mb-1">
-                      <span>{geoMetrics.p2Label}</span>
-                      <span className="font-mono font-semibold tabular-nums">{geoP2}</span>
-                    </div>
-                    <input
-                      type="range"
-                      min={2}
-                      max={12}
-                      value={geoP2}
-                      onChange={(e) => setGeoP2(Number(e.target.value))}
-                      className="w-full accent-teal-600"
-                    />
-                  </div>
-                </div>
-
-                <div className="pt-4 border-t border-slate-100 dark:border-slate-800 space-y-2.5">
-                  <p className="text-xs font-semibold text-navy-900 dark:text-white">
-                    {geoMetrics.title} Hesaplamaları
-                  </p>
-                  {geoMetrics.items.map((item) => (
-                    <div
-                      key={item.label}
-                      className="p-3 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex items-center justify-between gap-2 text-xs"
-                    >
-                      <span className="text-slate-600 dark:text-slate-400">{item.label}</span>
-                      <MathFormula latex={item.latex} />
-                    </div>
-                  ))}
-                </div>
-              </aside>
-            </div>
-          )}
+          {graphMode === 'geometry' && <Geometry3DNetLab />}
         </div>
       )}
 

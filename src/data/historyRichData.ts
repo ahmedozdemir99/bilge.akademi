@@ -261,6 +261,50 @@ export const MILITARY_CAMPAIGNS: MilitaryCampaign[] = [
       { label: 'Haymana & Dua Tepe', date: '10–13 Eylül 1921', x: 480, y: 208, note: 'Dua Tepe zaferiyle Yunan taarruz gücü tamamen kırıldı.' },
     ],
   },
+  {
+    id: 'miryokefalon-1176',
+    name: 'Miryokefalon (Kumdanlı) Zaferi',
+    year: '17 Eylül 1176',
+    era: 'Türkiye (Anadolu) Selçuklu Devleti',
+    winnerSide: 'Anadolu Selçuklu Devleti',
+    winnerCommander: 'Sultan II. Kılıç Arslan',
+    defeatedSide: 'Bizans İmparatorluğu',
+    defeatedCommander: 'İmparator Manuel Komnenos',
+    battleType: 'Kara Meydan Savaşı',
+    tactics: 'Dar dağ geçidinde pusu (Karamıkbeli / Kumdanlı vadisi) — Bizans ordusunun ikmal kollarını kesip geçidi iki uçtan kapatma.',
+    turningPoint: 'Bizans ordusu dar vadiye girdikten sonra Selçuklu okçularının tepelerden taarruza geçerek ağır kuşatma kolunu etkisiz hâle getirmesi.',
+    consequences: [
+      'Anadolu’nun kesin olarak Türk yurdu olduğu tüm dünyaca kabul edildi (“Yurt Tutan Savaş”).',
+      'Bizans’ın Türkleri Anadolu’dan çıkarma umudu tamamen sona erdi; Batı kaynakları Anadolu’ya “Türkiye” demeye başladı.',
+    ],
+    waypoints: [
+      { label: 'Konya (Selçuklu Başkenti)', date: 'Ağustos 1176', x: 486, y: 222, note: 'Sultan II. Kılıç Arslan başkenti savunmak ve Bizans ordusunu dar geçide çekmek için plan kurdu.' },
+      { label: 'Afyon / Sandıklı Hattı', date: 'Eylül 1176', x: 468, y: 217, note: 'Selçuklu öncüleri düşmanı yıpratarak dağlık vadiye yönlendirdi.' },
+      { label: 'Miryokefalon Vadisi (Isparta/Denizli)', date: '17 Eylül 1176', x: 464, y: 224, note: 'Tarihî pusu taktiğiyle Bizans ordusu bozguna uğratıldı; Anadolu kesin Türk yurdu oldu.' },
+    ],
+  },
+  {
+    id: 'kibris-1571',
+    name: 'Kıbrıs’ın Fethi ve Doğu Akdeniz Güvenliği',
+    year: '1570 – 1571',
+    era: 'Osmanlı Yükselme Dönemi',
+    winnerSide: 'Osmanlı Devleti',
+    winnerCommander: 'Lala Mustafa Paşa & Piyale Paşa',
+    defeatedSide: 'Venedik Cumhuriyeti',
+    defeatedCommander: 'Marcantonio Bragadin',
+    battleType: 'Kuşatma ve Fetih',
+    tactics: 'Amfibi deniz çıkarması, Lefkoşa’nın kısa sürede alınması ve Mağusa Kalesi’nde sistemli lağım-topçu kuşatması.',
+    turningPoint: 'Osmanlı donanmasının Anadolu’dan düzenli asker ve ikmal taşıyarak Ağustos 1571’de Mağusa’yı teslim alması.',
+    consequences: [
+      'Doğu Akdeniz ticaret ve hac yollarının güvenliği tamamen sağlandı.',
+      'Anadolu’dan giden Türk aileleriyle Kıbrıs’ta köklü Türk yerleşimi ve vakıf eserleri kuruldu.',
+    ],
+    waypoints: [
+      { label: 'İstanbul Tersanesi', date: 'Nisan 1570', x: 462, y: 196, note: 'Osmanlı donanması Doğu Akdeniz’e doğru yelken açtı.' },
+      { label: 'Alanya / Finike İkmal Üssü', date: 'Haziran 1570', x: 478, y: 237, note: 'Anadolu kıyılarından birlikler gemilere bindirildi.' },
+      { label: 'Larnaka, Lefkoşa ve Mağusa (Kıbrıs)', date: '1570–1571', x: 492, y: 252, note: 'Lefkoşa ve Mağusa’nın fethiyle Kıbrıs Osmanlı beylerbeyliği oldu.' },
+    ],
+  },
 ];
 
 export const SULTAN_PROFILES: SultanProfile[] = [
@@ -489,6 +533,49 @@ export const SULTAN_PROFILES: SultanProfile[] = [
       { battle: 'II. Kosova Savaşı', year: '1448', opponent: 'Hunyadi Yanoş Komutasındaki Haçlılar', result: 'Galip', note: 'Balkanlar kesin olarak Türk yurdu hâline geldi; İstanbul’un fethine giden yol açıldı.' },
     ],
   },
+  {
+    id: 'orhan-gazi',
+    name: 'Orhan Gazi',
+    reign: '1326 – 1362',
+    period: 'Kuruluş',
+    mahlas: 'Devlet Teşkilatçısı',
+    hiddenTalents: [
+      'İlk düzenli ordu (Yaya ve Müsellem) ve ilk Divan-ı Hümayun kurucusu',
+      'İznik’te ilk Osmanlı medresesini kurarak Davud-ı Kayserî’yi başmüderris atadı',
+      'İlk Osmanlı gümüş parasını (akçe) bastırdı ve Rumeli’ye geçişi başlattı',
+    ],
+    talentStory:
+      'Babası Osman Gazi’nin kurduğu beyliği kurumsal bir devlete dönüştüren Orhan Gazi, Bursa’yı başkent yaptı ve fethettiği şehirlerde derhâl medrese, imaret (aşevi) ve cami inşa ettirdi. İznik’te kurduğu ilk medreseyle Osmanlı bilim geleneğinin temelini attı.',
+    poemTitle: 'İbn Battûta’nın Orhan Gazi Gözlemi',
+    poemOriginal: '“O, Türkmen hükümdarlarının en büyüğüdür; şehirleri bizzat dolaşır, halkın derdini dinler ve asla bir yerde sabit kalıp rahata dalmaz.”',
+    poemModernTurkish:
+      'Ünlü seyyah İbn Battûta, Orhan Gazi’nin çalışkanlığını, halkla iç içe yönetimini ve adaletini seyahatnamesinde övgüyle anlatır.',
+    battles: [
+      { battle: 'Bursa’nın Fethi', year: '1326', opponent: 'Bizans İmparatorluğu', result: 'Galip', note: 'Bursa fethedilip Osmanlı’nın ilk büyük başkenti oldu.' },
+      { battle: 'Palekanon (Maltepe) Savaşı', year: '1329', opponent: 'Bizans İmparatorluğu', result: 'Galip', note: 'İznik ve İzmit’in fethi kesinleşti; Kocaeli Yarımadası Osmanlı’ya geçti.' },
+    ],
+  },
+  {
+    id: 'mahmud1',
+    name: 'I. Mahmud',
+    reign: '1730 – 1754',
+    period: 'Duraklama & Yenileşme',
+    mahlas: 'Sebkatî',
+    hiddenTalents: [
+      'Kütüphane tutkunu: Ayasofya, Fatih ve Galatasaray’da büyük halk kütüphaneleri kurdu',
+      'Usta bestekâr, şair (Sebkatî) ve ince zanaatçı (fildişi-abanoz oymacılığı)',
+      'Hendesehâne’yi (ilk modern mühendislik okulunu) açtırdı',
+    ],
+    talentStory:
+      'I. Mahmud kitaplara ve mimariye olan tutkusuyla tanınır. Kendi kurduğu kütüphanelerde nadir el yazmalarının korunması için özel kataloglar hazırlattı ve mühendislik eğitiminin öncüsü olan Hendesehâne’yi kurdu.',
+    poemTitle: 'Sebkatî’den (Kamu Malı Beyit)',
+    poemOriginal: 'Kıl adâlet ey gönül, zulm ile âlem pâyidâr olmaz\nHakk’ın rızâsından özge kuluna bir yâr olmaz',
+    poemModernTurkish:
+      'Ey gönül, adaletten ayrılma çünkü zulümle hiçbir düzen kalıcı olmaz; en sağlam dayanak doğruluktur.',
+    battles: [
+      { battle: 'Hisarcık (Grocka) Savaşı & Belgrad Antlaşması', year: '1739', opponent: 'Avusturya & Rusya', result: 'Galip', note: 'Belgrad geri alındı; Osmanlı 18. yüzyıldaki en kazançlı antlaşmasını imzaladı.' },
+    ],
+  },
 ];
 
 export const HISTORY_ANECDOTES_WISDOM: HistoryWisdomItem[] = [
@@ -611,5 +698,35 @@ export const HISTORY_ANECDOTES_WISDOM: HistoryWisdomItem[] = [
     content:
       '18 Mart 1915’te Rumeli Mecidiye Tabyası ağır bombardıman altında kalınca topun mermi kaldıran vinci bozuldu. Düşman zırhlısı Ocean boğaza doğru ilerlerken Havranlı Seyit Onbaşı arkadaşının yardımıyla 215 okkalık (yaklaşık 275 kg) top mermisini sırtlayıp namluya sürdü ve zırhlının dümen donanımını vurdu. Savaş sonrası fotoğraf çekilmesi istendiğinde aynı ağırlığı kaldıramayınca “O gün vatan aşkıyla kaldırdım; yine düşman gelse yine kaldırırım” demiştir.',
     lesson: 'İnanç, dayanışma ve yüksek bir amaç uğruna kenetlenmek insanın sınırlarını aşmasını sağlar.',
+  },
+  {
+    id: 'wis-13',
+    title: 'Barbaros Hayreddin Paşa: “Denizlere Hâkim Olan Cihana Hâkim Olur”',
+    category: 'İlginç Anekdot',
+    era: '1538 · Preveze Öncesi',
+    figures: 'Barbaros Hayreddin Paşa',
+    content:
+      'Preveze Deniz Savaşı öncesinde Haçlı donanmasının gemi sayısı Osmanlı donanmasının iki katından fazlaydı. Bazı komutanlar çekinince Barbaros sakinlikle rüzgâr yönünü ve haritaları inceledi: “Onların büyük kalyonları rüzgâr kesilince hareketsiz kalır; bizim kürekli kadırgalarımız ise her yöne ok gibi süzülür.” Strateji ve coğrafya bilgisi sayesinde sayısal dezavantajı tarihin en büyük deniz zaferine dönüştürdü.',
+    lesson: 'Doğayı tanımak, doğru strateji kurmak ve soğukkanlı düşünmek sayısal üstünlükten daha etkilidir.',
+  },
+  {
+    id: 'wis-14',
+    title: 'Kanuni Sultan Süleyman ve Şair Bâkî’nin Sanat Dostluğu',
+    category: 'Hikmetli Hikâye',
+    era: '16. Yüzyıl · İstanbul',
+    figures: 'Kanuni Sultan Süleyman & Şair Bâkî',
+    content:
+      '“Muhibbî” mahlaslı Kanuni, dönemin büyük şairi Bâkî’nin şiirlerine büyük hayranlık duyar ve sık sık ona şiirle karşılık verirdi. Bir gün “Saltanatımın en büyük kazancı nedir bilir misiniz? Şair Bâkî gibi bir sanatçının benim devrimde yetişmiş olmasıdır!” diyerek sanata ve edebiyata verdiği değeri tarihe not düşmüştür.',
+    lesson: 'Büyük medeniyetler yalnız askerî güçle değil, şairlere, bilim insanlarına ve sanata verdikleri değerle hatırlanır.',
+  },
+  {
+    id: 'wis-15',
+    title: 'İbn Sînâ’nın Genç Yaşta Kütüphane Tutkusu',
+    category: 'İlginç Anekdot',
+    era: '10. Yüzyıl Sonu · Buhara',
+    figures: 'İbn Sînâ & Sâmânî Hükümdarı Nuh bin Mansur',
+    content:
+      'Henüz 17 yaşındayken hekimlerin çare bulamadığı Buhara Hükümdarı’nı tedavi eden İbn Sînâ’ya hükümdar dilediği ödülü isteyebileceğini söyledi. Genç İbn Sînâ altın, makam veya saray değil; yalnızca sarayın nadir el yazmalarıyla dolu büyük kütüphanesine giriş izni istedi! Orada yıllarca okuyup inceleyerek tıp ve felsefe tarihini değiştiren eserlerinin temelini attı.',
+    lesson: 'Gerçek zenginlik tüketilen eşyalarda değil, zihni aydınlatan kitaplarda ve öğrenme aşkındadır.',
   },
 ];

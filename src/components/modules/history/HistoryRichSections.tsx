@@ -125,68 +125,268 @@ export function AnimatedCampaignsMap() {
             </div>
           </div>
 
-          {/* Focused Eastern Med / Anatolia / Balkans / Middle East Viewport */}
-          <div className="rounded-lg overflow-hidden border border-slate-200 dark:border-slate-800 bg-[#0D213B]">
-            <svg viewBox="320 110 310 215" className="w-full h-auto block" role="img" aria-label={`${campaign.name} animasyonlu sefer haritası`}>
+          {/* Colorful Cartographic Map: Distinct Seas, Coasts, Landmasses, Rivers & Islands */}
+          <div className="rounded-xl overflow-hidden border border-slate-300 dark:border-slate-700 bg-[#0B6A94] shadow-xs">
+            <svg
+              viewBox="330 118 290 198"
+              className="w-full h-auto block select-none"
+              role="img"
+              aria-label={`${campaign.name} animasyonlu tarihî sefer haritası`}
+            >
               <defs>
-                <pattern id="campaignGrid" width="25" height="25" patternUnits="userSpaceOnUse">
-                  <path d="M 25 0 L 0 0 0 25" fill="none" stroke="#38BDF8" strokeOpacity="0.12" strokeWidth="0.6" />
+                {/* Vibrant Mediterranean & Black Sea Ocean Gradient */}
+                <linearGradient id="seaOceanGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#0C7AA8" />
+                  <stop offset="50%" stopColor="#0E88B8" />
+                  <stop offset="100%" stopColor="#09608A" />
+                </linearGradient>
+
+                {/* Fertile Europe & Balkans Land Gradient */}
+                <linearGradient id="europeLandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#CFE0B2" />
+                  <stop offset="55%" stopColor="#DFDEBA" />
+                  <stop offset="100%" stopColor="#D7CCA0" />
+                </linearGradient>
+
+                {/* Anatolian Plateau & Eastern Highlands Gradient */}
+                <linearGradient id="anatoliaLandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#DCE0B4" />
+                  <stop offset="45%" stopColor="#E6D29E" />
+                  <stop offset="100%" stopColor="#D6B57D" />
+                </linearGradient>
+
+                {/* Levant, Sinai & Egypt Desert-Oasis Gradient */}
+                <linearGradient id="desertLandGrad" x1="0%" y1="0%" x2="100%" y2="100%">
+                  <stop offset="0%" stopColor="#EFE0B5" />
+                  <stop offset="60%" stopColor="#E8CFA0" />
+                  <stop offset="100%" stopColor="#DFBF88" />
+                </linearGradient>
+
+                {/* Subtle Latitude / Longitude Cartographic Grid */}
+                <pattern id="atlasGraticule" width="24" height="24" patternUnits="userSpaceOnUse">
+                  <path
+                    d="M 24 0 L 0 0 0 24"
+                    fill="none"
+                    stroke="#BAE6FD"
+                    strokeOpacity="0.18"
+                    strokeWidth="0.45"
+                  />
                 </pattern>
+
+                {/* Soft Shallow-Water Coastal Glow */}
+                <filter id="coastHalo" x="-8%" y="-8%" width="116%" height="116%">
+                  <feDropShadow dx="0" dy="0" stdDeviation="2.1" floodColor="#67E8F9" floodOpacity="0.52" />
+                </filter>
               </defs>
-              <rect x="320" y="110" width="310" height="215" fill="url(#campaignGrid)" />
 
-              {/* Stylized Landmasses matching HistoryAtlas coordinates */}
+              {/* 1. OCEAN BACKDROP */}
+              <rect x="330" y="118" width="290" height="198" fill="url(#seaOceanGrad)" />
+              <rect x="330" y="118" width="290" height="198" fill="url(#atlasGraticule)" />
+
+              {/* 2. DISTINCT CONTINENTAL LANDMASSES WITH COASTAL SHALLOW HALO */}
+              <g filter="url(#coastHalo)">
+                {/* Italian Boot Tip (West edge for Mediterranean orientation) */}
+                <path
+                  d="M 330 156 L 351 174 L 364 195 L 357 204 L 348 193 L 341 214 L 330 218 Z"
+                  fill="url(#europeLandGrad)"
+                  stroke="#6E5D3E"
+                  strokeWidth="0.85"
+                  strokeLinejoin="round"
+                />
+
+                {/* Central Europe, Balkans, Greece & Northern Black Sea Coast + Crimea */}
+                <path
+                  d="M 330 118 L 620 118 L 620 185 L 588 182 L 568 175 L 550 158 L 534 148 L 516 140 L 502 146 L 486 144 L 478 136 L 466 138 L 454 150 L 448 164 L 452 178 L 460 190 L 456 196 L 444 198 L 434 196 L 424 202 L 422 213 L 425 221 L 414 226 L 407 219 L 404 209 L 394 196 L 382 184 L 367 170 L 356 155 L 344 146 L 330 144 Z"
+                  fill="url(#europeLandGrad)"
+                  stroke="#6E5D3E"
+                  strokeWidth="0.9"
+                  strokeLinejoin="round"
+                />
+
+                {/* Anatolia, Caucasus, Mesopotamia & Levant (separated from Balkans by Marmara & Straits!) */}
+                <path
+                  d="M 464 192 L 478 184 L 502 180 L 528 182 L 552 187 L 574 185 L 594 181 L 620 183 L 620 316 L 528 316 L 515 288 L 506 274 L 500 282 L 495 272 L 508 256 L 514 242 L 508 236 L 494 239 L 478 239 L 464 235 L 451 232 L 445 224 L 444 214 L 442 204 L 447 199 L 456 198 Z"
+                  fill="url(#anatoliaLandGrad)"
+                  stroke="#6E5D3E"
+                  strokeWidth="0.95"
+                  strokeLinejoin="round"
+                />
+
+                {/* Sinai Peninsula, Nile Valley, Egypt & North African Coast (separated by Mediterranean & Red Sea!) */}
+                <path
+                  d="M 330 278 L 365 276 L 398 282 L 428 281 L 458 279 L 480 275 L 496 274 L 506 286 L 500 296 L 492 288 L 495 304 L 502 316 L 330 316 Z"
+                  fill="url(#desertLandGrad)"
+                  stroke="#6E5D3E"
+                  strokeWidth="0.9"
+                  strokeLinejoin="round"
+                />
+
+                {/* Crete (Girit) Island */}
+                <path
+                  d="M 424 231 L 436 229 L 447 231 L 444 235 L 427 235 Z"
+                  fill="#DDD1A6"
+                  stroke="#6E5D3E"
+                  strokeWidth="0.75"
+                />
+
+                {/* Cyprus (Kıbrıs) Island */}
+                <path
+                  d="M 486 252 L 496 249 L 503 248 L 499 254 L 489 255 Z"
+                  fill="#DFCFA0"
+                  stroke="#6E5D3E"
+                  strokeWidth="0.75"
+                />
+
+                {/* Rhodes & Major Aegean Islands */}
+                <circle cx="451" cy="234" r="1.8" fill="#DFCFA0" stroke="#6E5D3E" strokeWidth="0.5" />
+                <circle cx="436" cy="212" r="1.4" fill="#DFCFA0" stroke="#6E5D3E" strokeWidth="0.45" />
+                <circle cx="439" cy="220" r="1.3" fill="#DFCFA0" stroke="#6E5D3E" strokeWidth="0.45" />
+              </g>
+
+              {/* 3. MAJOR RIVERS & FERTILE NILE DELTA */}
+              <g fill="none" stroke="#38BDF8" strokeOpacity="0.65" strokeLinecap="round">
+                {/* Tuna (Danube) */}
+                <path d="M 366 136 Q 388 156 410 168 T 451 168" strokeWidth="1.05" />
+                {/* Kızılırmak / Sakarya */}
+                <path d="M 516 184 Q 512 204 526 205" strokeWidth="0.8" />
+                <path d="M 476 188 Q 480 202 486 206" strokeWidth="0.75" />
+                {/* Fırat & Dicle */}
+                <path d="M 552 205 Q 542 232 560 264" strokeWidth="0.9" />
+                <path d="M 564 214 Q 570 242 582 268" strokeWidth="0.9" />
+                {/* Nil & Nile Delta */}
+                <path d="M 479 316 L 478 288 L 472 276" strokeWidth="1.35" />
+                <path d="M 478 288 L 485 276" strokeWidth="1.05" />
+              </g>
+              {/* Nile Delta green oasis tint */}
+              <polygon points="478,288 470,276 486,276" fill="#84B86E" fillOpacity="0.38" />
+
+              {/* Subtle Topographic Mountain Ridges (Toroslar & Doğu Anadolu) */}
+              <g fill="none" stroke="#9A8259" strokeWidth="0.75" strokeOpacity="0.55" strokeLinecap="round">
+                <path d="M 476 231 l 3 -3 l 3 3 m 5 0 l 3 -3 l 3 3 m 6 -1 l 3 -3 l 3 3" />
+                <path d="M 550 198 l 3 -3.5 l 3 3.5 m 5 -1 l 3 -3.5 l 3 3.5 m 5 1 l 3 -3.5 l 3 3.5" />
+                <path d="M 505 189 l 3 -2.5 l 3 2.5 m 6 -1 l 3 -2.5 l 3 2.5" />
+              </g>
+
+              {/* 4. CLEAR GEOGRAPHIC WATER & LAND LABELS */}
+              <g className="pointer-events-none select-none">
+                {/* Sea Labels (Crisp italic pale aqua) */}
+                <text x="506" y="164" fill="#E0F2FE" fontSize="6.6" fontStyle="italic" fontWeight="600" letterSpacing="0.8" textAnchor="middle">
+                  KARADENİZ
+                </text>
+                <text x="419" y="256" fill="#E0F2FE" fontSize="7.4" fontStyle="italic" fontWeight="600" letterSpacing="1.1" textAnchor="middle">
+                  AKDENİZ
+                </text>
+                <text x="433" y="218" fill="#E0F2FE" fontSize="4.8" fontStyle="italic" fontWeight="600" textAnchor="middle">
+                  Ege
+                </text>
+                <text x="512" y="305" fill="#E0F2FE" fontSize="5" fontStyle="italic" fontWeight="600" textAnchor="middle">
+                  Kızıldeniz
+                </text>
+
+                {/* Land Region Labels (Warm muted sepia-brown) */}
+                <text x="514" y="216" fill="#6B5634" fontSize="6.8" fontWeight="700" letterSpacing="0.9" textAnchor="middle" opacity="0.72">
+                  ANADOLU
+                </text>
+                <text x="392" y="139" fill="#52603C" fontSize="6.2" fontWeight="700" letterSpacing="0.6" textAnchor="middle" opacity="0.75">
+                  ORTA AVRUPA
+                </text>
+                <text x="424" y="179" fill="#52603C" fontSize="5.4" fontWeight="600" letterSpacing="0.5" textAnchor="middle" opacity="0.72">
+                  Balkanlar
+                </text>
+                <text x="458" y="302" fill="#785E33" fontSize="6.2" fontWeight="700" letterSpacing="0.8" textAnchor="middle" opacity="0.78">
+                  MISIR
+                </text>
+                <text x="548" y="258" fill="#785E33" fontSize="5.6" fontWeight="600" letterSpacing="0.5" textAnchor="middle" opacity="0.72">
+                  Suriye &amp; Mezopotamya
+                </text>
+              </g>
+
+              {/* 5. CAMPAIGN TRAJECTORY (PLANNED + ANIMATED TRAVERSED ROUTE) */}
               <path
-                d="M 290 135 L 355 110 L 445 95 L 610 85 L 660 120 L 650 280 L 555 325 L 500 280 L 455 240 L 410 218 L 360 220 L 300 205 Z"
-                fill="#1C395E"
-                stroke="#C89B3C"
-                strokeOpacity="0.45"
-                strokeWidth="1"
+                d={fullPathD}
+                fill="none"
+                stroke="#0F172A"
+                strokeWidth="2.8"
+                strokeOpacity="0.22"
+                strokeDasharray="3.5 3"
+                strokeLinecap="round"
               />
               <path
-                d="M 310 245 L 435 248 L 495 280 L 535 345 L 360 345 Z"
-                fill="#183254"
-                stroke="#C89B3C"
-                strokeOpacity="0.35"
-                strokeWidth="1"
+                d={fullPathD}
+                fill="none"
+                stroke="#FFFFFF"
+                strokeWidth="1.4"
+                strokeOpacity="0.8"
+                strokeDasharray="3.5 3"
+                strokeLinecap="round"
               />
 
-              {/* Subtle region captions */}
-              <text x="488" y="212" fill="#94A3B8" fontSize="8" opacity="0.7">Anadolu</text>
-              <text x="365" y="145" fill="#94A3B8" fontSize="8" opacity="0.7">Orta Avrupa</text>
-              <text x="415" y="242" fill="#38BDF8" fontSize="7.5" opacity="0.65">Akdeniz</text>
-              <text x="458" y="305" fill="#94A3B8" fontSize="8" opacity="0.7">Mısır</text>
-
-              {/* Dashed planned route */}
-              <path d={fullPathD} fill="none" stroke="#94A3B8" strokeWidth="1.5" strokeDasharray="3 3" opacity="0.55" />
-
-              {/* Animated illuminated route */}
+              {/* Animated illuminated route with white contrast halo */}
               <polyline
                 points={activePathPoints.join(' ')}
                 fill="none"
-                stroke="#DDB75F"
-                strokeWidth="2.8"
+                stroke="#FFFFFF"
+                strokeWidth="4.6"
+                strokeOpacity="0.85"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              />
+              <polyline
+                points={activePathPoints.join(' ')}
+                fill="none"
+                stroke="#C81E1E"
+                strokeWidth="2.5"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
 
-              {/* Waypoint nodes */}
+              {/* 6. CLICKABLE NUMBERED WAYPOINTS WITH HALOED LABELS */}
               {pts.map((pt, idx) => {
                 const reached = progress >= (idx / totalSegments) * 100 - 1;
+                const isFinal = idx === pts.length - 1;
+                const placeLeft = pt.x > 540;
+                const labelDx = placeLeft ? -8 : 8;
+                const labelDy = idx % 2 === 0 ? -5.5 : 10.5;
                 return (
-                  <g key={pt.label} transform={`translate(${pt.x}, ${pt.y})`}>
+                  <g
+                    key={pt.label}
+                    transform={`translate(${pt.x}, ${pt.y})`}
+                    onClick={() => {
+                      setIsPlaying(false);
+                      setProgress((idx / totalSegments) * 100);
+                    }}
+                    className="cursor-pointer"
+                  >
+                    {isFinal && reached && (
+                      <circle r="8.5" fill="#C81E1E" fillOpacity="0.22" stroke="#C81E1E" strokeWidth="0.8" />
+                    )}
                     <circle
-                      r={idx === pts.length - 1 ? 4.5 : 3.5}
-                      fill={reached ? '#0D9488' : '#475569'}
+                      r={isFinal ? 5.2 : 4.4}
+                      fill={isFinal ? '#B91C1C' : reached ? '#0F766E' : '#475569'}
                       stroke="#FFFFFF"
-                      strokeWidth="1.2"
+                      strokeWidth="1.4"
                     />
                     <text
-                      x="6"
-                      y={idx % 2 === 0 ? -4 : 9}
-                      fill="#F8FAFC"
-                      fontSize="7.5"
-                      fontWeight={reached ? '700' : '400'}
+                      x="0"
+                      y="2.1"
+                      textAnchor="middle"
+                      fill="#FFFFFF"
+                      fontSize="5.2"
+                      fontWeight="700"
+                    >
+                      {idx + 1}
+                    </text>
+                    <text
+                      x={labelDx}
+                      y={labelDy}
+                      textAnchor={placeLeft ? 'end' : 'start'}
+                      fill="#0B1F3A"
+                      stroke="#FFFFFF"
+                      strokeWidth="2.6"
+                      paintOrder="stroke"
+                      strokeLinejoin="round"
+                      fontSize="6.8"
+                      fontWeight={reached ? '700' : '600'}
                     >
                       {pt.label}
                     </text>
@@ -194,12 +394,60 @@ export function AnimatedCampaignsMap() {
                 );
               })}
 
-              {/* Moving Expedition Marker */}
+              {/* 7. ANIMATED EXPEDITION EMBLEM (NAVAL GALLEY FOR SEA / BANNER FOR LAND) */}
               <g transform={`translate(${markerX}, ${markerY})`}>
-                <circle r="7" fill="#DDB75F" fillOpacity="0.3" />
-                <circle r="3.8" fill="#DDB75F" stroke="#0B1F3A" strokeWidth="1.2" />
+                <circle r="8.5" fill="#F59E0B" fillOpacity="0.28" />
+                <circle r="5.6" fill="#0B1F3A" stroke="#FCD34D" strokeWidth="1.4" />
+                {campaign.battleType === 'Deniz Savaşı' ? (
+                  /* Crisp Ottoman Galley / Ship Icon */
+                  <g transform="translate(-3.4, -3)">
+                    <path d="M 0.5 4.2 L 6.3 4.2 L 5.2 6 L 1.6 6 Z" fill="#FCD34D" />
+                    <path d="M 3.4 0.5 L 3.4 4.1 L 5.9 3.6 Z" fill="#FFFFFF" />
+                    <path d="M 3.1 1.2 L 3.1 4.1 L 1.1 3.7 Z" fill="#E0F2FE" />
+                  </g>
+                ) : (
+                  /* Crisp Army Banner / Standard Icon */
+                  <g transform="translate(-2.6, -3.2)">
+                    <line x1="1" y1="0.4" x2="1" y2="6.4" stroke="#FCD34D" strokeWidth="1" strokeLinecap="round" />
+                    <path d="M 1.4 0.7 L 5.6 1.8 L 1.4 3.4 Z" fill="#EF4444" stroke="#FFFFFF" strokeWidth="0.45" />
+                  </g>
+                )}
+              </g>
+
+              {/* 8. COMPASS ROSE (TOP-RIGHT CORNER) */}
+              <g transform="translate(604, 134)" className="pointer-events-none">
+                <circle r="9.5" fill="#0B1F3A" fillOpacity="0.72" stroke="#FCD34D" strokeWidth="0.7" />
+                <polygon points="0,-6.2 1.8,0 0,6.2 -1.8,0" fill="#FFFFFF" />
+                <polygon points="0,-6.2 1.8,0 0,-1 -1.8,0" fill="#EF4444" />
+                <polygon points="-6.2,0 0,-1.6 6.2,0 0,1.6" fill="#CBD5E1" />
+                <text x="0" y="-7.2" textAnchor="middle" fill="#FCD34D" fontSize="4.6" fontWeight="700">
+                  K
+                </text>
               </g>
             </svg>
+          </div>
+
+          {/* Clean 4-item Cartographic Map Legend */}
+          <div className="flex flex-wrap items-center justify-between gap-x-4 gap-y-1.5 px-1 text-[11px] text-slate-600 dark:text-slate-300">
+            <div className="flex flex-wrap items-center gap-x-4 gap-y-1">
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-[#E2D2A2] border border-[#6E5D3E]" />
+                <span>Kara / Topografya</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-3 h-3 rounded-xs bg-[#0E88B8] border border-[#09608A]" />
+                <span>Denizler &amp; Boğazlar</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-4 h-1 rounded-full bg-[#C81E1E]" />
+                <span>İlerlenen Rota</span>
+              </span>
+              <span className="inline-flex items-center gap-1.5">
+                <span className="w-2.5 h-2.5 rounded-full bg-[#B91C1C] border border-white ring-1 ring-[#B91C1C]" />
+                <span>Muharebe / Hedef</span>
+              </span>
+            </div>
+            <span className="text-[10px] text-slate-400">Durak numaralarına tıklayarak atlayabilirsiniz</span>
           </div>
 
           {/* Scrub slider + active stage caption */}
@@ -294,7 +542,7 @@ export function SultansGalleryPanel() {
   return (
     <div className="space-y-5">
       <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
-        {(['all', 'Yükselme', 'Duraklama & Yenileşme'] as const).map((per) => (
+        {(['all', 'Kuruluş', 'Yükselme', 'Duraklama & Yenileşme'] as const).map((per) => (
           <button
             key={per}
             type="button"

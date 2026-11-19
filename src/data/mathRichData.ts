@@ -43,6 +43,39 @@ export interface LogicPuzzleItem {
 
 export const MATH_STORIES_ANECDOTES: MathStoryItem[] = [
   {
+    id: 'keops-pyramid',
+    title: 'Keops (Büyük Giza) Piramidi ve Matematiksel Sırları',
+    era: 'y. MÖ 2560 · Giza (Antik Mısır)',
+    tag: 'Piramitler & Geometri',
+    summary: '4500 yıl önce lazer veya bilgisayar olmadan inşa edilen dev kare dik piramidin π sayısı, Altın Oran ve hacim mucizesi.',
+    story:
+      'Firavun Khufu (Keops) için Mimar Hemiunu yönetiminde inşa edilen Büyük Giza Piramidi, Antik Dünyanın Yedi Harikası arasında günümüze ulaşan tek eserdir. Geometrik olarak dev bir KARE DİK PİRAMİT olan yapının taban kenarı yaklaşık 230,4 metre, ilk yapıldığındaki yüksekliği ise 146,6 metredir (zamanla tepe taşları aşındığı için bugün 138,5 m’dir). Yaklaşık 2,3 milyon dev kireçtaşı bloğundan oluşan piramidin hacmi V = (1/3) × a² × h formülüyle yaklaşık 2,58 milyon m³’tür! Matematikçileri en çok şaşırtan detaylar şunlardır: Taban çevresini (4 × 230,4 = 921,6 m) yüksekliğinin iki katına (2 × 146,6 = 293,2 m) böldüğümüzde 3,1432 ≈ π sayısını buluruz! Ayrıca yan yüz yüksekliğinin (≈ 186,4 m) yarım taban kenarına (115,2 m) oranı ≈ 1,618 ile meşhur Altın Oran’a (φ) neredeyse kusursuz biçimde yaklaşır. Üstelik taban kenarları dört ana yöne (Kuzey-Güney-Doğu-Batı) 1 derecenin yirmide birinden bile az sapmayla hizalanmıştır.',
+    mathTakeaway: 'Kare dik piramidin taban alanı (a²), yan yüz üçgen yüksekliği (Pisagor ile) ve hacmi (V = a²h / 3) 8. sınıf Geometrik Cisimler ünitesinin gerçek dünyadaki en görkemli örneğidir.',
+    formulaLatex: 'V = \\frac{1}{3}a^2 h \\approx 2{,}58 \\times 10^6 \\text{ m}^3, \\quad \\frac{4a}{2h} \\approx \\pi, \\quad \\frac{h_{\\text{yan}}}{a/2} \\approx \\varphi',
+  },
+  {
+    id: 'world-pyramids',
+    title: 'Diğer Büyük Piramitler: Zoser, Kızıl Piramit, Kefren, Mikerinos ve Maya Kukulkan',
+    era: 'MÖ 2670 – MS 1100 · Mısır, Sudan & Meksika',
+    tag: 'Piramitler & Geometri',
+    summary: 'Basamaklı ilk piramitten eğimi düzeltilen Eğik Piramide ve 365 basamaklı Maya takvim piramidine geometrinin evrimi.',
+    story:
+      'Keops tek piramit değildir; insanlık tarihi geometrik deneme-yanılmalarla dolu muhteşem piramitlerle doludur: 1) Zoser Basamaklı Piramidi (MÖ 2670): Tarihin ilk büyük taş piramidi olup Mimar İmhotep tarafından 6 dev basamak hâlinde (62 m) inşa edildi. 2) Eğik Piramit ve Kızıl Piramit (Firavun Snefru): Dahşur’daki Eğik Piramit’e 54° eğimle başlandı; zemin kayıp çatlaklar oluşunca mimarlar yarı yolda açıyı 43°’ye düşürdü! Bu mühendislik dersinden sonra yapılan Kızıl Piramit (105 m), tarihin ilk kusursuz düz yüzlü gerçek piramidi oldu. 3) Giza Üçlüsü’nün Diğerleri: Kefren Piramidi (143,5 m) daha yüksek bir plato üzerinde durduğu için Keops’tan uzun görünür ve tepesindeki parlak kireçtaşı kaplamasını hâlâ korur; Mikerinos Piramidi (65 m) ise üçlünün en küçüğüdür. 4) Chichén Itzá – Kukulkan Piramidi (Meksika): Mayaların inşa ettiği bu basamaklı kare piramidin 4 cephesinde 91’er merdiven vardır. En üstteki tapınak platformuyla birlikte 4 × 91 + 1 = 365 basamak eder — yani tam bir güneş yılındaki gün sayısı!',
+    mathTakeaway: 'Eğim açısı (54° → 43°), çokgen simetrisi ve 4 × 91 + 1 = 365 gibi cebirsel örüntüler antik mimarların matematik ve astronomiyi nasıl birleştirdiğini gösterir.',
+    formulaLatex: '4 \\times 91 + 1 = 365 \\text{ basamak (Kukulkan Takvim Piramidi)}',
+  },
+  {
+    id: 'thales-pyramid',
+    title: 'Thales ve Bir Çubuğun Gölgesiyle Keops Piramidini Ölçmek',
+    era: 'y. MÖ 585 · Mısır / Milet',
+    tag: 'Piramitler & Benzerlik',
+    summary: 'Piramidin tepesine tırmanmadan yalnızca bir değnek ve 8. sınıf benzer üçgen bilgisiyle 146 metrelik yüksekliği hesaplamak!',
+    story:
+      'Anadolu’nun Milet şehrinde yetişen bilge Thales Mısır’a gittiğinde rahipler ona meydan okudu: “Tepesine çıkmadan Keops Piramidi’nin yüksekliğini ölçebilir misin?” Thales gülümsedi, kumun üzerine düz bir çubuk dikti ve Güneş’in gökyüzünde hareketini bekledi. Çubuğun yere düşen gölge uzunluğunun tam kendi boyuna eşit olduğu anı yakaladığı saniye (güneş ışınlarının 45° geldiği an) piramidin gölgesini ölçtürdü. Dikkat! Piramidin gölgesi taban kenarından dışarı doğru uzandığı için toplam gölge uzunluğuna taban kenarının yarısını (a/2) da ekledi. Benzer dik üçgenler sayesinde piramidin yüksekliği, merkezden gölge ucuna kadar olan toplam uzunluğa tıpatıp eşitti!',
+    mathTakeaway: '8. sınıf Üçgenlerde Eşlik ve Benzerlik konusunda gördüğümüz oran-orantı (h / a = g₁ / g₂), doğrudan ulaşamadığımız dev yükseklikleri yerden güvenle ölçmemizi sağlar.',
+    formulaLatex: '\\frac{H_{\\text{piramit}}}{L_{\\text{gölge}} + \\frac{a}{2}} = \\frac{h_{\\text{çubuk}}}{g_{\\text{çubuk}}}',
+  },
+  {
     id: 'gauss-100',
     title: 'Küçük Gauss ve 1’den 100’e Saniyelik Toplam',
     era: '1785 · Almanya',
@@ -352,6 +385,36 @@ export const MATHEMATICIANS: MathematicianProfile[] = [
     middleSchoolLink: '8. Sınıf Geometrik Cisimler (Prizma & Piramitler) ve Mantık Ağları',
     quote: 'Kuşku duyduğunuzda hesaplayın; doğanın dili sayılar ve şekillerle konuşur.',
   },
+  {
+    id: 'thales',
+    name: 'Miletli Thales',
+    lifespan: 'y. MÖ 624 – 546',
+    origin: 'Milet (Aydın · Anadolu)',
+    specialty: 'Geometri, Benzer Üçgenler ve Astronomi',
+    bio: 'Anadolu topraklarında (bugünkü Aydın yakınlarındaki Milet’te) yaşamış, geometride “neden doğrudur?” sorusunu sorarak ilk mantıksal ispat geleneğini başlatan bilim insanı ve filozoftur.',
+    keyDiscoveries: [
+      'Gölge boyu ve benzer üçgenler yardımıyla Keops Piramidi’nin yüksekliğini ölçtü',
+      'Thales Teoremi: Paralel doğruların kestiği doğru parçalarının orantılı olması',
+      'MÖ 585 güneş tutulmasını önceden hesaplayarak astronomi tarihine geçti',
+    ],
+    middleSchoolLink: '8. Sınıf Üçgenlerde Benzerlik, Oran-Orantı ve Açılar',
+    quote: 'En zor şey insanın kendini bilmesi, en kolay şey başkasına akıl vermektir.',
+  },
+  {
+    id: 'imhotep-ahmes',
+    name: 'İmhotep ve Kâtip Ahmes (Rhind Papirüsü)',
+    lifespan: 'MÖ 2670 & MÖ 1650',
+    origin: 'Antik Mısır',
+    specialty: 'Piramit Mimarisi, Birim Kesirler ve Alan-Hacim Hesapları',
+    bio: 'İmhotep tarihin adı bilinen ilk mimarı olarak Zoser Basamaklı Piramidi’ni tasarladı; Kâtip Ahmes ise günümüze ulaşan en ünlü antik matematik kitabı Rhind Papirüsü’nde 84 pratik geometri ve kesir problemini kayıt altına aldı.',
+    keyDiscoveries: [
+      'Piramitlerin eğim oranını (“seked”) ölçen ilk mühendislik hesap cetvelleri',
+      'Daire alanını yaklaşık π ≈ 3,16 ile hesaplayan antik kareleştirme yöntemi',
+      'Kesik kare piramidin hacim formülü ve birim kesirlerle denklem çözümleri',
+    ],
+    middleSchoolLink: '5.–8. Sınıf Birim Kesirler, Daire Alanı ve Piramit Geometrisi',
+    quote: 'Var olan her şeyin gizemine ulaşmanın yolu doğru ölçüm ve kesin hesaptan geçer.',
+  },
 ];
 
 export const SCIENCE_HISTORY_TIMELINE: ScienceMilestone[] = [
@@ -458,6 +521,22 @@ export const SCIENCE_HISTORY_TIMELINE: ScienceMilestone[] = [
     inventorOrCulture: 'Pîrî Reis (Gelibolu)',
     description: 'Osmanlı denizcisi ve haritacısı Pîrî Reis, 20’den fazla harita ve denizci gözlemini matematiksel rüzgâr gülleriyle birleştirerek Atlantik ve Amerika kıyılarını çizdi.',
     impact: 'Ölçek, koordinat, pusula açıları ve küresel haritacılıkta çığır açan bir miras.',
+  },
+  {
+    id: 'sc-14',
+    year: 'MÖ 2560',
+    title: 'Keops (Büyük Giza) Piramidi ve Dev Kare Dik Piramit Mühendisliği',
+    inventorOrCulture: 'Antik Mısır (Mimar Hemiunu)',
+    description: '230,4 m taban kenarı ve 146,6 m yüksekliğiyle 2,3 milyon taş bloğun hassas açılar, su terazileri ve kare dik piramit geometrisiyle birleştirilmesi.',
+    impact: 'Piramit hacim/alan hesapları, yön bulma astronomisi ve mühendislik geometrisinin anıtı.',
+  },
+  {
+    id: 'sc-15',
+    year: 'MÖ 585',
+    title: 'Thales’in Gölgeyle Piramit Yüksekliğini Ölçmesi',
+    inventorOrCulture: 'Miletli Thales (Anadolu)',
+    description: 'Benzer dik üçgenler ve güneş ışınlarının paralelliği kullanılarak doğrudan tırmanmadan Keops Piramidi’nin yüksekliğinin hesaplanması.',
+    impact: 'Geometrinin yalnızca ölçme sanatı olmaktan çıkıp ispat temelli bir bilime dönüşmesi.',
   },
 ];
 
@@ -641,5 +720,50 @@ export const LOGIC_PUZZLES: LogicPuzzleItem[] = [
     answer: '1, 2, 4, 8, 16, 32, 64, 128, 256 ve son keseye 489 altın!',
     explanation:
       'İkili (binary) sayı sistemi sayesinde 1, 2, 4, 8, 16, 32, 64, 128, 256 sayılarının toplamlarıyla 1’den 511’e kadar HER tam sayı elde edilebilir. 10. keseye kalan 1000 - 511 = 489 altın konulduğunda, 512’den 1000’e kadar olan tüm sayılar da (489 + ilk 9 keseden uygun toplam) eksiksiz oluşturulur!',
+  },
+  {
+    id: 'puz-13',
+    title: 'Kare Dik Piramidin Yan Yüz Yüksekliği (Keops Mini Modeli)',
+    category: 'Geometri Zekâsı',
+    difficulty: 'Orta',
+    question:
+      'Taban kenarı 12 cm ve cisim yüksekliği 8 cm olan bir kare dik piramidin kartondan açınımını yapmak istiyorsunuz. Açınımdaki 4 eş ikizkenar üçgenin her birinin yüksekliği (yan yüz yüksekliği) kaç cm olmalıdır?',
+    hints: [
+      'Piramidin taban merkezinden bir kenarın orta noktasına uzaklık taban kenarının YARISIDIR (12 / 2 = 6 cm).',
+      'Cisim yüksekliği (8 cm) ve yarı taban (6 cm) bir dik üçgenin dik kenarlarıdır! 6-8-? özel üçgenini hatırlayın.',
+    ],
+    answer: '10 cm (Toplam yüzey alanı da 144 + 4×(12×10/2) = 384 cm² olur)',
+    explanation:
+      'Taban merkezinden kenar ortasına uzaklık 12/2 = 6 cm, cisim yüksekliği 8 cm’dir. Pisagor bağıntısıyla yan yüz yüksekliği √(6² + 8²) = √(36 + 64) = √100 = 10 cm bulunur!',
+  },
+  {
+    id: 'puz-14',
+    title: 'Boyalı Dev Küpten Kaç Birim Küpün Tam 2 Yüzü Boyalıdır?',
+    category: 'Geometri Zekâsı',
+    difficulty: 'Orta',
+    question:
+      '3 × 3 × 3 boyutlarında 27 küçük birim küpten oluşan büyük bir küpün dış yüzeyi tamamen maviye boyanıyor ve sonra 27 küçük küpe ayrılıyor. Bu küçük küplerden kaç tanesinin TAM OLARAK 2 yüzü maviye boyanmıştır?',
+    hints: [
+      'Köşedeki 8 küpün 3 yüzü boyalıdır; her yüzün tam ortasındaki 1 küpün ise yalnızca 1 yüzü boyalıdır.',
+      'Tam 2 yüzü boyalı olan küpler, büyük küpün AYRITLARININ (kenarlarının) ortasındadır. Bir küpün kaç ayrıtı vardır?',
+    ],
+    answer: '12 küçük küp',
+    explanation:
+      'Bir küpün 12 ayrıtı vardır ve 3×3×3’lük küpte her ayrıtın tam ortasında 1 adet küp bulunur: 12 × 1 = 12 küpün tam 2 yüzü boyalıdır! (Kontrol: 8 köşe [3 yüz] + 12 ayrıt [2 yüz] + 6 yüz ortası [1 yüz] + 1 iç merkez [0 yüz] = 27 küp!)',
+  },
+  {
+    id: 'puz-15',
+    title: 'Karıncanın Küp Üzerindeki En Kısa Yolu (Açınım Zekâsı)',
+    category: 'Geometri Zekâsı',
+    difficulty: 'Zor',
+    question:
+      'Bir ayrıtı 6 cm olan bir küpün tabanındaki bir köşeden hareket eden karınca, yüzeyden yürüyerek tam karşı üst köşeye (cisim köşegeninin diğer ucuna) en kısa kaç cm yürüyerek ulaşabilir?',
+    hints: [
+      'Karınca havadan uçamaz, sadece yüzeyden yürüyebilir! Küpün komşu iki yüzünü düz bir masaya AÇINIM gibi yatırın.',
+      'Yan yana açılan iki 6×6 kare, kenarları 12 cm ve 6 cm olan bir dikdörtgen oluşturur. En kısa yol bu dikdörtgenin köşegenidir!',
+    ],
+    answer: '√(12² + 6²) = √180 = 6√5 ≈ 13,42 cm',
+    explanation:
+      '3 boyutlu şekillerde yüzey üzerindeki en kısa yolu bulmanın sırrı AÇINIM çizmektir! Karıncanın geçeceği iki kare yüzeyi düzleme açtığımızda 12 cm × 6 cm bir dikdörtgen oluşur. Pisagor bağıntısıyla en kısa yol √(12² + 6²) = √(144 + 36) = √180 = 6√5 cm olur.',
   },
 ];

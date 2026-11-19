@@ -485,6 +485,62 @@ export const WISDOM_STORIES: WisdomStory[] = [
     moralLesson: 'Liderlik, üstünlük taslamak değil; öfkesine hâkim olmak, sabretmek, gönül almak ve insanı merkeze koymaktır.',
     relatedVerseOrHadith: '"İnsanların en hayırlısı, insanlara en faydalı olanıdır." (Hadis-i Şerif)',
   },
+  {
+    id: 'ws-9',
+    title: 'Hz. Ebubekir’in Sıddîk Vefası ve Sevr Mağarası',
+    figure: 'Hz. Ebubekir (r.a.)',
+    theme: 'Vefa ve Aile',
+    era: 'Asr-ı Saadet · Hicret (622)',
+    storyParagraphs: [
+      'Mekke’den Medine’ye Hicret yolculuğu başladığında Peygamber Efendimiz (s.a.v.) yol arkadaşı olarak sadık dostu Hz. Ebubekir’i (r.a.) seçti. Sevr Mağarası’na sığındıklarında Hz. Ebubekir önce içeri girip zararlı canlıların çıkabileceği delikleri kendi elbisesinden parçalarla kapattı.',
+      'Müşrikler mağaranın ağzına kadar yaklaştığında Hz. Ebubekir kendi canı için değil, Peygamberimize bir zarar gelmesinden endişelendi. Bunun üzerine Efendimiz onu Kur’an’da ölümsüzleşen şu sözlerle teselli etti: "Üzülme, çünkü Allah bizimle beraberdir!"',
+      'Gerçek dostluk, yalnız iyi günlerde yan yana olmak değil; en zorlu anlarda fedakârlık, güven ve vefa gösterebilmektir.',
+    ],
+    moralLesson: 'Zor zamanda sarsılmayan dostluk, güven ve tevekkül en kıymetli ahlaki erdemlerdendir.',
+    relatedVerseOrHadith: '"Üzülme, çünkü Allah bizimle beraberdir." (Tevbe Suresi, 40)',
+  },
+  {
+    id: 'ws-10',
+    title: 'Ahî Evran ve Anadolu Esnafının Dürüstlük Geleneği',
+    figure: 'Ahî Evran-ı Velî',
+    theme: 'Dürüstlük',
+    era: 'Anadolu Selçuklu (13. Yüzyıl · Kırşehir)',
+    storyParagraphs: [
+      'Anadolu’da zanaatkârları ve esnafı yüksek ahlak ilkeleriyle bir araya getiren Ahîlik Teşkilatı’nın kurucusu Ahî Evran, bir çırak usta olmadan önce yalnızca mesleki beceriye değil, karakter olgunluğuna bakardı.',
+      'Ahîlikte sabah ilk alışverişini yapan esnaf, komşusunun henüz siftah yapmadığını biliyorsa gelen ikinci müşteriyi ona yönlendirirdi: "Ben siftahımı yaptım, komşum henüz yapmadı; lütfen ondan alınız." Kusurlu mal satan esnafın ise "pabucu dama atılarak" halk uyarılırdı.',
+      'Bu gelenek asırlar boyunca Anadolu’da kardeşliği, üretkenliği, kaliteyi ve karşılıklı güveni canlı tutmuştur.',
+    ],
+    moralLesson: 'Helal kazanç, işini en güzel şekilde yapmak (itkan) ve başkalarının rızkına saygı duymak toplumu huzurlu kılar.',
+    relatedVerseOrHadith: '"Hiç kimse kendi elinin emeğiyle kazandığından daha hayırlı bir lokma yememiştir." (Hadis-i Şerif, Buhârî)',
+  },
+  {
+    id: 'ws-11',
+    title: 'Hz. Ali’nin Zırh Davası ve Hukuk Önünde Eşitlik',
+    figure: 'Hz. Ali (r.a.) & Kadı Şüreyh',
+    theme: 'Adalet ve Merhamet',
+    era: 'Dört Halife Dönemi · Kûfe',
+    storyParagraphs: [
+      'Halife Hz. Ali’nin (r.a.) kıymetli zırhı bir yolculuk sırasında kaybolmuştu. Bir süre sonra zırhı Kûfe çarşısında gayrimüslim bir vatandaşın elinde gördü. Devlet başkanı olmasına rağmen zor kullanmadı ve meseleyi bağımsız mahkemeye, Kadı Şüreyh’e götürdü.',
+      'Kadı Şüreyh, Hz. Ali’ye zırhın kendisine ait olduğuna dair şahit sordu. Hz. Ali oğlu Hz. Hasan’ı şahit gösterince Kadı, "Oğlun babasına şahitliği hukuken geçerli değildir" diyerek davayı gayrimüslim vatandaş lehine karara bağladı.',
+      'Bir devlet başkanının mahkeme önünde sıradan bir vatandaşla tamamen eşit yargılandığını ve karara saygıyla uyduğunu gören vatandaş derinden etkilendi; zırhın gerçekten Hz. Ali’nin devesinden düştüğünü itiraf edip gönülden Müslüman oldu.',
+    ],
+    moralLesson: 'Gerçek adalet, güçlünün değil haklının yanında durmak ve herkesin hukuk önünde eşit olmasını sağlamaktır.',
+    relatedVerseOrHadith: '"Bir topluluğa duyduğunuz kin, sizi adaletsizliğe sevk etmesin. Adil olun!" (Maide Suresi, 8)',
+  },
+  {
+    id: 'ws-12',
+    title: 'Nasreddin Hoca’nın Göle Maya Çalması ve Umut Hikmeti',
+    figure: 'Nasreddin Hoca',
+    theme: 'Sabır ve Şükür',
+    era: '13. Yüzyıl · Akşehir',
+    storyParagraphs: [
+      'Bir gün Akşehir Gölü’nün kıyısında elindeki bakraçtan göle kaşık kaşık yoğurt mayası döken Nasreddin Hoca’yı gören köylüler şaşkınlıkla sorar: "Hoca Efendi, ne yapıyorsun? Koca göl hiç maya tutar mı?"',
+      'Nasreddin Hoca ince bir tebessümle asırlardır dillerden düşmeyen o hikmetli cevabı verir: "Tutmaz ama… ya tutarsa!"',
+      'Hoca’nın bu latifesi, görünüşte imkânsız sayılan zorluklar karşısında bile ümitsizliğe kapılmamayı, iyilik ve hayır tohumu ekmekten asla vazgeçmemeyi öğretir.',
+    ],
+    moralLesson: 'Umut, gayret ve iyimserlik; zor görünen hedeflere yürürken insanın en büyük manevi gücüdür.',
+    relatedVerseOrHadith: '"Allah’ın rahmetinden ümit kesmeyin." (Zümer Suresi, 53)',
+  },
 ];
 
 export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
@@ -630,5 +686,109 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     turkishMeaning:
       'Dil, beden ve mal ile yapılan bütün ibadetler Allah’a mahsustur. Ey Peygamber! Allah’ın selamı, rahmeti ve bereketi senin üzerine olsun. Selam bize ve Allah’ın salih kullarının üzerine olsun. Şahitlik ederim ki Allah’tan başka ilah yoktur ve yine şahitlik ederim ki Hz. Muhammed O’nun kulu ve elçisidir.',
     keyMessage: 'Namazların ilk ve son oturuşlarında okunan temel şehadet ve selam duasıdır.',
+  },
+  {
+    id: 'sd-11',
+    title: 'Allâhümme Salli Duası',
+    category: 'Namaz Duası',
+    audioType: 'dua',
+    staticArabicText:
+      'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ',
+    transliteration:
+      'Allâhümme salli alâ Muhammedin ve alâ âli Muhammed. Kemâ salleyte alâ İbrâhîme ve alâ âli İbrâhîm. İnneke hamîdün mecîd.',
+    turkishMeaning:
+      'Allah’ım! Hz. İbrahim’e ve ailesine rahmet ettiğin gibi, Hz. Muhammed’e ve ailesine de rahmet eyle. Şüphesiz sen övgüye layıksın, şanın yücedir.',
+    keyMessage: 'Namazın son oturuşunda Ettehiyyâtü’den sonra okunan salavat duasıdır.',
+  },
+  {
+    id: 'sd-12',
+    title: 'Allâhümme Bârik Duası',
+    category: 'Namaz Duası',
+    audioType: 'dua',
+    staticArabicText:
+      'اللَّهُمَّ بَارِكْ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ',
+    transliteration:
+      'Allâhümme bârik alâ Muhammedin ve alâ âli Muhammed. Kemâ bârekte alâ İbrâhîme ve alâ âli İbrâhîm. İnneke hamîdün mecîd.',
+    turkishMeaning:
+      'Allah’ım! Hz. İbrahim’e ve ailesine bereket verdiğin gibi, Hz. Muhammed’e ve ailesine de bereket ver. Şüphesiz sen övgüye layıksın, şanın yücedir.',
+    keyMessage: 'Namazın son oturuşunda Allâhümme Salli’den hemen sonra okunan bereket duasıdır.',
+  },
+  {
+    id: 'sd-13',
+    title: 'Kunut Duaları (Vitir Namazı)',
+    category: 'Namaz Duası',
+    audioType: 'dua',
+    staticArabicText:
+      'اللَّهُمَّ إِنَّا نَسْتَعِينُكَ وَنَسْتَغْفِرُكَ وَنَسْتَهْدِيكَ وَنُؤْمِنُ بِكَ وَنَتُوبُ إِلَيْكَ وَنَتَوَكَّلُ عَلَيْكَ وَنُثْنِي عَلَيْكَ الْخَيْرَ كُلَّهُ نَشْكُرُكَ وَلَا نَكْفُرُكَ وَنَخْلَعُ وَنَتْرُكُ مَنْ يَفْجُرُكَ ۝ اللَّهُمَّ إِيَّاكَ نَعْبُدُ وَلَكَ نُصَلِّي وَنَسْجُدُ وَإِلَيْكَ نَسْعَى وَنَحْفِدُ نَرْجُو رَحْمَتَكَ وَنَخْشَى عَذَابَكَ إِنَّ عَذَابَكَ بِالْكُفَّارِ مُلْحِقٌ',
+    transliteration:
+      'Allâhümme innâ nesteînüke ve nestağfirüke ve nestehdîk ve nü’minü bike ve netûbü ileyk ve netevekkelü aleyk ve nüsnî aleykel-hayra küllehû neşkürüke ve lâ nekfürük ve nahleu ve netrükü men yefcürük. Allâhümme iyyâke na’büdü ve leke nüsallî ve nescüdü ve ileyke nes’â ve nahfidü nercû rahmeteke ve nahşâ azâbeke inne azâbeke bil-küffâri mülhık.',
+    turkishMeaning:
+      'Allah’ım! Senden yardım isteriz, günahlarımızı bağışlamanı ve bizi doğru yola iletmeni dileriz. Sana inanır, sana tövbe eder ve sana güveniriz. Seni bütün hayırlarla över, sana şükrederiz. Allah’ım! Biz yalnız sana kulluk eder, senin için namaz kılar ve secde ederiz; rahmetini umar, azabından korkarız.',
+    keyMessage: 'Yatsıdan sonra kılınan Vitir namazının 3. rekatında okunan vacip dualardır.',
+  },
+  {
+    id: 'sd-14',
+    title: 'Fil Suresi',
+    category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '105',
+    quranApiRef: { type: 'surah', ref: '105' },
+    transliteration:
+      'Elem tera keyfe feale rabbüke bi-ashâbil fîl. Elem yec’al keydehüm fî tadlîl. Ve ersele aleyhim tayran ebâbîl. Termîhim bi-hicâratin min siccîl. Fecealehüm ke-asfin me’kûl.',
+    turkishMeaning:
+      'Rabbinin fil sahiplerine ne yaptığını görmedin mi? Onların tuzaklarını boşa çıkarmadı mı? Üzerlerine pişkin tuğladan yapılmış taşlar atan sürü sürü kuşlar gönderdi de onları yenilmiş ekin yaprağına çevirdi.',
+    keyMessage: 'Kâbe’yi yıkmaya gelen Ebrehe ordusuna karşı Allah’ın Kâbe’yi koruduğunu anlatır.',
+  },
+  {
+    id: 'sd-15',
+    title: 'Kureyş Suresi',
+    category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '106',
+    quranApiRef: { type: 'surah', ref: '106' },
+    transliteration:
+      'Li-îlâfi kurayş. Îlâfihim rıhleteş-şitâi ves-sayf. Felya’büdû rabbe hâzel beyt. Ellezî et’amehüm min cûin ve âmenehüm min havf.',
+    turkishMeaning:
+      'Kureyş’e kolaylaştırıldığı, evet kış ve yaz yolculukları onlara kolaylaştırıldığı için; kendilerini açlıktan doyuran ve korkudan emin kılan bu Ev’in (Kâbe’nin) Rabbine kulluk etsinler.',
+    keyMessage: 'Güvenlik ve rızık nimetlerinin kıymetini bilip yalnız Allah’a kulluk etmeyi hatırlatır.',
+  },
+  {
+    id: 'sd-16',
+    title: 'Maun Suresi',
+    category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '107',
+    quranApiRef: { type: 'surah', ref: '107' },
+    transliteration:
+      'Eraeytellezî yükezzibü bid-dîn. Fezâlikellezî yedu’ul yetîm. Ve lâ yehuddu alâ taâmil miskîn. Feveylün lil-musallîn. Ellezîne hüm an salâtihim sâhûn. Ellezîne hüm yürâûn. Ve yemneûnel mâûn.',
+    turkishMeaning:
+      'Hesap gününü yalanlayanı gördün mü? İşte o, yetimi itip kakar, yoksulu doyurmaya teşvik etmez. Yazıklar olsun o namaz kılanlara ki onlar namazlarını ciddiye almazlar, gösteriş yaparlar ve en küçük bir yardımı bile esirgerler.',
+    keyMessage: 'İbadetin samimiyetle, yetimi koruyarak ve yardımlaşma ahlakıyla bütünleşmesi gerektiğini öğretir (8. Sınıf LGS!).',
+  },
+  {
+    id: 'sd-17',
+    title: 'Kâfirûn Suresi',
+    category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '109',
+    quranApiRef: { type: 'surah', ref: '109' },
+    transliteration:
+      'Kul yâ eyyühel kâfirûn. Lâ a’büdü mâ ta’büdûn. Ve lâ entüm âbidûne mâ a’büd. Ve lâ ene âbidün mâ abedtüm. Ve lâ entüm âbidûne mâ a’büd. Leküm dînüküm veliye dîn.',
+    turkishMeaning:
+      'De ki: Ey inkârcılar! Ben sizin taptıklarınıza tapmam. Siz de benim kulluk ettiğime kulluk edecek değilsiniz. Sizin dininiz size, benim dinim banadır.',
+    keyMessage: 'Tevhid inancında kesin duruşu ve inanç özgürlüğünde net ilkeyi ifade eder.',
+  },
+  {
+    id: 'sd-18',
+    title: 'Nasr Suresi',
+    category: 'Namaz Suresi',
+    audioType: 'surah',
+    surahNumber: '110',
+    quranApiRef: { type: 'surah', ref: '110' },
+    transliteration:
+      'İzâ câe nasrullâhi vel-feth. Ve raeyten-nâse yedhulûne fî dînillâhi efvâcâ. Fesebbih bihamdi rabbike vestağfirh. İnnehû kâne tevvâbâ.',
+    turkishMeaning:
+      'Allah’ın yardımı ve fetih geldiğinde, insanların bölük bölük Allah’ın dinine girdiğini gördüğünde, Rabbini hamd ile tesbih et ve O’ndan bağışlanma dile. Çünkü O tövbeleri çok kabul edendir.',
+    keyMessage: 'Zafer ve başarı anlarında kibirlenmek yerine şükür, tesbih ve tevazuya yönelmeyi öğretir.',
   },
 ];

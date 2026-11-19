@@ -609,6 +609,39 @@ export const SCIENCE_STORIES_AND_SCIENTISTS: ScienceStoryOrScientist[] = [
     lgsConnection: '5. Sınıf Mikroskobik Canlılar ve 8. Sınıf Biyoteknoloji',
     quote: 'Şans, yalnızca hazırlanmış zihinlere yardım eder.',
   },
+  {
+    id: 'oktay-sinanoglu',
+    name: 'Prof. Dr. Oktay Sinanoğlu',
+    era: '1935 – 2015 · Türkiye / Yale',
+    field: 'Kimya',
+    summary: '28 yaşında dünyanın en genç profesörü unvanını alan kuantum kimyası ve moleküler biyoloji öncüsü Türk bilim insanı.',
+    story:
+      'Henüz 28 yaşındayken Yale Üniversitesi’nde profesör unvanını kazanan Oktay Sinanoğlu, çok elektronlu atom ve moleküllerin davranışlarını açıklayan teorileriyle iki kez Nobel Kimya Ödülü’ne aday gösterildi. Aynı zamanda bilimin ana dilde (Türkçe) üretilmesi ve gençlerin kendine güvenmesi için ömrünü adadı.',
+    lgsConnection: '7. ve 8. Sınıf Atomun Elektron Dizilimi, Moleküller ve Kimyasal Bağlar',
+    quote: 'Matematik ve fen bir ezber değil, kendi ana dilinde düşünerek keşfetme sanatıdır.',
+  },
+  {
+    id: 'rosalind-franklin',
+    name: 'Rosalind Franklin',
+    era: '1920 – 1958 · İngiltere',
+    field: 'Biyoloji',
+    summary: 'X-ışını kırınımı ile çektiği ünlü “Fotoğraf 51” sayesinde DNA’nın çift sarmal yapısının keşfine kilit kanıt sundu.',
+    story:
+      'Laboratuvarda büyük bir titizlikle çalışan kimyager Rosalind Franklin, DNA liflerinden elde ettiği X-ışını kırınım deseninde belirgin bir “X” şekli gördü. Bu görüntü, DNA’nın birbirine dolanmış iki sarmal zincirden oluştuğunu doğrudan kanıtlıyordu.',
+    lgsConnection: '8. Sınıf DNA’nın Çift Zincirli Sarmal Yapısı ve Nükleotid Dizilimi',
+    quote: 'Bilim ve günlük yaşam birbirinden ayrılamaz; merak her ikisinin de motorudur.',
+  },
+  {
+    id: 'galileo-galilei',
+    name: 'Galileo Galilei',
+    era: '1564 – 1642 · İtalya',
+    field: 'Astronomi & Mühendislik',
+    summary: 'Teleskobu gökyüzüne çevirerek Jüpiter’in uydularını, Ay’ın kraterlerini ve Venüs’ün evrelerini gözlemledi.',
+    story:
+      'Mercekleri geliştirerek teleskop yapan Galileo, Ay yüzeyinin pürüzsüz değil dağlar ve kraterlerle kaplı olduğunu çizdi. Ayrıca farklı kütlelerdeki cisimlerin hava direnci ihmal edildiğinde aynı ivmeyle düştüğünü deneylerle göstererek modern fiziği başlattı.',
+    lgsConnection: '5. Sınıf Güneş-Dünya-Ay, 7. Sınıf Teleskop ve Uzay Araştırmaları',
+    quote: 'Evren matematik diliyle yazılmıştır; onun harfleri üçgenler, çemberler ve geometrik şekillerdir.',
+  },
 ];
 
 export const SAFE_HOME_EXPERIMENTS: SafeHomeExperiment[] = [
@@ -709,5 +742,52 @@ export const SAFE_HOME_EXPERIMENTS: SafeHomeExperiment[] = [
     scienceBehind:
       'Asit (sirke) ile bazik tuz (karbonat) kimyasal tepkimeye girerek karbondioksit (CO₂) gazı açığa çıkarır. Kapalı sistem olduğu için toplam kütle değişmez ama oluşan gaz balonu şişirir.',
     safetyNote: 'Balonu şişeye sıkı geçirin; karışımı gözünüze sıçratmayın.',
+  },
+  {
+    id: 'exp-lava-lamp',
+    title: 'Ev Yapımı Lav Lambası (Yoğunluk & Gaz Kaldırma)',
+    gradeLevel: '6. Sınıf',
+    topic: 'Yoğunluk, Çözünürlük ve Gaz Kabarcıkları',
+    duration: '10 dk',
+    materials: ['Şeffaf uzun bardak veya kavanoz', 'Su (1/4 bardak)', 'Ayçiçek yağı (3/4 bardak)', 'Gıda boyası', '1 adet efervesan (C vitamini) tablet'],
+    steps: [
+      'Bardağın 1/4’üne renkli su, kalan 3/4’üne ise yavaşça sıvı yağ ekleyin; yağın üstte kaldığını gözlemleyin.',
+      'Efervesan tableti ikiye bölüp bardağa bırakın.',
+      'Tablet suyla tepkimeye girince oluşan renkli kabarcıkların yağın içinden yukarı çıkıp gazı bırakınca tekrar dibe indiğini izleyin!',
+    ],
+    scienceBehind:
+      'Su yağdan daha yoğun olduğu için altta kalır. Tabletten çıkan CO₂ gazı su damlacıklarına tutunup ortalama yoğunluğu düşürerek onları yukarı taşır; yüzeyde gaz uçunca damlacık tekrar yoğunlaşıp dibe çöker.',
+    safetyNote: 'Karışımı içmeyin ve kavanozun kapağını gaz çıkışı sürerken kesinlikle sıkı kapatmayın.',
+  },
+  {
+    id: 'exp-walking-water',
+    title: 'Yürüyen Su ve Renk Karışımı (Kılcallık & Adezyon)',
+    gradeLevel: '7. Sınıf',
+    topic: 'Sıvılarda Kılcallık, Adezyon ve Renk Oluşumu',
+    duration: '25 dk',
+    materials: ['3 şeffaf bardak', 'Su', 'Sarı ve mavi gıda boyası (veya suluboya)', '2 parça katlanmış kâğıt havlu'],
+    steps: [
+      'Üç bardağı yan yana dizin: 1. bardağa sarı su, 3. bardağa mavi su koyun, ortadaki 2. bardağı BOŞ bırakın.',
+      'Katlanmış kâğıt havlunun bir ucunu 1. bardağa diğer ucunu boş 2. bardağa; ikinci havluyu ise 3. bardak ile 2. bardak arasına köprü yapın.',
+      '20 dakika içinde suyun yerçekimine karşı yükselip ortadaki boş bardakta YEŞİL su oluşturduğunu gözlemleyin!',
+    ],
+    scienceBehind:
+      'Kâğıt havludaki ince selüloz lifleri ile su molekülleri arasındaki çekim (adezyon) ve suyun kendi molekülleri arasındaki bağ (kohezyon) sayesinde su kılcal borulardan tırmanır — bitkilerin köklerinden yapraklara su taşıması da aynı prensiple olur!',
+    safetyNote: 'Boyaların kıyafetlere bulaşmaması için masaya gazete/tepsi serebilirsiniz.',
+  },
+  {
+    id: 'exp-sound-ruler',
+    title: 'Cetvelle Sesin Frekansı (İncelik – Kalınlık) Deneyi',
+    gradeLevel: '6. Sınıf',
+    topic: 'Sesin Yayılması, Titreşim ve Frekans',
+    duration: '5 dk',
+    materials: ['30 cm esnek plastik veya metal cetvel', 'Düz bir çalışma masası'],
+    steps: [
+      'Cetvelin 20 cm’lik kısmını masanın kenarından dışarı taşırın, kalanını elinizle masaya sıkıca bastırıp ucuna hafifçe vurun — kalın (pes) ses duyarsınız.',
+      'Dışarı taşan kısmı 10 cm’ye kısaltıp aynı işlemi tekrarlayın — titreşim hızlanır ve ses belirgin biçimde İNCELİR (tizleşir)!',
+    ],
+    scienceBehind:
+      'Kısa cisimler saniyede daha çok kez titreşir (yüksek frekans → ince/tiz ses). Uzun cisimler daha yavaş titreşir (düşük frekans → kalın/pes ses). Tüm telli ve üflemeli çalgılar bu fizik yasasıyla nota üretir.',
+    safetyNote: 'Cetveli aşırı bükmeyin; kırılıp sıçramaması için hafifçe titreştirin.',
   },
 ];
