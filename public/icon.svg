@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" role="img" aria-label="Bilge Akademi">
+  <rect width="512" height="512" rx="112" fill="#0B1F3A"/>
+  <rect x="29" y="29" width="454" height="454" rx="92" fill="none" stroke="#C89B3C" stroke-width="7"/>
+  <path d="M116 334c46-20 93-18 140 9 47-27 94-29 140-9V177c-49-22-96-17-140 13-44-30-91-35-140-13v157Z" fill="none" stroke="#E7E9E5" stroke-width="19" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M256 190v153" stroke="#C89B3C" stroke-width="11" stroke-linecap="round"/>
+  <path d="M148 225c30-7 55-3 77 10M148 270c30-7 55-3 77 10M287 235c22-13 47-17 77-10M287 280c22-13 47-17 77-10" fill="none" stroke="#E7E9E5" stroke-width="9" stroke-linecap="round"/>
+  <path d="M256 92l14 31 34 4-25 23 7 34-30-17-30 17 7-34-25-23 34-4Z" fill="#C89B3C"/>
+  <path d="M169 390h174" stroke="#C89B3C" stroke-width="11" stroke-linecap="round"/>
+</svg>
