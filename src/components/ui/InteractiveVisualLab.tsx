@@ -23,6 +23,14 @@ const descriptors: Record<EnrichmentModule,string[]> = {
 };
 
 
+const SUBJECT_STORYBOARDS: Record<'english'|'history'|'literature'|'religion'|'philosophy',string[][]> = {"english":[["go","he/she/it","goes"],["watch","yesterday","watched"],["fast","compare two things","faster"],["advice","should","should + verb"],["borrow","receive temporarily","lend = give"],["07:30","30 minutes past 7","half past seven"],["traffic lights","turn left","←"],["You like science","do + you + like","Do you like science?"],["tomorrow","prediction","will rain"],["Mia studies at night","because","it is quiet"]],"history":[["1071","Malazgirt","Anadolu"],["1453","İstanbul","II. Mehmet"],["19 Mayıs 1919","Samsun","Millî Mücadele"],["23 Nisan 1920","Ankara","TBMM"],["29 Ekim 1923","Cumhuriyet","yönetim biçimi"],["24 Temmuz 1923","Lozan","barış antlaşması"],["Doğu ↔ Batı","İpek Yolu","ticaret ve kültür"],["Mektup","olayın dönemi","birincil kaynak"],["Matbaa","kitap üretimi","bilgi yayılımı"],["Tarihî eser","koruma","gelecek kuşaklar"]],"literature":[["Güneş","gülümsedi","kişileştirme"],["Cesur kişi","aslan gibi","benzetme"],["Dize 1 + 2","Dize 3 + 4","dörtlük"],["Şiir","temel duygu","tema"],["Metin","temel mesaj","ana fikir"],["Ben","anlatıcı","birinci kişi"],["Etekleri zil çalmak","mecaz","çok sevinmek"],["Küçük birikim","zaman","büyük sonuç"],["Kişi + yer","zaman + olay","hikâye"],["her + şey","ayrı yazım","her şey"]],"religion":[["Namaza giriş","Allahu ekber","iftitah tekbiri"],["İmsak","oruç süresi","akşam"],["Paylaşma","ihtiyaç sahibi","dayanışma"],["Emanet","sorumluluk","güven"],["Hak","saygı","adalet"],["Kaynaklar","ölçülü kullanım","israfı önleme"],["Kur'an-ı Kerim","ilk sure","Fâtiha"],["Hz. Muhammed","güvenilirlik","el-Emîn"],["Şükür ve dilek","dua","Allah'a yönelme"],["İyilik","gönüllü yardım","sadaka"]],"philosophy":[["İddia","gerekçe","sorgulama"],["Bütün insanlar ölümlü","Sokrates insandır","Sokrates ölümlüdür"],["Eylem","iyi / kötü?","etik"],["Bilgi","kaynağı ve sınırları","epistemoloji"],["Var olan","varlık nedir?","ontoloji"],["Öncüller","gerekçelendirme","sonuç"],["P","P ve değil P","çelişki"],["Seçim","belirlenim","özgür irade"],["Sanat","güzellik","estetik"],["Soru","varsayımı açığa çıkar","yeni soru"]]};
+function SubjectConceptDiagram({module,index,stage}:{module:keyof typeof SUBJECT_STORYBOARDS;index:number;stage:number}) {
+ const parts=SUBJECT_STORYBOARDS[module][index];
+ return <div className="flex items-center justify-center gap-2 flex-wrap" aria-label={`${module} konusunun ${stage+1}. aşaması`}>
+ {parts.slice(0,stage+1).map((part,i)=><span key={i} className="rounded-lg bg-white dark:bg-slate-800 border border-slate-300 dark:border-slate-600 px-3 py-2 text-sm sm:text-base font-semibold text-slate-800 dark:text-slate-100 shadow-sm transition-all duration-500">{part}</span>)}
+ </div>;
+}
+
 function MathConceptDiagram({index,stage}:{index:number;stage:number}) {
  const steps = [
   [['24','36'],['2 × 12','3 × 12'],['EBOB = 12']],
@@ -69,7 +77,7 @@ export function InteractiveVisualLab({module}:{module:EnrichmentModule}) {
    <header className="mb-4">
      <p className="text-xs font-semibold tracking-widest uppercase text-teal-700 dark:text-teal-300">Görsel ve etkileşimli öğrenme laboratuvarı</p>
      <h2 className="text-xl font-bold text-slate-900 dark:text-white mt-1">{labels[module]} · 10 Görsel Materyal</h2>
-     <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Matematik ve fen için konuya özgü modeller; diğer derslerde kavram kartları. Adımları ilerletip soruyu çözün.</p>
+     <p className="text-sm text-slate-600 dark:text-slate-300 mt-1">Yedi derste konuya özgü aşamalı şemalar bulunur. Adımları ilerletip soruyu çözün.</p>
    </header>
    <div className="grid grid-cols-5 sm:grid-cols-10 gap-1.5 mb-5">
      {ENRICHMENT_LIBRARY[module].map((entry,i)=><button key={i} type="button" title={entry.topic} aria-label={`${i+1}. ${entry.topic}`} aria-pressed={index===i} onClick={()=>reset(i)} className={`rounded-lg py-2 text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 ${index===i?'text-white shadow-md':'bg-slate-100 dark:bg-slate-800 text-slate-700 dark:text-slate-200'}`} style={index===i?{backgroundColor:colors[i]}:undefined}>{i+1}</button>)}
@@ -84,7 +92,7 @@ export function InteractiveVisualLab({module}:{module:EnrichmentModule}) {
          <div className="w-16 h-16 sm:w-20 sm:h-20 shrink-0 rounded-2xl flex items-center justify-center text-white text-xl sm:text-2xl font-bold shadow-md transition-all duration-500" style={{backgroundColor:color,transform:stage>0?'translateY(-5px) scale(1.05)':'none'}}>{index+1}</div>
          <div className="flex-1 min-w-0">
            <div className="h-2 rounded-full bg-slate-200 dark:bg-slate-700 overflow-hidden"><div className="h-full transition-all duration-700" style={{backgroundColor:color,width:`${(stage+1)*33.34}%`}}/></div>
-           <div className="mt-3 text-center rounded-xl border-2 bg-white dark:bg-slate-900 px-3 py-4 text-lg sm:text-xl font-bold break-words transition-all duration-500" style={{borderColor:color,color}}>{module==='mathematics' ? <MathConceptDiagram index={index} stage={stage} /> : module==='science' ? <ScienceConceptDiagram index={index} stage={stage} /> : icons[module][index]}</div>
+           <div className="mt-3 text-center rounded-xl border-2 bg-white dark:bg-slate-900 px-3 py-4 text-lg sm:text-xl font-bold break-words transition-all duration-500" style={{borderColor:color,color}}>{module==='mathematics' ? <MathConceptDiagram index={index} stage={stage} /> : module==='science' ? <ScienceConceptDiagram index={index} stage={stage} /> : <SubjectConceptDiagram module={module} index={index} stage={stage} />}</div>
          </div>
        </div>
        <div className="relative text-center max-w-lg">
