@@ -15,6 +15,29 @@ const descriptors: Record<EnrichmentModule,string[]> = {
 
 
 const SUBJECT_STORYBOARDS: Record<'english'|'history'|'literature'|'religion'|'philosophy',string[][]> = {"english":[["go","he/she/it","goes"],["watch","yesterday","watched"],["fast","compare two things","faster"],["advice","should","should + verb"],["borrow","receive temporarily","lend = give"],["07:30","30 minutes past 7","half past seven"],["traffic lights","turn left","←"],["You like science","do + you + like","Do you like science?"],["tomorrow","prediction","will rain"],["Mia studies at night","because","it is quiet"]],"history":[["1071","Malazgirt","Anadolu"],["1453","İstanbul","II. Mehmet"],["19 Mayıs 1919","Samsun","Millî Mücadele"],["23 Nisan 1920","Ankara","TBMM"],["29 Ekim 1923","Cumhuriyet","yönetim biçimi"],["24 Temmuz 1923","Lozan","barış antlaşması"],["Doğu ↔ Batı","İpek Yolu","ticaret ve kültür"],["Mektup","olayın dönemi","birincil kaynak"],["Matbaa","kitap üretimi","bilgi yayılımı"],["Tarihî eser","koruma","gelecek kuşaklar"]],"literature":[["Güneş","gülümsedi","kişileştirme"],["Cesur kişi","aslan gibi","benzetme"],["Dize 1 + 2","Dize 3 + 4","dörtlük"],["Şiir","temel duygu","tema"],["Metin","temel mesaj","ana fikir"],["Ben","anlatıcı","birinci kişi"],["Etekleri zil çalmak","mecaz","çok sevinmek"],["Küçük birikim","zaman","büyük sonuç"],["Kişi + yer","zaman + olay","hikâye"],["her + şey","ayrı yazım","her şey"]],"religion":[["Namaza giriş","Allahu ekber","iftitah tekbiri"],["İmsak","oruç süresi","akşam"],["Paylaşma","ihtiyaç sahibi","dayanışma"],["Emanet","sorumluluk","güven"],["Hak","saygı","adalet"],["Kaynaklar","ölçülü kullanım","israfı önleme"],["Kur'an-ı Kerim","ilk sure","Fâtiha"],["Hz. Muhammed","güvenilirlik","el-Emîn"],["Şükür ve dilek","dua","Allah'a yönelme"],["İyilik","gönüllü yardım","sadaka"]],"philosophy":[["İddia","gerekçe","sorgulama"],["Bütün insanlar ölümlü","Sokrates insandır","Sokrates ölümlüdür"],["Eylem","iyi / kötü?","etik"],["Bilgi","kaynağı ve sınırları","epistemoloji"],["Var olan","varlık nedir?","ontoloji"],["Öncüller","gerekçelendirme","sonuç"],["P","P ve değil P","çelişki"],["Seçim","belirlenim","özgür irade"],["Sanat","güzellik","estetik"],["Soru","varsayımı açığa çıkar","yeni soru"]]};
+function ConceptCanvas({module,index,stage}:{module:EnrichmentModule;index:number;stage:number}) {
+ const nodes=module==='mathematics'
+  ? [['24','36','EBOB = 12'],['8 ve 12','Katlar','24'],['240 TL','%25 indirim','180 TL'],['3 : 4','7 pay = 28','12 kız'],['3x + 7 = 28','3x = 21','x = 7'],['3 kırmızı','8 toplam','3/8'],['2³ · 2⁴','2³⁺⁴','128'],['√144','√81','21'],['10 × 6','÷ 2','30 cm²'],['35 toplam','5 sayı','7 ortalama']][index]
+  :module==='science'
+  ? [['Katı','Isı alır','Sıvı'],['Kuvvet','Yüzey alanı','Basınç'],['Pil','Seri bağlantı','Ampuller'],['A – T','G – C','DNA'],['Işık + su','Karbondioksit','Besin + oksijen'],['Eksen eğikliği','Dolanma','Mevsimler'],['Asit','Nötr','Baz'],['Ağırlık ↓','Kaldırma ↑','Denge'],['Aynı grup','Dış elektron','Benzer özellik'],['Üretici','Tüketici','Enerji akışı']][index]
+  :SUBJECT_STORYBOARDS[module][index];
+ const accent=colors[index];
+ return <div className="relative mx-auto w-full max-w-[680px]" role="img" aria-label={`${nodes.slice(0,stage+1).join(' → ')} kavram akış şeması`}>
+   <svg viewBox="0 0 680 235" className="block h-auto w-full" aria-hidden="true">
+     <defs><linearGradient id="concept-card" x1="0" x2="1" y1="0" y2="1"><stop stopColor="#ffffff"/><stop offset="1" stopColor="#eef5fa"/></linearGradient></defs>
+     <path d="M115 118 H565" stroke={accent} strokeOpacity=".16" strokeWidth="7" strokeLinecap="round"/>
+     {[0,1].map(i=><g key={i} opacity={stage>=i+1?1:.12}><path d={`M${210+i*180} 118 h70`} stroke={accent} strokeWidth="4" strokeDasharray="7 8" strokeLinecap="round"/><path d={`M${267+i*180} 109 l13 9 -13 9`} stroke={accent} fill="none" strokeWidth="4" strokeLinecap="round"/></g>)}
+     {nodes.map((label,i)=><g key={i} opacity={i<=stage?1:.3} style={{transition:'opacity .35s ease'}}>
+       <rect x={20+i*230} y="60" width="180" height="116" rx="24" fill="url(#concept-card)" stroke={i===stage?accent:'#d7e3ec'} strokeWidth={i===stage?3:2}/>
+       <rect x={34+i*230} y="72" width="33" height="25" rx="8" fill={accent} opacity=".12"/>
+       <text x={50+i*230} y="89" fill={accent} textAnchor="middle" fontSize="14" fontWeight="800">{i+1}</text>
+       {(()=>{const words=label.split(' ');const lines:string[]=[];let line='';for(const word of words){if((line+' '+word).trim().length>16&&line){lines.push(line);line=word;}else line=(line+' '+word).trim();}if(line)lines.push(line);return lines.slice(0,3).map((part,j)=><text key={j} x={110+i*230} y={122+(j-(Math.min(lines.length,3)-1)/2)*19} fill="#163047" fontSize={part.length>16?12:15} fontWeight="700" textAnchor="middle">{part}</text>);})()}
+     </g>)}
+     <circle cx="340" cy="213" r="4" fill={accent} opacity=".45"/>
+   </svg>
+   <div className="mt-1 flex flex-wrap justify-center gap-2" aria-hidden="true">{nodes.slice(0,stage+1).map((node,i)=><span key={i} className="rounded-full border border-slate-200 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-sm dark:border-slate-600 dark:bg-slate-800 dark:text-slate-100">{node}</span>)}</div>
+ </div>;
+}
 function SubjectConceptDiagram({module,index,stage}:{module:keyof typeof SUBJECT_STORYBOARDS;index:number;stage:number}) {
  const parts=SUBJECT_STORYBOARDS[module][index];
  return <div className="flex items-center justify-center gap-2 flex-wrap" aria-label={`${module} konusunun ${stage+1}. aşaması`}>
@@ -69,9 +92,9 @@ export function InteractiveVisualLab({module}:{module:EnrichmentModule}) {
  const isComplete=completed.includes(index);
  const goTo=(next:number)=>{setIndex(next);setStage(0);setRevealed(false);};
  const finish=()=>{setRevealed(true);setCompleted(current=>current.includes(index)?current:[...current,index]);};
- const diagramStage=stage===2&&!revealed?1:stage;
+ const diagramStage=stage;
  const visible=activities.map((entry,i)=>({entry,i})).filter(({i})=>filter==='all'||!completed.includes(i));
- return <section className="mt-10 overflow-hidden rounded-[28px] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 dark:border-slate-700 dark:bg-slate-900" aria-label={`${labels[module]} etkileşimli materyal atölyesi`}>
+ return <section className="mt-10 overflow-hidden rounded-2xl sm:rounded-[24px] border border-slate-200 bg-white shadow-xl shadow-slate-900/5 dark:border-slate-700 dark:bg-slate-900" aria-label={`${labels[module]} etkileşimli materyal atölyesi`}>
    <header className="relative overflow-hidden bg-gradient-to-br from-slate-950 via-slate-900 to-teal-950 px-5 py-7 text-white sm:px-8 sm:py-9">
      <div aria-hidden="true" className="pointer-events-none absolute -right-12 -top-16 h-56 w-56 rounded-full border-[36px] border-white/5"/>
      <div className="relative flex flex-wrap items-start justify-between gap-4">
@@ -89,13 +112,13 @@ export function InteractiveVisualLab({module}:{module:EnrichmentModule}) {
        <div className="h-full rounded-full bg-gradient-to-r from-teal-300 to-emerald-400 transition-[width] duration-500" style={{width:`${completed.length*10}%`}}/>
      </div>
    </header>
-   <div className="grid gap-0 lg:grid-cols-[260px_minmax(0,1fr)]">
-     <aside className="border-b border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40 lg:border-b-0 lg:border-r lg:p-5" aria-label="Materyal listesi">
+   <div className="grid gap-0 xl:grid-cols-[220px_minmax(0,1fr)]">
+     <aside className="border-b border-slate-200 bg-slate-50/80 p-4 dark:border-slate-700 dark:bg-slate-950/40 xl:border-b-0 xl:border-r xl:p-4" aria-label="Materyal listesi">
        <div className="mb-3 flex items-center justify-between gap-2">
          <h3 className="text-sm font-bold text-slate-800 dark:text-slate-100">Konu Haritası</h3>
          <button type="button" onClick={()=>setFilter(v=>v==='all'?'remaining':'all')} aria-pressed={filter==='remaining'} className="rounded-lg border border-slate-300 px-2 py-1.5 text-xs font-semibold text-slate-700 hover:bg-white focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 dark:border-slate-600 dark:text-slate-200 dark:hover:bg-slate-800">{filter==='all'?'Kalanlar':'Tümü'}</button>
        </div>
-       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 lg:grid-cols-1">
+       <div className="grid grid-cols-2 gap-2 sm:grid-cols-5 xl:grid-cols-1">
          {visible.map(({entry,i})=><button type="button" key={i} onClick={()=>goTo(i)} aria-current={index===i?'step':undefined} className={`flex min-w-0 items-center gap-2 rounded-xl border p-2.5 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 ${index===i?'border-teal-500 bg-teal-50 shadow-sm dark:border-teal-400 dark:bg-teal-950/40':'border-transparent bg-white hover:border-slate-300 dark:bg-slate-800/70 dark:hover:border-slate-600'}`}>
            <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-lg text-xs font-extrabold ${completed.includes(i)?'bg-emerald-600 text-white':index===i?'bg-teal-700 text-white':'bg-slate-100 text-slate-600 dark:bg-slate-700 dark:text-slate-200'}`}>{completed.includes(i)?'✓':i+1}</span>
            <span className="min-w-0 truncate text-xs font-semibold text-slate-800 dark:text-slate-100" title={entry.topic}>{entry.topic}</span>
@@ -115,11 +138,11 @@ export function InteractiveVisualLab({module}:{module:EnrichmentModule}) {
        <div className="mb-4 grid grid-cols-3 gap-2" aria-label="Öğrenme aşamaları">
          {['Keşfet','İlişkilendir','Düşün'].map((label,i)=><button type="button" key={label} onClick={()=>setStage(i)} aria-current={stage===i?'step':undefined} className={`min-w-0 rounded-xl border px-2 py-3 text-center text-xs font-bold transition-colors focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-teal-500 sm:text-sm ${stage===i?'border-teal-600 bg-teal-700 text-white':'border-slate-200 bg-slate-50 text-slate-600 hover:border-teal-300 dark:border-slate-700 dark:bg-slate-800 dark:text-slate-200'}`}>{i+1}. {label}</button>)}
        </div>
-       <div className="relative flex min-h-[290px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-8 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 sm:min-h-[350px] sm:px-8">
+       <div className="relative flex min-h-[220px] flex-col items-center justify-center overflow-hidden rounded-2xl border border-slate-200 bg-gradient-to-b from-slate-50 to-white px-4 py-8 dark:border-slate-700 dark:from-slate-800 dark:to-slate-900 sm:min-h-[280px] sm:px-8">
          <div aria-hidden="true" className="pointer-events-none absolute inset-0 opacity-20" style={{backgroundImage:`radial-gradient(${color} 1px, transparent 1px)`,backgroundSize:'24px 24px'}}/>
          <div className="relative mb-5 flex h-14 w-14 items-center justify-center rounded-2xl text-xl font-black text-white shadow-lg sm:h-16 sm:w-16" style={{backgroundColor:color}}>{index+1}</div>
-         <div className="relative flex min-h-[105px] w-full max-w-xl items-center justify-center rounded-2xl border border-slate-200 bg-white/95 px-4 py-5 shadow-sm dark:border-slate-600 dark:bg-slate-950/90" aria-live="polite">
-           {module==='mathematics'?<MathConceptDiagram index={index} stage={diagramStage}/>:module==='science'?<ScienceConceptDiagram index={index} stage={diagramStage}/>:<SubjectConceptDiagram module={module} index={index} stage={diagramStage}/>}
+         <div className="relative flex min-h-[150px] w-full max-w-3xl items-center justify-center rounded-2xl border border-slate-200 bg-white/95 px-4 py-5 shadow-sm dark:border-slate-600 dark:bg-slate-950/90" aria-live="polite">
+           <ConceptCanvas module={module} index={index} stage={diagramStage}/>
          </div>
          <div className="relative mt-5 max-w-lg text-center">
            <p className="text-sm font-semibold text-slate-800 dark:text-slate-100">{stage===0?'Önce modeldeki öğeleri tanı.':stage===1?'Öğeler arasındaki bağlantıyı düşün.':'Soruyu çöz; sonucu hazır olduğunda aç.'}</p>
