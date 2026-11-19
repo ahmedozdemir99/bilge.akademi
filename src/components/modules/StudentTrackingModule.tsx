@@ -1076,7 +1076,11 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Sınıf Ortalaması']} />
-                      <Bar dataKey="average" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={48} animationDuration={650}>
+                        {classComparisonData.map((item, index) => (
+                          <Cell key={item.name} fill={['#0d9488', '#7c3aed', '#ea580c', '#2563eb', '#db2777', '#65a30d', '#0891b2'][index % 7]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
