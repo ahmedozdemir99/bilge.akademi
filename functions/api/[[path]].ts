@@ -1,6 +1,6 @@
 interface Env { API_ORIGIN?: string }
 /** Cloudflare Pages proxy: paid AI requests remain on a separate secured Node backend. */
-export const onRequest: PagesFunction<Env> = async ({ request, env }) => {
+export const onRequest = async ({ request, env }: { request: Request; env: Env }): Promise<Response> => {
   if (!env.API_ORIGIN) return Response.json({ error: 'API_ORIGIN ayarlanmamış. AI özellikleri için güvenli Node API sunucusu gerekir.' }, { status: 503 });
   const origin = new URL(env.API_ORIGIN);
   if (origin.protocol !== 'https:') return Response.json({ error: 'API_ORIGIN HTTPS olmalı.' }, { status: 500 });
