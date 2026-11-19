@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../../lib/secureAiFetch';
 import { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -308,7 +309,7 @@ export function StudentTrackingModule() {
     const targetClass = analyticsClassId === 'all' ? null : classMap.get(analyticsClassId);
     const trialSummary = calculateTrialRobotSummary(analyticsPracticeExams);
     try {
-      const response = await fetch('/api/ai/class-analysis', {
+      const response = await secureAiFetch('/api/ai/class-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
