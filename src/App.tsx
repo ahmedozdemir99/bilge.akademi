@@ -16,7 +16,9 @@ import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/ToastContainer';
 
 function BilgeAkademiRouter() {
-  const { activeModule } = useAcademy();
+  const { activeModule, workspaceView } = useAcademy();
+  // Hide teacher-only reporting when the workspace is in student view.
+  if (workspaceView === 'student' && activeModule === 'reports') return <HomeDashboard />;
 
   switch (activeModule) {
     case 'home':
