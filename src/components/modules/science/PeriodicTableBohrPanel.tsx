@@ -1,4 +1,5 @@
 import React, { useMemo, useState } from 'react';
+import { FULL_PERIODIC_ELEMENTS } from '../../../data/fullPeriodicElements';
 import { Atom, CheckCircle2, Sparkles, XCircle } from 'lucide-react';
 import {
   PERIODIC_ELEMENTS,
@@ -54,10 +55,10 @@ export function PeriodicTableBohrPanel() {
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
           <div>
             <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
-              8. Sınıf LGS Periyodik Sistem · İlk 20 Element ve Bohr Atom Modeli
+              8. Sınıf LGS · 118 Elementin Tamamı · İlk 20 Element için Bohr Atom Modeli
             </p>
             <h2 className="mt-0.5 text-lg font-semibold text-navy-900 dark:text-white">
-              Etkileşimli Periyodik Tablo (1A – 8A)
+              Tam Periyodik Tablo (1–18. Gruplar)
             </h2>
           </div>
 
@@ -79,52 +80,39 @@ export function PeriodicTableBohrPanel() {
           </div>
         </div>
 
-        {/* 8-Column Main Group Periodic Grid */}
-        <div className="overflow-x-auto pb-1">
-          <div className="min-w-[640px] space-y-2">
-            <div className="grid grid-cols-8 gap-2 text-center text-[11px] font-mono font-semibold text-slate-500 dark:text-slate-400">
-              {['1A', '2A', '3A', '4A', '5A', '6A', '7A', '8A'].map((grp) => (
-                <div key={grp}>{grp}</div>
-              ))}
+        <p className="text-xs text-slate-500 dark:text-slate-400">Tablonun tamamını görmek için yatay kaydırın. İlk 20 elemente dokunarak Bohr modelini inceleyebilirsiniz.</p>
+        <div className="flex flex-wrap gap-2 text-[11px] font-medium">
+          {[['Metal','bg-sky-300 text-sky-950'],['Yarı Metal','bg-amber-300 text-amber-950'],['Ametal','bg-emerald-300 text-emerald-950'],['Soygaz','bg-violet-300 text-violet-950'],['Geçiş Metali','bg-rose-300 text-rose-950'],['Lantanit','bg-orange-300 text-orange-950'],['Aktinit','bg-fuchsia-300 text-fuchsia-950']].map(([label, color]) => <span key={label} className={`rounded-md px-2 py-1 ${color}`}>{label}</span>)}
+        </div>
+        <div className="overflow-x-auto pb-3" aria-label="118 elementli tam periyodik tablo">
+          <div className="min-w-[1080px] space-y-1.5">
+            <div className="grid grid-cols-18 gap-1 text-center text-[10px] font-semibold text-slate-500">
+              {Array.from({length:18},(_,i)=><span key={i}>{i+1}</span>)}
             </div>
-
-            {[1, 2, 3, 4].map((periodNum) => (
-              <div key={periodNum} className="grid grid-cols-8 gap-2">
-                {[1, 2, 3, 4, 5, 6, 7, 8].map((colNum) => {
-                  const el = PERIODIC_ELEMENTS.find(
-                    (item) => item.period === periodNum && item.column === colNum
-                  );
-                  if (!el) {
-                    return <div key={`${periodNum}-${colNum}`} className="h-[68px]" />;
-                  }
-                  const dimmed = categoryFilter !== 'Tümü' && el.category !== categoryFilter;
-                  const isActive = el.symbol === selected.symbol;
-                  return (
-                    <button
-                      key={el.symbol}
-                      type="button"
-                      onClick={() => handleSelectElement(el.symbol)}
-                      className={`h-[68px] p-2 rounded-lg border text-left transition-all flex flex-col justify-between cursor-pointer ${
-                        isActive
-                          ? 'border-navy-900 bg-navy-900 text-white dark:border-teal-400 dark:bg-teal-600 ring-2 ring-teal-500/40'
-                          : `${CATEGORY_CELL_COLORS[el.category]} text-navy-900 dark:text-white hover:border-navy-900 dark:hover:border-teal-400`
-                      } ${dimmed ? 'opacity-25' : 'opacity-100'}`}
-                    >
-                      <div className="flex items-center justify-between text-[10px] font-mono tabular-nums">
-                        <span>{el.atomicNumber}</span>
-                        <span className={isActive ? 'text-gold-300 dark:text-white/80' : 'text-slate-500 dark:text-slate-400'}>
-                          {el.stateAtRoom}
-                        </span>
-                      </div>
-                      <p className="text-base font-bold leading-none">{el.symbol}</p>
-                      <p className={`text-[10px] truncate ${isActive ? 'text-slate-200' : 'text-slate-600 dark:text-slate-300'}`}>
-                        {el.name}
-                      </p>
-                    </button>
-                  );
+            {[1,2,3,4,5,6,7,8,9].map((period) => (
+              <div key={period} className="grid grid-cols-18 gap-1">
+                {Array.from({length:18},(_,i)=>{
+                  const item=FULL_PERIODIC_ELEMENTS.find(el=>el.p===period && el.g===i+1);
+                  if(!item) return <div key={i} className="h-[67px]" />;
+                  const detailed=PERIODIC_ELEMENTS.find(el=>el.atomicNumber===item.n);
+                  const category = detailed?.category ?? ([8,9].includes(period) ? (period===8?'Lantanit':'Aktinit') : item.g>=3&&item.g<=12?'Geçiş Metali' : [2,10,18,36,54,86,118].includes(item.n)?'Soygaz' : [5,14,32,33,51,52].includes(item.n)?'Yarı Metal' : [1,6,7,8,9,15,16,17,34,35,53,85,117].includes(item.n)?'Ametal':'Metal');
+                  const palette:Record<string,string>={
+                    'Metal':'bg-sky-200 border-sky-500 text-sky-950 dark:bg-sky-900 dark:text-sky-50',
+                    'Yarı Metal':'bg-amber-200 border-amber-500 text-amber-950 dark:bg-amber-900 dark:text-amber-50',
+                    'Ametal':'bg-emerald-200 border-emerald-500 text-emerald-950 dark:bg-emerald-900 dark:text-emerald-50',
+                    'Soygaz':'bg-violet-200 border-violet-500 text-violet-950 dark:bg-violet-900 dark:text-violet-50',
+                    'Geçiş Metali':'bg-rose-200 border-rose-500 text-rose-950 dark:bg-rose-900 dark:text-rose-50',
+                    'Lantanit':'bg-orange-200 border-orange-500 text-orange-950 dark:bg-orange-900 dark:text-orange-50',
+                    'Aktinit':'bg-fuchsia-200 border-fuchsia-500 text-fuchsia-950 dark:bg-fuchsia-900 dark:text-fuchsia-50'
+                  };
+                  const dimmed=categoryFilter!=='Tümü' && category!==categoryFilter;
+                  const cls=`h-[67px] min-w-0 p-1 rounded-md border-2 flex flex-col items-center justify-center transition-all ${palette[category]} ${dimmed?'opacity-25':'opacity-100'} ${detailed?'cursor-pointer hover:scale-105 focus-visible:outline-2 focus-visible:outline-offset-2':'cursor-default'} ${selected.atomicNumber===item.n?'ring-2 ring-offset-1 ring-slate-900 dark:ring-white':''}`;
+                  const inner=<><span className="text-[9px] leading-none">{item.n}</span><strong className="text-[17px] leading-tight">{item.s}</strong><span className="text-[8px] leading-tight truncate w-full text-center" title={item.name}>{item.name}</span></>;
+                  return detailed?<button key={item.n} type="button" title={`${item.n}. ${item.name} — ${category}`} aria-label={`${item.n}. ${item.name}`} onClick={()=>handleSelectElement(item.s)} className={cls}>{inner}</button>:<div key={item.n} title={`${item.n}. ${item.name} — ${category}`} className={cls}>{inner}</div>;
                 })}
               </div>
             ))}
+            <p className="text-[11px] text-slate-500 pt-1">Alt iki sıra: Lantanitler (58–71) ve Aktinitler (90–103). İlk 20 elementin ayrıntılı Bohr modeli aşağıdadır.</p>
           </div>
         </div>
       </section>
