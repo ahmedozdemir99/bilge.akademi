@@ -198,8 +198,9 @@ export function StudentTrackingModule() {
             Kişisel Akademik Dosya Bulunamadı
           </h2>
           <p className="mt-2 text-sm text-slate-600 dark:text-slate-400 max-w-md mx-auto">
-            {user ? 'Bu hesapla eşleştirilmiş öğrenci dosyası henüz yok. Öğrenci verilerinin yanlış kişiye gösterilmesini önlemek için kişisel dosya kapalıdır.' : 'Örnek öğrenci görünümü. Öğretmen'}
-            görünümüne geçerek sınıf ve öğrenci kayıtları oluşturabilirsiniz.
+            {user
+              ? 'Bu hesapla eşleştirilmiş öğrenci dosyası henüz yok. Yanlış kişisel verilerin gösterilmesini önlemek için bu alan kapalıdır.'
+              : 'Demo öğrenci dosyası bulunamadı. Öğretmen görünümüne geçerek örnek kayıtlar oluşturabilirsiniz.'}
           </p>
         </div>
       );
