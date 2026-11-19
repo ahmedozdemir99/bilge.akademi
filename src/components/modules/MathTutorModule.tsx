@@ -39,7 +39,7 @@ import { VisualProofsLab } from './math/VisualProofsLab';
 type MathTab = 'proofs' | 'game' | 'encyclopedia' | 'tests' | 'solver' | 'graphs' | 'exercises';
 type GraphMode = 'geometry' | 'linear' | 'coordinate';
 
-function buildExerciseMcqOptions(acceptedAnswers: string[], questionText = ''): string[] {
+function buildExerciseMcqOptions(acceptedAnswers: string[]): string[] {
   const correct = (acceptedAnswers[0] ?? '').trim();
   if (!correct) return [];
   const candidates = new Set<string>([correct]);
@@ -130,7 +130,7 @@ export function MathTutorModule() {
   const [sessionScore, setSessionScore] = useState({ correct: 0, total: 0 });
 
   const exerciseMcqOptions = useMemo(
-    () => buildExerciseMcqOptions(exercise.acceptedAnswers, exercise.questionText),
+    () => buildExerciseMcqOptions(exercise.acceptedAnswers),
     [exercise]
   );
 
