@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import {
   Bar,
+  Cell,
   BarChart,
   Line,
   LineChart,
@@ -1047,7 +1048,11 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="subject" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Ortalama']} />
-                      <Bar dataKey="average" fill="#0B1F3A" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={44} animationDuration={650}>
+                        {analyticsSubjectBreakdown.map((item, index) => (
+                          <Cell key={item.subject} fill={['#2563eb', '#e11d48', '#059669', '#d97706', '#7c3aed', '#0891b2', '#db2777', '#65a30d'][index % 8]} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
