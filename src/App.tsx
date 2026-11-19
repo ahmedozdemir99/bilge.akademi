@@ -66,7 +66,7 @@ export default function App() {
     <ErrorBoundary>
       <AcademyProvider>
         <AppShell>
-          <div className="min-w-0 w-full">
+          <div className="min-w-0 w-full max-w-full overflow-x-clip">
             <BilgeAkademiRouter />
             <ModuleEnrichment />
           </div>
