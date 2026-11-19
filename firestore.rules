@@ -389,7 +389,6 @@ service cloud.firestore {
           isAdmin() ||
           (existing().teacherId == request.auth.uid &&
             ownsClass(incoming().classId) &&
-            ownsStudentInClass(incoming().studentId, incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'fullName', 'studentNumber', 'gradeLevel', 'guardianNote', 'status', 'updatedAt']))
         );
       allow delete: if isVerifiedUser() && isValidId(studentId) && (existing().teacherId == request.auth.uid || isAdmin());
@@ -426,7 +425,6 @@ service cloud.firestore {
           isAdmin() ||
           (existing().teacherId == request.auth.uid &&
             ownsClass(incoming().classId) &&
-            ownsStudentInClass(incoming().studentId, incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'subjectName', 'title', 'examType', 'examDate', 'maxScore', 'updatedAt']))
         );
       allow delete: if isVerifiedUser() && isValidId(examId) && (existing().teacherId == request.auth.uid || isAdmin());
