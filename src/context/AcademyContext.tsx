@@ -482,6 +482,15 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     setDataLoading(true);
     const uid = user.uid;
 
+    // Listener errors must not throw from asynchronous Firebase callbacks.
+    // Preserve the signed-in session and show a diagnostic instead.
+    const reportSubscriptionError = (error: Error, collectionName: string) => {
+      console.error(`Firestore listener error (${collectionName}):`, error);
+      setDataLoading(false);
+      const code = (error as Error & { code?: string }).code ?? 'unknown';
+      notify('error', 'Firebase veri bağlantısı', `${collectionName}: ${code}. Oturum korunuyor; bağlantınızı ve Firestore izinlerini kontrol edin.`);
+    };
+
     const unsubClasses = onSnapshot(
       query(collection(db, 'classes'), where('teacherId', '==', uid)),
       (snap) => {
@@ -493,7 +502,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         setCloudClasses(list);
         setDataLoading(false);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'classes')
+      (err) => reportSubscriptionError(err, 'classes')
     );
 
     const unsubStudents = onSnapshot(
@@ -506,7 +515,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         list.sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr'));
         setCloudStudents(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'students')
+      (err) => reportSubscriptionError(err, 'students')
     );
 
     const unsubGrades = onSnapshot(
@@ -519,7 +528,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         list.sort((a, b) => b.examDate.localeCompare(a.examDate));
         setCloudGrades(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'grades')
+      (err) => reportSubscriptionError(err, 'grades')
     );
 
     const unsubAttendance = onSnapshot(
@@ -532,7 +541,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         list.sort((a, b) => b.date.localeCompare(a.date));
         setCloudAttendance(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'attendance')
+      (err) => reportSubscriptionError(err, 'attendance')
     );
 
     const unsubPracticeExams = onSnapshot(
@@ -545,7 +554,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         list.sort((a, b) => b.examDate.localeCompare(a.examDate));
         setCloudPracticeExams(list);
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'practiceExams')
+      (err) => reportSubscriptionError(err, 'practiceExams')
     );
 
     const unsubPoems = onSnapshot(
@@ -553,7 +562,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       (snap) => {
         setCloudPoems(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PoemSummary, 'id'>) })));
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'poems')
+      (err) => reportSubscriptionError(err, 'poems')
     );
 
     const unsubQuizzes = onSnapshot(
@@ -563,7 +572,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<QuizAttemptSummary, 'id'>) }))
         );
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'quizAttempts')
+      (err) => reportSubscriptionError(err, 'quizAttempts')
     );
 
     const unsubMath = onSnapshot(
@@ -573,7 +582,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MathAttemptSummary, 'id'>) }))
         );
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'mathAttempts')
+      (err) => reportSubscriptionError(err, 'mathAttempts')
     );
 
     const unsubAI = onSnapshot(
@@ -583,7 +592,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AIConversation, 'id'>) }))
         );
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'aiConversations')
+      (err) => reportSubscriptionError(err, 'aiConversations')
     );
 
     return () => {
@@ -597,7 +606,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       unsubMath();
       unsubAI();
     };
-  }, [user]);
+  }, [user, notify]);
 
   const signInWithGoogle = useCallback(async () => {
     try {
