@@ -29,8 +29,6 @@ import {
 import wuduAthleteImg from '../../../assets/images/wudu_athlete_fullbody_1795091471521.jpg';
 import namazQawmahImg from '../../../assets/images/namaz_athlete_qawmah_1795091453974.jpg';
 import namazTakbirImg from '../../../assets/images/namaz_athlete_takbir_1795091788958.jpg';
-import namazQiyamLowImg from '../../../assets/images/namaz_athlete_qiyam_inrug_1795108814356.jpg';
-import namazRukuImg from '../../../assets/images/namaz_athlete_ruku_inrug_1795108812960.jpg';
 import namazSujudInRugImg from '../../../assets/images/namaz_athlete_sujud_inrug_1795096354505.jpg';
 import namazTashahhudInRugImg from '../../../assets/images/namaz_athlete_tashahhud_inrug_1795096355811.jpg';
 import namazSalamRightImg from '../../../assets/images/namaz_athlete_salam_right_1795096355282.jpg';
@@ -57,12 +55,12 @@ const NAMAZ_POSTURE_PHOTOS: Record<
     caption: 'İftitah tekbiri (Allâhu Ekber)',
   },
   qiyam: {
-    src: namazQiyamLowImg,
-    caption: 'Kıyam ve kıraat (eller göbek altında bağlı)',
+    src: namazTakbirImg,
+    caption: 'Kıyam için geçici temsili duruş (ellerin bağlanışı görselde gösterilmiyor)',
   },
   ruku: {
-    src: namazRukuImg,
-    caption: 'Rükû (sırt düz, eller dizlerde)',
+    src: namazQawmahImg,
+    caption: 'Rükû için geçici temsili duruş (rükû hareketi görselde gösterilmiyor)',
   },
   qawmah: {
     src: namazQawmahImg,
@@ -263,13 +261,13 @@ function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
 
   return (
     <div className="rounded-2xl overflow-hidden border border-slate-200/90 dark:border-slate-800 bg-stone-100 dark:bg-slate-950 max-w-[380px] mx-auto w-full">
-      <div className="relative aspect-[3/4] w-full overflow-hidden">
+      <div className="relative aspect-[3/4] w-full overflow-hidden bg-stone-100 dark:bg-slate-950 p-2 sm:p-3">
         <img
           key={activeSrc}
           src={activeSrc}
           alt={activeAlt}
           referrerPolicy="no-referrer"
-          className={`w-full h-full object-cover object-center select-none transition-opacity duration-300 ${
+          className={`w-full h-full object-contain object-center select-none transition-opacity duration-300 ${
             photo.flipX ? '-scale-x-100' : ''
           }`}
         />
@@ -293,6 +291,8 @@ function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
           </div>
         )}
       </div>
+
+      <p className="px-3 py-1 text-center text-xs text-slate-600 dark:text-slate-300">{photo.caption}</p>
 
       {/* Interactive Right / Left Salam Toggle on Step 10 */}
       {isSalam && (
