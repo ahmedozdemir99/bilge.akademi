@@ -663,14 +663,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   // Batches stay below Firestore's 500-write limit.
   const deleteDependentRecords = useCallback(async (field: 'classId' | 'studentId', id: string) => {
     for (const collectionName of ['grades', 'attendance', 'practiceExams'] as const) {
-      const matching = await getDocs(query(collection(db, collectionName), where(field, '==', id)));
+      const matching = await getDocs(query(collection(db, collectionName), where('teacherId', '==', user!.uid), where(field, '==', id)));
       for (let index = 0; index < matching.docs.length; index += 400) {
         const batch = writeBatch(db);
         matching.docs.slice(index, index + 400).forEach((record) => batch.delete(record.ref));
         await batch.commit();
       }
     }
-  }, []);
+  }, [user]);
 
   // --- CRUD: Classes ---
   const addClass = useCallback(
@@ -774,7 +774,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       const path = `classes/${id}`;
       try {
         // Remove students and their related records before deleting the class.
-        const classStudents = await getDocs(query(collection(db, 'students'), where('classId', '==', id)));
+        const classStudents = await getDocs(query(collection(db, 'students'), where('teacherId', '==', user.uid), where('classId', '==', id)));
         await deleteDependentRecords('classId', id);
         for (let index = 0; index < classStudents.docs.length; index += 400) {
           const batch = writeBatch(db);
