@@ -1042,7 +1042,8 @@ export function MathTutorModule() {
               <div className="inline-flex p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
                 <button
                   type="button"
-                  onClick={() => setExerciseInputMode('mcq')}\n                  disabled={exerciseMcqOptions.length < 4}
+                  onClick={() => setExerciseInputMode('mcq')}
+                  disabled={exerciseMcqOptions.length < 4}
                   className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer whitespace-nowrap ${
                     exerciseInputMode === 'mcq'
                       ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
