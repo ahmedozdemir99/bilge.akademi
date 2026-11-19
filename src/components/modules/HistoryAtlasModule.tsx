@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../../lib/secureAiFetch';
 import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -136,7 +137,7 @@ export function HistoryAtlasModule() {
     setTutorLoading(true);
     setTutorError('');
     try {
-      const response = await fetch('/api/ai/history-tutor', {
+      const response = await secureAiFetch('/api/ai/history-tutor', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
