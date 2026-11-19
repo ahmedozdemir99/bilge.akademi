@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Download, Printer } from 'lucide-react';
 import {
   Bar,
+  Cell,
   BarChart,
   CartesianGrid,
   ResponsiveContainer,
@@ -17,6 +18,8 @@ import {
   exportToCsv,
   triggerPrintReport,
 } from '../../utils/exportUtils';
+
+const CHART_COLORS = ['#0D9488', '#2563EB', '#E11D48', '#7C3AED', '#D97706', '#059669', '#DB2777', '#0891B2', '#EA580C', '#65A30D'];
 
 export function ReportsModule() {
   const {
@@ -181,7 +184,9 @@ export function ReportsModule() {
                   <XAxis dataKey="subject" tick={{ fontSize: 11, fill: '#64748b' }} />
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                   <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Ortalama']} />
-                  <Bar dataKey="average" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                  <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                    {subjectAverages.map((entry, index) => <Cell key={`${entry.subject}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             )}
@@ -210,7 +215,9 @@ export function ReportsModule() {
                   <XAxis dataKey="shortLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
                   <YAxis domain={[0, 20]} tick={{ fontSize: 11, fill: '#64748b' }} />
                   <Tooltip formatter={(val) => [`${val ?? 0} net`, 'Ortalama Net']} />
-                  <Bar dataKey="avgNet" fill="#C89B3C" radius={[6, 6, 0, 0]} maxBarSize={36} />
+                  <Bar dataKey="avgNet" radius={[6, 6, 0, 0]} maxBarSize={36}>
+                    {trialSummary.subjectAverages.map((entry, index) => <Cell key={`${entry.shortLabel}-${index}`} fill={CHART_COLORS[index % CHART_COLORS.length]} />)}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
