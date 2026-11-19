@@ -1,3 +1,4 @@
+import { secureAiFetch } from '../../lib/secureAiFetch';
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -119,7 +120,7 @@ export function PhilosophyModule() {
     setCompareLoading(true);
     setAiComparison(null);
     try {
-      const res = await fetch('/api/ai/philosopher-compare', {
+      const res = await secureAiFetch('/api/ai/philosopher-compare', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -161,7 +162,7 @@ export function PhilosophyModule() {
     setDialogueLoading(true);
 
     try {
-      const res = await fetch('/api/ai/socratic-dialogue', {
+      const res = await secureAiFetch('/api/ai/socratic-dialogue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
@@ -215,7 +216,7 @@ export function PhilosophyModule() {
     setOpenLoading(true);
     setOpenFeedback('');
     try {
-      const res = await fetch('/api/ai/socratic-dialogue', {
+      const res = await secureAiFetch('/api/ai/socratic-dialogue', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
