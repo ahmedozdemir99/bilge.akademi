@@ -251,7 +251,13 @@ function PrayerPhotoStage({ step }: { step: PrayerPostureStep }) {
 
   const photo = NAMAZ_POSTURE_PHOTOS[step.postureKey];
   const isSalam = step.postureKey === 'salam';
-  const activeSrc = isSalam ? SALAM_PHOTOS[salamSide].src : photo.src;
+  // Force a fresh request for the corrected takbir photograph on older cached deployments.
+  // Other prayer images, Firebase authentication, and AI requests remain untouched.
+  const activeSrc = isSalam
+    ? SALAM_PHOTOS[salamSide].src
+    : step.postureKey === 'takbir'
+      ? `${photo.src}?takbir-photo=20261119-corrected`
+      : photo.src;
   const activeAlt = isSalam
     ? `Namaz Adım ${step.stepNumber}: ${SALAM_PHOTOS[salamSide].label}`
     : `Namaz Adım ${step.stepNumber}: ${step.title} — ${photo.caption}`;
