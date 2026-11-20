@@ -37,8 +37,10 @@ import {
   calculateTrialRobotSummary,
   exportToCsv,
   formatTurkishDate,
+  LGS_SUBJECT_CONFIG,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { hasPublishedTrialScore } from '../../../utils/bulkStudentRecords';
 import { ExamNetTrend } from './ExamNetTrend';
 import { summarizePracticeForAnalysis } from '../../../utils/practiceAnalysis';
 import { getSubjectColor, trialSubjectColors } from '../../../utils/subjectColors';
@@ -76,6 +78,8 @@ export function StudentProfileView({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
+  const archive = useMemo(() => [...practiceExams].sort((a, b) =>
+    b.examDate.localeCompare(a.examDate) || a.examTitle.localeCompare(b.examTitle, 'tr')), [practiceExams]);
   const avgScore = useMemo(() => calculateAverageScore(grades), [grades]);
   const subjectAverages = useMemo(() => calculateSubjectAverages(grades), [grades]);
   const trialSummary = useMemo(
@@ -120,7 +124,7 @@ export function StudentProfileView({
           'LGS Deneme',
           ex.examTitle,
           `${ex.totalNet.toFixed(2)} Net (${ex.totalCorrect}D/${ex.totalWrong}Y)`,
-          `Tahmini LGS: ${ex.estimatedLgsScore.toFixed(1)}`,
+          `${hasPublishedTrialScore(ex.id) ? 'PDF puanı' : 'Tahmini LGS'}: ${ex.estimatedLgsScore}`,
         ]),
         ...grades.map((g) => [
           formatTurkishDate(g.examDate),
@@ -226,7 +230,7 @@ export function StudentProfileView({
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama Tahmini LGS</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama LGS Puanı</p>
             <p className="mt-1 text-2xl font-semibold font-mono tabular-nums text-gold-600 dark:text-gold-400">
               {trialSummary.examCount > 0 ? trialSummary.avgLgsScore.toFixed(1) : '—'}
             </p>
@@ -258,6 +262,43 @@ export function StudentProfileView({
       </section>
 
       {/* Charts Row: Subject Averages & Trial Net Progress */}
+      <section className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <h3 className="text-base font-semibold text-navy-900 dark:text-white">Deneme Arşivi ({archive.length})</h3>
+        {archive.length === 0 ? <p className="text-sm text-slate-600 dark:text-slate-300">Bu öğrenci için henüz deneme sonucu yok.</p> :
+          <ol className="space-y-3">
+            {archive.map((exam) => {
+              const published = hasPublishedTrialScore(exam.id);
+              return <li key={exam.id} className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800 sm:p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-semibold">{exam.examTitle}</h4>
+                    <time dateTime={exam.examDate} className="text-sm text-slate-600 dark:text-slate-300">{formatTurkishDate(exam.examDate)}</time>
+                  </div>
+                  {!readOnly && onDeletePracticeExam && <button type="button" onClick={() => onDeletePracticeExam(exam)}
+                    aria-label={exam.examTitle + ' kaydını sil'} className="min-h-11 min-w-11 rounded-md text-slate-500 hover:text-red-600 no-print">
+                    <Trash2 className="mx-auto size-4" />
+                  </button>}
+                </div>
+                <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {LGS_SUBJECT_CONFIG.map(({ key, label }) => {
+                    const d = exam[`${key}D`];
+                    const y = exam[`${key}Y`];
+                    return <div key={key} className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-950"
+                      style={{ borderTop: '2px solid ' + trialSubjectColors[key].color }}>
+                      <dt className="text-sm font-semibold">{label}</dt>
+                      <dd className="text-sm tabular-nums">{d} D · {y} Y · <strong>{calculateNet(d, y, exam.wrongPenalty).toLocaleString('tr-TR')} net</strong></dd>
+                    </div>;
+                  })}
+                </dl>
+                <dl className="grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+                  <div><dt className="text-sm">Toplam net</dt><dd className="font-bold tabular-nums">{exam.totalNet.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</dd></div>
+                  <div><dt className="text-sm">{published ? 'PDF’deki LGS puanı' : 'Tahmini LGS puanı'}</dt><dd className="font-bold tabular-nums">{exam.estimatedLgsScore.toLocaleString('tr-TR', { minimumFractionDigits: published ? 3 : 1 })}</dd></div>
+                </dl>
+              </li>;
+            })}
+          </ol>}
+      </section>
+
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
           <h3 className="text-base font-semibold text-navy-900 dark:text-white">
@@ -375,65 +416,8 @@ export function StudentProfileView({
         )}
       </section>
 
-      {/* Practice Exams & Grades Tables */}
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <div className="xl:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h3 className="text-base font-semibold text-navy-900 dark:text-white">
-              Deneme Sınavları (D/Y/Net) ({practiceExams.length})
-            </h3>
-          </div>
-          {practiceExams.length === 0 ? (
-            <p className="p-6 text-sm text-slate-500 dark:text-slate-400">
-              Bu öğrenci için kayıtlı deneme sınavı bulunmuyor.
-            </p>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {practiceExams.map((ex) => (
-                <div
-                  key={ex.id}
-                  className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 space-y-2"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-navy-900 dark:text-white">
-                        {ex.examTitle}
-                      </p>
-                      <p className="text-xs font-mono text-slate-500 tabular-nums">
-                        {formatTurkishDate(ex.examDate)} · {ex.totalCorrect} Doğru · {ex.totalWrong}{' '}
-                        Yanlış ·{' '}
-                        <strong className="text-teal-700 dark:text-teal-400">
-                          {ex.totalNet.toFixed(2)} Net
-                        </strong>{' '}
-                        · LGS ~{ex.estimatedLgsScore.toFixed(1)}
-                      </p>
-                    </div>
-                    {!readOnly && onDeletePracticeExam && (
-                      <button
-                        type="button"
-                        onClick={() => onDeletePracticeExam(ex)}
-                        aria-label="Denemeyi sil"
-                        className="p-1.5 rounded-md text-slate-400 hover:text-red-600 cursor-pointer no-print"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-[11px] font-mono tabular-nums text-slate-600 dark:text-slate-300">
-                    <span>Trk: {calculateNet(ex.turkceD, ex.turkceY, ex.wrongPenalty)}</span>
-                    <span>Mat: {calculateNet(ex.matematikD, ex.matematikY, ex.wrongPenalty)}</span>
-                    <span>Fen: {calculateNet(ex.fenD, ex.fenY, ex.wrongPenalty)}</span>
-                    <span>İnk: {calculateNet(ex.inkilapD, ex.inkilapY, ex.wrongPenalty)}</span>
-                    <span>Din: {calculateNet(ex.dinD, ex.dinY, ex.wrongPenalty)}</span>
-                    <span>İng: {calculateNet(ex.ingilizceD, ex.ingilizceY, ex.wrongPenalty)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="xl:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+      <section>
+        <div className=" bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
             <h3 className="text-base font-semibold text-navy-900 dark:text-white">
               Notlar ({grades.length})

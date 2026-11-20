@@ -6,8 +6,8 @@ import { ErrorBoundary } from '../components/ui/ErrorBoundary';
 import { GoogleSignInDialog } from '../components/ui/GoogleSignInDialog';
 import { ToastContainer } from '../components/ui/ToastContainer';
 import { DEMO_TEACHER_ID } from '../data/demoData';
-import { buildBulkPlan, bulkHeaders, type BulkInput, type BulkPlan } from '../utils/bulkStudentRecords';
-import { importSheetWidth, readPdfImport, readPdfPageCount, readTrialPdfResults, type ImportSheet } from '../utils/bulkRecordFiles';
+import { buildBulkPlan, bulkHeaders, publishedTrialKey, type BulkInput, type BulkPlan } from '../utils/bulkStudentRecords';
+import { importSheetWidth, inspectTrialPdf, readPdfImport, readTrialPdfResults, type ImportSheet } from '../utils/bulkRecordFiles';
 import { calculateNet, computePracticeExamTotals, LGS_SUBJECT_CONFIG } from '../utils/exportUtils';
 import '../index.css';
 
@@ -20,7 +20,7 @@ type TrialInput = Extract<BulkInput, { mode: 'trials' }>;
 
 function TrialImporter() {
   const { user, authLoading, dataLoading, workspaceView, classes, students, practiceExams, grades, signInWithGoogle, saveBulkRecords } = useAcademy();
-  const [pdf, setPdf] = useState<{ file: File; count: number }>();
+  const [pdf, setPdf] = useState<{ file: File; count: number; schoolPages: string }>();
   const [selection, setSelection] = useState('');
   const [sheets, setSheets] = useState<ImportSheet[]>([]);
   const [title, setTitle] = useState('');
@@ -33,15 +33,21 @@ function TrialImporter() {
   const [savedCount, setSavedCount] = useState<number>();
   const locked = useRef(false);
   const authorized = Boolean(user && workspaceView === 'teacher' && !authLoading && !dataLoading);
+  const publishedReport = sheets.some((sheet) => Boolean(sheet.published));
+  const penalty = publishedReport ? 3 : wrongPenalty;
   const detection = useMemo(() => {
     if (!sheets.length || authLoading || dataLoading) return null;
     try {
-      const eligible = classId ? students.filter((student) => student.classId === classId) : students;
-      return readTrialPdfResults(sheets, eligible, trialFields);
+      const schoolYear = date ? Number(date.slice(0, 4)) - (Number(date.slice(5, 7)) < 9 ? 1 : 0) : null;
+      const sections = classId ? classes.filter((item) => item.id === classId) : publishedReport && schoolYear
+        ? classes.filter((item) => item.academicYear.replace(/[^0-9]/g, '') === String(schoolYear) + (schoolYear + 1))
+        : classes;
+      const ids = new Set(sections.map(({ id }) => id));
+      return readTrialPdfResults(sheets, students.filter((student) => ids.has(student.classId)), trialFields, sections);
     } catch (issue) {
-      return { groups: new Map<string, string[][]>(), issues: [], error: issue instanceof Error ? issue.message : 'Sonuçlar okunamadı.' };
+      return { groups: new Map<string, string[][]>(), issues: [], publishedResults: new Map<string, { totalNet: number; score: number }>(), error: issue instanceof Error ? issue.message : 'Sonuçlar okunamadı.' };
     }
-  }, [sheets, students, classId, authLoading, dataLoading]);
+  }, [sheets, students, classes, classId, authLoading, dataLoading, date, publishedReport]);
 
   const matchedCount = [...(detection?.groups.values() ?? [])].reduce((count, group) => count + group.length, 0);
   const names = useMemo(() => {
@@ -78,13 +84,13 @@ function TrialImporter() {
       setSheets([]);
       setSavedCount(undefined);
       setProgress('PDF açılıyor…');
-      const count = await readPdfPageCount(file);
-      const pages = count === 1 ? '1' : '1-' + Math.min(count, 60);
-      setPdf({ file, count });
+      const { count, schoolPages } = await inspectTrialPdf(file);
+      const pages = schoolPages || (count === 1 ? '1' : '1-' + Math.min(count, 60));
+      setPdf({ file, count, schoolPages });
       setSelection(pages);
       setTitle(file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 120));
       setDate(/\b\d{4}-\d{2}-\d{2}\b/.exec(file.name)?.[0] ?? '');
-      if (count <= 60) await readPages(file, pages);
+      if (schoolPages || count <= 60) await readPages(file, pages);
     });
   }
 
@@ -96,7 +102,7 @@ function TrialImporter() {
       for (const [groupId, rows] of detection.groups) {
         for (let start = 0; start < rows.length; start += 250) {
           const input: TrialInput = {
-            mode: 'trials', classId: groupId, assessment: { examTitle: title, examDate: date, wrongPenalty },
+            mode: 'trials', classId: groupId, assessment: { examTitle: title, examDate: date, wrongPenalty: penalty }, publishedResults: detection.publishedResults,
             text: rows.slice(start, start + 250).map((row) => row.join('\t')).join('\n'),
           };
           batches.push({ input, plan: await buildBulkPlan(input, { classes, students, grades, practiceExams }, user.uid) });
@@ -142,9 +148,9 @@ function TrialImporter() {
             <input className="sr-only" type="file" accept=".pdf,application/pdf"
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) open(file); }} />
           </label>
-          {pdf && <p className="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300">{pdf.file.name} · {pdf.count} sayfa</p>}
+          {pdf && <p className="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300">{pdf.file.name} · {pdf.count} sayfa{pdf.schoolPages && ' · Okul sonuçları ' + pdf.schoolPages + '. sayfa'}</p>}
         </div>
-        {pdf && pdf.count > 1 && <details className="space-y-2" open={pdf.count > 60 && sheets.length === 0 ? true : undefined}>
+        {pdf && pdf.count > 1 && <details className="space-y-2" open={pdf.count > 60 && !pdf.schoolPages && sheets.length === 0 ? true : undefined}>
           <summary className="cursor-pointer text-sm font-medium underline">PDF sayfalarını seç</summary>
           <div className="flex flex-wrap items-end gap-2">
             <label className="space-y-1 text-sm">Sayfa veya aralık
@@ -163,7 +169,7 @@ function TrialImporter() {
             </select>
           </label>
           <label className="space-y-1 text-sm font-medium">Net kuralı
-            <select className={inputClass} value={wrongPenalty} onChange={(event) => setWrongPenalty(event.target.value === '4' ? 4 : 3)}>
+            <select className={inputClass} value={penalty} disabled={publishedReport} onChange={(event) => setWrongPenalty(event.target.value === '4' ? 4 : 3)}>
               <option value="3">3 yanlış 1 doğruyu götürür</option><option value="4">4 yanlış 1 doğruyu götürür</option>
             </select>
           </label>
@@ -184,22 +190,24 @@ function TrialImporter() {
             <table className="w-full whitespace-nowrap text-left text-sm">
               <thead className="sticky top-0 bg-slate-100 dark:bg-slate-800"><tr>
                 <th scope="col" className="p-2">Öğrenci</th>{LGS_SUBJECT_CONFIG.map((subject) => <th scope="col" key={subject.key} className="p-2">{subject.shortLabel}</th>)}
-                <th scope="col" className="p-2">Toplam net</th>
+                <th scope="col" className="p-2">Toplam net</th><th scope="col" className="p-2">Puan</th>
               </tr></thead>
               <tbody>{rows.map(([id, ...values]) => {
                 const [turkceD, turkceY, matematikD, matematikY, fenD, fenY, inkilapD, inkilapY, dinD, dinY, ingilizceD, ingilizceY] = values.map(Number);
-                const { totalNet } = computePracticeExamTotals({ wrongPenalty, turkceD, turkceY, matematikD, matematikY, fenD, fenY, inkilapD, inkilapY, dinD, dinY, ingilizceD, ingilizceY });
+                const pdfScore = detection.publishedResults.get(publishedTrialKey(groupId, id));
+                const { totalNet, estimatedLgsScore } = computePracticeExamTotals({ wrongPenalty: penalty, turkceD, turkceY, matematikD, matematikY, fenD, fenY, inkilapD, inkilapY, dinD, dinY, ingilizceD, ingilizceY });
                 const subjects = LGS_SUBJECT_CONFIG.map(({ maxQuestions }, index) => {
                   const d = Number(values[index * 2]);
                   const y = Number(values[index * 2 + 1]);
-                  return { d, y, blank: maxQuestions - d - y, net: calculateNet(d, y, wrongPenalty) };
+                  return { d, y, blank: maxQuestions - d - y, net: calculateNet(d, y, penalty) };
                 });
                 return <tr key={id} className="border-t border-slate-200 dark:border-slate-800">
                   <th scope="row" className="p-2">{names.get(JSON.stringify([groupId, id]))}</th>
                   {subjects.map(({ d, y, blank, net }, index) => <td key={LGS_SUBJECT_CONFIG[index].key} className="p-2">
                     <span className="block font-semibold">{numberFormat.format(net)} net</span><span>{d} D · {y} Y · {blank} B</span>
                   </td>)}
-                  <td className="p-2 font-bold">{numberFormat.format(totalNet)}</td>
+                  <td className="p-2 font-bold">{numberFormat.format(pdfScore?.totalNet ?? totalNet)}</td>
+                  <td className="p-2">{pdfScore ? pdfScore.score.toLocaleString('tr-TR', { minimumFractionDigits: 3 }) : numberFormat.format(estimatedLgsScore) + ' (tahmini)'}</td>
                 </tr>;
               })}</tbody>
             </table>

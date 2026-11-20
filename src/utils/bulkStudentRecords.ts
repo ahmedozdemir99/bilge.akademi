@@ -6,10 +6,14 @@ import { normalizeSearchText } from './searchText';
 export const BULK_EXAM_TYPES: ExamType[] = ['Yazılı', 'Deneme', 'Sözlü', 'Proje', 'Performans'];
 
 export type BulkMode = 'roster' | 'grades' | 'trials';
+export interface PublishedBulkTrial { totalNet: number; score: number }
+export const publishedTrialKey = (classId: string, studentNumber: string) => JSON.stringify([classId, studentNumber]);
+export const hasPublishedTrialScore = (id: string) => id.startsWith('bulk_pdf_');
+
 export type BulkInput =
   | { mode: 'roster'; classId: string; newClass?: ClassInput; text: string }
   | { mode: 'grades'; classId: string; text: string; assessment: Pick<GradeInput, 'subjectName' | 'examTitle' | 'examType' | 'examDate' | 'maxScore'> }
-  | { mode: 'trials'; classId: string; text: string; assessment: Pick<PracticeExamInput, 'examTitle' | 'examDate' | 'wrongPenalty'> };
+  | { mode: 'trials'; classId: string; text: string; assessment: Pick<PracticeExamInput, 'examTitle' | 'examDate' | 'wrongPenalty'>; publishedResults?: ReadonlyMap<string, PublishedBulkTrial> };
 
 interface BulkSnapshot {
   classes: SchoolClass[];
@@ -23,7 +27,7 @@ type BulkPracticeExam = PracticeExamInput & Pick<PracticeExamRecord, 'totalCorre
 export type BulkRow = { key: string; student: string; detail: string; skip: boolean } & (
   | { collection: 'students'; data: StudentInput }
   | { collection: 'grades'; data: GradeInput }
-  | { collection: 'practiceExams'; data: BulkPracticeExam }
+  | { collection: 'practiceExams'; data: BulkPracticeExam; published?: boolean }
 );
 
 export interface BulkPlan {
@@ -71,9 +75,9 @@ function classIdentity(value: Pick<ClassInput, 'academicYear' | 'gradeLevel' | '
   return [value.academicYear.trim().replace(/[–—]/g, '-').replace(/\s/g, ''), value.gradeLevel, normalizeSearchText(value.section)].join('|');
 }
 
-export async function bulkRecordId(teacherId: string, collection: string, key: string): Promise<string> {
+export async function bulkRecordId(teacherId: string, collection: string, key: string, published = false): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([teacherId, collection, key])));
-  return 'bulk_' + Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return (published ? 'bulk_pdf_' : 'bulk_') + Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 const gradeKey = (record: Pick<GradeInput, 'classId' | 'studentId' | 'subjectName' | 'examTitle' | 'examDate' | 'examType'>) =>
@@ -177,13 +181,27 @@ export async function buildBulkPlan(input: BulkInput, snapshot: BulkSnapshot, te
       });
       const [turkceD, turkceY, matematikD, matematikY, fenD, fenY, inkilapD, inkilapY, dinD, dinY, ingilizceD, ingilizceY] = pairs;
       const scores = { wrongPenalty: input.assessment.wrongPenalty, turkceD, turkceY, matematikD, matematikY, fenD, fenY, inkilapD, inkilapY, dinD, dinY, ingilizceD, ingilizceY };
-      const { totalCorrect, totalWrong, totalNet, estimatedLgsScore } = computePracticeExamTotals(scores);
+      const computed = computePracticeExamTotals(scores);
+      const { totalCorrect, totalWrong } = computed;
+      const published = input.publishedResults?.get(publishedTrialKey(classId, studentNumber));
+      if (published && (input.assessment.wrongPenalty !== 3 || !Number.isFinite(published.totalNet) ||
+        published.totalNet < -30 || published.totalNet > 90 || Math.abs(published.totalNet - computed.totalNet) > 0.04 ||
+        !Number.isFinite(published.score) || published.score < 100 || published.score > 500)) {
+        throw new Error('PDF’deki toplam net veya puan doğrulanamadı.');
+      }
+      // The existing Firestore score field supports both calculated and printed LGS points.
+      // The deterministic PDF ID records the source without changing deployed rules.
+      const totalNet = published?.totalNet ?? computed.totalNet;
+      const estimatedLgsScore = published?.score ?? computed.estimatedLgsScore;
       const key = trialKey(common);
       const prior = priorTrials.get(key);
       if (prior && Object.keys(scores).some((field) => prior[field as keyof typeof scores] !== scores[field as keyof typeof scores])) {
         throw new Error('Bu deneme farklı sonuçlarla kayıtlı. Deneme kaydını kontrol edin.');
       }
-      rows.push({ collection: 'practiceExams', key, student: match.fullName, detail: `${totalCorrect} D / ${totalWrong} Y · ${totalNet.toLocaleString('tr-TR')} net`, skip: Boolean(prior), data: { ...common, ...scores, totalCorrect, totalWrong, totalNet, estimatedLgsScore } });
+      if (prior && published && (prior.totalNet !== totalNet || prior.estimatedLgsScore !== estimatedLgsScore || !hasPublishedTrialScore(prior.id))) {
+        throw new Error('Bu deneme daha önce tahmini veya farklı puanla kaydedildi. Arşivdeki kaydı kontrol edin.');
+      }
+      rows.push({ collection: 'practiceExams', key, published: Boolean(published), student: match.fullName, detail: `${totalCorrect} D / ${totalWrong} Y · ${totalNet.toLocaleString('tr-TR')} net`, skip: Boolean(prior), data: { ...common, ...scores, totalCorrect, totalWrong, totalNet, estimatedLgsScore } });
     } catch (error) {
       errors.push(`Satır ${index + 1} — ${error instanceof Error ? error.message : 'Geçersiz kayıt.'}`);
     } finally {

@@ -208,7 +208,7 @@ export function PracticeExamRobotPanel({
         'Toplam Doğru',
         'Toplam Yanlış',
         'Toplam Net',
-        'Tahmini LGS Puanı',
+        'LGS Puanı',
       ],
       filteredExams.map((ex) => {
         const stu = studentMap.get(ex.studentId);
@@ -500,7 +500,7 @@ export function PracticeExamRobotPanel({
             <p className="text-[11px] text-slate-500 dark:text-slate-400">90 soru üzerinden</p>
           </div>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama Tahmini LGS</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama LGS Puanı</p>
             <p className="mt-1 text-2xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
               {robotSummary.examCount > 0 ? robotSummary.avgLgsScore.toFixed(1) : '—'}
             </p>

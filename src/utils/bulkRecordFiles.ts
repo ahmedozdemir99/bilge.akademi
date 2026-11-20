@@ -1,12 +1,14 @@
 import { normalizeSearchText } from './searchText';
 import { LGS_SUBJECT_CONFIG } from './exportUtils';
-import { readBulkColumns } from './bulkStudentRecords';
-import type { Student } from '../types/academy';
+import { publishedTrialKey, readBulkColumns } from './bulkStudentRecords';
+import type { SchoolClass, Student } from '../types/academy';
 import { extractTableRows } from './bulkTableLayout';
+import { isSchoolNetList, readIsleyenZekaPage } from './isleyenZekaReport';
 
 export interface ImportSheet {
   name: string;
   rows: string[][];
+  published?: NonNullable<ReturnType<typeof readIsleyenZekaPage>>;
 }
 
 const MAX_ROWS = 5000;
@@ -83,6 +85,27 @@ export async function readPdfPageCount(file: File): Promise<number> {
   }
 }
 
+export async function inspectTrialPdf(file: File) {
+  const task = await loadPdf(file);
+  try {
+    const pdf = await task.promise;
+    let end = 0;
+    for (let number = 1; number <= Math.min(pdf.numPages, MAX_PDF_PAGES_PER_SCAN); number += 1) {
+      const page = await pdf.getPage(number);
+      try {
+        const content = await page.getTextContent();
+        if (!isSchoolNetList(content.items)) break;
+        end = number;
+      } finally {
+        page.cleanup();
+      }
+    }
+    return { count: pdf.numPages, schoolPages: end ? (end === 1 ? '1' : '1-' + end) : '' };
+  } finally {
+    await task.destroy();
+  }
+}
+
 export async function readPdfImport(
   file: File,
   selection: string,
@@ -103,7 +126,10 @@ export async function readPdfImport(
       try {
         const start = rows.length;
         const content = imageScan ? null : await page.getTextContent();
-        const textRows = content ? extractTableRows(content.items) : [];
+        const published = keepPages && content ? readIsleyenZekaPage(content.items) : null;
+        const textRows = published?.results.length ? published.results.map((row) => [
+          row.number, row.name, row.section, ...row.scores, String(row.totalNet), String(row.score),
+        ]) : content ? extractTableRows(content.items) : [];
         const isTable = textRows.some((row) => row.filter(Boolean).length >= 2 && row.some((cell) => /^\d+(?:[.,]\d+)?$/.test(cell)));
         if (isTable) {
           rows.push(...textRows);
@@ -123,7 +149,7 @@ export async function readPdfImport(
           }
         }
         checkedRows(rows);
-        if (keepPages && rows.length > start) pageSheets.push({ name: 'Sayfa ' + pageNumber, rows: rows.slice(start) });
+        if (keepPages && rows.length > start) pageSheets.push({ name: 'Sayfa ' + pageNumber, rows: rows.slice(start), published: published ?? undefined });
       } finally {
         page.cleanup();
       }
@@ -406,9 +432,10 @@ export function extractMappedRows(rows: string[][], columns: number[], range: Im
   return selected.join('\n');
 }
 
-export function readTrialPdfResults(sheets: ImportSheet[], students: Student[], fields: string[]) {
+export function readTrialPdfResults(sheets: ImportSheet[], students: Student[], fields: string[], classes: SchoolClass[] = []) {
   const groups = new Map<string, string[][]>();
   const issues: string[] = [];
+  const publishedResults = new Map<string, { totalNet: number; score: number }>();
   const seen = new Map<string, string>();
   const roster = studentLookup(students);
   const byNumber = new Map<string, Student[]>();
@@ -420,8 +447,35 @@ export function readTrialPdfResults(sheets: ImportSheet[], students: Student[], 
     byName.set(name, [...(byName.get(name) ?? []), student]);
   }
 
+  const sections = new Map(classes.map((item) => [item.id, normalizeSearchText(item.gradeLevel + item.section).replace(/[^a-z0-9]/g, '')]));
+
   let previous: { width: number; columns: number[]; numberColumn: number; nameColumn: number } | undefined;
   for (const sheet of sheets) {
+    if (sheet.published) {
+      const { results, invalid } = sheet.published;
+      if (invalid) issues.push(sheet.name + ' · ' + invalid + ' satırın net veya puan bilgisi doğrulanamadı.');
+      let unmatched = 0;
+      for (const row of results) {
+        const section = normalizeSearchText(row.section).replace(/[^a-z0-9]/g, '');
+        const candidates = (byNumber.get(row.number) ?? []).filter((item) => sections.get(item.classId) === section);
+        const named = candidates.filter((item) => studentName(item.fullName) === studentName(row.name));
+        const student = candidates.length === 1 ? candidates[0] : named.length === 1 ? named[0] : undefined;
+        if (!student) { unmatched += 1; continue; }
+        const signature = [...row.scores, row.totalNet, row.score].join(',');
+        if (seen.has(student.id)) {
+          if (seen.get(student.id) !== signature) throw new Error('Aynı öğrenci için iki farklı PDF sonucu bulundu.');
+          continue;
+        }
+        seen.set(student.id, signature);
+        const group = groups.get(student.classId) ?? [];
+        group.push([student.studentNumber, ...row.scores]);
+        groups.set(student.classId, group);
+        publishedResults.set(publishedTrialKey(student.classId, student.studentNumber), { totalNet: row.totalNet, score: row.score });
+      }
+      if (unmatched) issues.push(sheet.name + ' · ' + unmatched + ' sonuç okul numarası ve sınıfla eşleşmedi.');
+      previous = undefined;
+      continue;
+    }
     const { rows } = sheet;
     if (!rows.some((row) => row.filter(Boolean).length >= 3)) continue;
     const range = suggestImportRange(rows);
@@ -479,5 +533,5 @@ export function readTrialPdfResults(sheets: ImportSheet[], students: Student[], 
       groups.set(student.classId, group);
     }
   }
-  return { groups, issues };
+  return { groups, issues, publishedResults };
 }
