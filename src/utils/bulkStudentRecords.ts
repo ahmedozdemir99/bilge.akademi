@@ -39,9 +39,11 @@ export function bulkHeaders(mode: BulkMode): string[] {
   return ['Okul No', ...LGS_SUBJECT_CONFIG.flatMap(({ label }) => [label + ' D', label + ' Y'])];
 }
 
-export function readBulkColumns(line: string): string[] {
+export function readBulkColumns(line: string, delimiter: ';' | ',' = ';'): string[] {
   if (line.includes('\t')) return line.split('\t').map((cell) => cell.trim());
-  const pattern = /(?:^|;)(?:"((?:[^"]|"")*)"|([^";]*))(?=;|$)/gy;
+  const pattern = delimiter === ';'
+    ? /(?:^|;)(?:"((?:[^"]|"")*)"|([^";]*))(?=;|$)/gy
+    : /(?:^|,)(?:"((?:[^"]|"")*)"|([^",]*))(?=,|$)/gy;
   const matches = [...line.matchAll(pattern)];
   const last = matches.at(-1);
   if (!last || last.index + last[0].length !== line.length) throw new Error('CSV sütunları okunamadı.');

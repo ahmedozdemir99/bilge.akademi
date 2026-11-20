@@ -142,6 +142,20 @@ export function isScreenshot(file: File): boolean {
   return /\.(png|jpe?g|webp)$/i.test(file.name) || /^(image\/(png|jpeg|webp))$/.test(file.type);
 }
 
+function readDelimitedRows(text: string): string[][] {
+  const lines = text.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/);
+  for (const delimiter of [';', ','] as const) {
+    let rows: string[][];
+    try {
+      rows = lines.map((line) => readBulkColumns(line, delimiter));
+    } catch {
+      continue;
+    }
+    if (rows.some((row) => row.length >= 2)) return checkedRows(rows);
+  }
+  throw new Error('CSV tablosunda okunabilir sütun bulunamadı.');
+}
+
 export async function readImportWorkbook(file: File, onProgress: (message: string) => void = () => {}): Promise<ImportSheet[]> {
   checkFileSize(file);
   if (isScreenshot(file)) {
@@ -154,9 +168,7 @@ export async function readImportWorkbook(file: File, onProgress: (message: strin
     return [{ name: 'Ekran görüntüsü', rows }];
   }
   if (/\.(csv|tsv|txt)$/i.test(file.name)) {
-    const rows = checkedRows((await file.text()).replace(/^\uFEFF/, '').split(/\r\n|\n|\r/).map(readBulkColumns));
-    if (!rows.some((row) => row.length >= 2)) throw new Error('CSV tablosunda okunabilir sütun bulunamadı.');
-    return [{ name: 'CSV', rows }];
+    return [{ name: 'CSV', rows: readDelimitedRows(await file.text()) }];
   }
   if (/\.xlsx$/i.test(file.name)) {
     const { default: readXlsxFile } = await import('read-excel-file/universal');
