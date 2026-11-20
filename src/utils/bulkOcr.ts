@@ -71,12 +71,35 @@ export async function createBulkOcr() {
   };
 }
 
+async function decodeScreenshot(file: File) {
+  if (!file.size) throw new Error('Görüntü dosyası boş. Ekran görüntüsünü telefona kaydedip yeniden seçin.');
+  if (typeof createImageBitmap === 'function') {
+    try {
+      const image = await createImageBitmap(file);
+      return { image, width: image.width, height: image.height, release: () => image.close() };
+    } catch {
+      // Some mobile file pickers return JPEGs that only the browser image element can decode.
+    }
+  }
+  const url = URL.createObjectURL(file);
+  try {
+    const image = await withScanTimeout(new Promise<HTMLImageElement>((resolve, reject) => {
+      const element = new Image();
+      element.onload = () => resolve(element);
+      element.onerror = () => reject(new Error('Görüntü açılamadı. Ekran görüntüsünü telefona kaydedip tekrar seçin.'));
+      element.src = url;
+    }), 10000, 'Görüntü açılırken zaman aşımı oluştu.');
+    return { image, width: image.naturalWidth, height: image.naturalHeight, release: () => URL.revokeObjectURL(url) };
+  } catch (error) {
+    URL.revokeObjectURL(url);
+    throw error;
+  }
+}
+
 export async function readScreenshotRows(file: File): Promise<string[][]> {
-  const image = await createImageBitmap(file).catch(() => {
-    throw new Error('Görüntü açılamadı. PNG, JPEG veya WebP biçiminde bir ekran görüntüsü seçin.');
-  });
-  const scale = Math.min(2, 1900 / image.width, 2800 / Math.max(image.width, image.height));
-  const canvas = createOcrCanvas(image.width * scale, image.height * scale);
+  const { image, width, height, release } = await decodeScreenshot(file);
+  const scale = Math.min(2, 1900 / width, 2800 / Math.max(width, height));
+  const canvas = createOcrCanvas(width * scale, height * scale);
   try {
     const context = canvas.getContext('2d');
     if (!context) throw new Error(OCR_ERROR);
@@ -84,7 +107,7 @@ export async function readScreenshotRows(file: File): Promise<string[][]> {
     context.fillRect(0, 0, canvas.width, canvas.height);
     context.drawImage(image, 0, 0, canvas.width, canvas.height);
   } finally {
-    image.close();
+    release();
   }
   try {
     const reader = await createBulkOcr();

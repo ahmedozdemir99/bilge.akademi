@@ -1,4 +1,4 @@
-import { useRef, useState, type FormEvent } from 'react';
+import { useEffect, useRef, useState, type FormEvent } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { useAcademy } from '../../../context/AcademyContext';
 import { DEFAULT_SUBJECT_NAMES, DEMO_TEACHER_ID } from '../../../data/demoData';
@@ -52,6 +52,11 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
+  const previewRef = useRef<HTMLElement>(null);
+
+  useEffect(() => {
+    if (preview) previewRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [preview]);
 
   const classId = choice || (mode !== 'roster' ? classes[0]?.id ?? '' : '');
   const classStudents = students.filter((student) => student.classId === classId)
@@ -76,9 +81,13 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
 
   async function previewRows(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
+    await previewText(text);
+  }
+
+  async function previewText(rows: string, fromFile = false) {
     if (locked.current || dataLoading) return;
     invalidate();
-    const common = { classId, text };
+    const common = { classId, text: rows };
     const assessment = { examTitle: title, examDate: date };
     const input: BulkInput = mode === 'roster' ? {
       ...common, mode, newClass: classId ? undefined : { name, gradeLevel: Number(gradeLevel), section, academicYear },
@@ -91,6 +100,7 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
     try {
       const plan = await buildBulkPlan(input, { classes, students, grades, practiceExams }, user?.uid ?? DEMO_TEACHER_ID);
       setPreview({ input, plan });
+      if (fromFile) setMappingOpen(false);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : 'Liste okunamadı.');
     } finally {
@@ -132,7 +142,8 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
     try {
       if (/\.(csv|tsv|txt)$/i.test(file.name)) {
         if (file.size > 400000) throw new Error('CSV çok büyük. Bir sınıf ve bir değerlendirme içeren daha küçük bir dosya seçin.');
-        setText(await file.text());
+        setWorkbook({ filename: file.name, sheets: await readImportWorkbook(file) });
+        setMappingOpen(true);
       } else if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
         const pageCount = await readPdfPageCount(file);
         setPdfSource({ file, pageCount });
@@ -244,23 +255,16 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
           )}
 
           {mode !== 'roster' && classStudents.length === 0 && (
-            <p className="text-sm text-amber-700 dark:text-amber-300">Bu sınıfa önce öğrenci ekleyin.</p>
+            <div className="space-y-1 text-sm text-amber-800 dark:text-amber-200">
+              <p>Bu sınıfta henüz öğrenci yok.</p>
+              <button type="button" className="font-medium underline" onClick={() => {
+                changeMode('roster');
+                if (workbook) setMappingOpen(true);
+              }}>{workbook ? 'Aynı dosyadan öğrenci listesini oluştur' : 'Öğrenci listesini ekle'}</button>
+            </div>
           )}
           <div className="space-y-2">
-            <label className="block text-sm font-medium" htmlFor="bulk-rows">Kayıt listesi</label>
-            <p id="bulk-columns" className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-              Excel’den sütunları kopyalayın ya da Excel (.xlsx), PDF, CSV veya ekran görüntüsü açın.
-              <span className="block font-medium">{headers.join(' · ')}</span>
-              {mode !== 'roster' && 'Katılmayan öğrencinin puan veya sonuç hücrelerini boş bırakın. Sıfır sonuç için 0 yazın.'}
-            </p>
-            <textarea id="bulk-rows" className={controls + ' min-h-32 font-mono'} aria-describedby="bulk-columns"
-              rows={6} value={text} onChange={(event) => setText(event.target.value)} placeholder={sample}
-              maxLength={100000} required spellCheck={false} />
             <div className="flex flex-wrap gap-2">
-              <button type="button" className={secondary} onClick={() => exportToCsv('bilge_akademi_toplu_' + mode, headers,
-                mode === 'roster' ? [['', '']] : classStudents.map((item) => [item.studentNumber, ...Array(headers.length - 1).fill('')]))}>
-                <Download className="size-4" /> Şablonu İndir
-              </button>
               <label className={secondary + ' cursor-pointer focus-within:outline-2'}>
                 <Upload className="size-4" /> Dosya veya Ekran Görüntüsü Aç
                 <input className="sr-only" type="file" accept=".xlsx,.pdf,.csv,.tsv,.txt,.png,.jpg,.jpeg,.webp"
@@ -292,18 +296,35 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
           )}
           {fileProgress && <p role="status" className="text-sm text-teal-700 dark:text-teal-300">{fileProgress}</p>}
           {workbook && mappingOpen && <BulkFileMapper key={mode + workbook.filename} filename={workbook.filename} sheets={workbook.sheets}
-            fields={headers} onClose={() => setMappingOpen(false)} onApply={(rows) => {
-              invalidate();
+            fields={headers} students={mode === 'roster' ? undefined : classStudents}
+            hasRoster={!dataLoading && (mode === 'roster' || classStudents.length > 0)}
+            onClose={() => setMappingOpen(false)} onApply={(rows) => {
               setText(rows);
-              setMappingOpen(false);
+              void previewText(rows, true);
             }} />}
-          <button type="submit" className={primary} disabled={dataLoading || (mode !== 'roster' && classStudents.length === 0)}>Önizle</button>
+          <details className="space-y-2">
+            <summary className="cursor-pointer text-sm font-medium underline">Elle gir veya şablon indir</summary>
+            <label className="block text-sm font-medium" htmlFor="bulk-rows">Kayıt listesi</label>
+            <p id="bulk-columns" className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
+              Excel’den sütunları kopyalayın ya da Excel (.xlsx), PDF, CSV veya ekran görüntüsü açın.
+              <span className="block font-medium">{headers.join(' · ')}</span>
+              {mode !== 'roster' && 'Katılmayan öğrencinin puan veya sonuç hücrelerini boş bırakın. Sıfır sonuç için 0 yazın.'}
+            </p>
+            <textarea id="bulk-rows" className={controls + ' min-h-32 font-mono'} aria-describedby="bulk-columns"
+              rows={6} value={text} onChange={(event) => setText(event.target.value)} placeholder={sample}
+              maxLength={100000} spellCheck={false} />
+              <button type="button" className={secondary} onClick={() => exportToCsv('bilge_akademi_toplu_' + mode, headers,
+                mode === 'roster' ? [['', '']] : classStudents.map((item) => [item.studentNumber, ...Array(headers.length - 1).fill('')]))}>
+                <Download className="size-4" /> Şablonu İndir
+              </button>
+            <button type="submit" className={primary} disabled={dataLoading || !text.trim() || (mode !== 'roster' && classStudents.length === 0)}>Önizle</button>
+          </details>
         </fieldset>
       </form>
 
       {error && <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
       {preview && (
-        <section className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800 sm:p-4">
+        <section ref={previewRef} className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800 sm:p-4">
           <h3 className="font-semibold">{preview.plan.className} · {preview.plan.rows.filter((row) => !row.skip).length} yeni kayıt</h3>
           {preview.plan.newClass && <p className="text-sm text-slate-600 dark:text-slate-300">Yeni sınıf oluşturulacak.</p>}
           <ul aria-label="Kayıt önizlemesi" className="max-h-56 divide-y divide-slate-200 overflow-y-auto text-sm dark:divide-slate-800">

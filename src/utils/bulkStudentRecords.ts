@@ -39,7 +39,7 @@ export function bulkHeaders(mode: BulkMode): string[] {
   return ['Okul No', ...LGS_SUBJECT_CONFIG.flatMap(({ label }) => [label + ' D', label + ' Y'])];
 }
 
-function readColumns(line: string): string[] {
+export function readBulkColumns(line: string): string[] {
   if (line.includes('\t')) return line.split('\t').map((cell) => cell.trim());
   const pattern = /(?:^|;)(?:"((?:[^"]|"")*)"|([^";]*))(?=;|$)/gy;
   const matches = [...line.matchAll(pattern)];
@@ -128,7 +128,7 @@ export async function buildBulkPlan(input: BulkInput, snapshot: BulkSnapshot, te
   for (const [index, line] of lines.entries()) {
     if (!line.trim()) continue;
     try {
-      const [studentNumber, ...values] = readColumns(line);
+      const [studentNumber, ...values] = readBulkColumns(line);
       if (firstRow && /^(okul no|okul numarasi|ogrenci no)$/.test(normalizeSearchText(studentNumber))) continue;
       if (input.mode !== 'roster' && values.every((value) => !value) && studentNumber) continue;
       const expected = input.mode === 'trials' ? 12 : 1;
