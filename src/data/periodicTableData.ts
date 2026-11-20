@@ -1,0 +1,156 @@
+import { PERIODIC_ELEMENTS, type ElementCategory, type PeriodicElement } from './scienceRichData';
+
+type ElementPhase = PeriodicElement['stateAtRoom'];
+
+export interface TableElement {
+  atomicNumber: number;
+  symbol: string;
+  name: string;
+  period: number;
+  group: number | null;
+  category: ElementCategory;
+  phase: ElementPhase | null;
+  shells: number[];
+  predictedShells?: boolean;
+  lesson?: PeriodicElement;
+}
+
+type ElementRow = [
+  symbol: string,
+  name: string,
+  period: number,
+  group: number | null,
+  category: ElementCategory,
+  phase: ElementPhase | null,
+  shells: number[],
+  predictedShells?: boolean,
+];
+
+// Positions follow IUPAC's 18-column table with separate lanthanoid and actinoid rows.
+// Data: https://pubchem.ncbi.nlm.nih.gov/rest/pug/periodictable/CSV
+// Lawrencium: https://periodic-table.rsc.org/element/103/lawrencium
+const additionalElements: ElementRow[] = [
+  ["Sc", "Skandiyum", 4, 3, "Metal", "Katı", [2, 8, 9, 2]],
+  ["Ti", "Titanyum", 4, 4, "Metal", "Katı", [2, 8, 10, 2]],
+  ["V", "Vanadyum", 4, 5, "Metal", "Katı", [2, 8, 11, 2]],
+  ["Cr", "Krom", 4, 6, "Metal", "Katı", [2, 8, 13, 1]],
+  ["Mn", "Mangan", 4, 7, "Metal", "Katı", [2, 8, 13, 2]],
+  ["Fe", "Demir", 4, 8, "Metal", "Katı", [2, 8, 14, 2]],
+  ["Co", "Kobalt", 4, 9, "Metal", "Katı", [2, 8, 15, 2]],
+  ["Ni", "Nikel", 4, 10, "Metal", "Katı", [2, 8, 16, 2]],
+  ["Cu", "Bakır", 4, 11, "Metal", "Katı", [2, 8, 18, 1]],
+  ["Zn", "Çinko", 4, 12, "Metal", "Katı", [2, 8, 18, 2]],
+  ["Ga", "Galyum", 4, 13, "Metal", "Katı", [2, 8, 18, 3]],
+  ["Ge", "Germanyum", 4, 14, "Yarı Metal", "Katı", [2, 8, 18, 4]],
+  ["As", "Arsenik", 4, 15, "Yarı Metal", "Katı", [2, 8, 18, 5]],
+  ["Se", "Selenyum", 4, 16, "Ametal", "Katı", [2, 8, 18, 6]],
+  ["Br", "Brom", 4, 17, "Ametal", "Sıvı", [2, 8, 18, 7]],
+  ["Kr", "Kripton", 4, 18, "Soygaz", "Gaz", [2, 8, 18, 8]],
+  ["Rb", "Rubidyum", 5, 1, "Metal", "Katı", [2, 8, 18, 8, 1]],
+  ["Sr", "Stronsiyum", 5, 2, "Metal", "Katı", [2, 8, 18, 8, 2]],
+  ["Y", "İtriyum", 5, 3, "Metal", "Katı", [2, 8, 18, 9, 2]],
+  ["Zr", "Zirkonyum", 5, 4, "Metal", "Katı", [2, 8, 18, 10, 2]],
+  ["Nb", "Niyobyum", 5, 5, "Metal", "Katı", [2, 8, 18, 12, 1]],
+  ["Mo", "Molibden", 5, 6, "Metal", "Katı", [2, 8, 18, 13, 1]],
+  ["Tc", "Teknetyum", 5, 7, "Metal", "Katı", [2, 8, 18, 13, 2]],
+  ["Ru", "Rutenyum", 5, 8, "Metal", "Katı", [2, 8, 18, 15, 1]],
+  ["Rh", "Rodyum", 5, 9, "Metal", "Katı", [2, 8, 18, 16, 1]],
+  ["Pd", "Paladyum", 5, 10, "Metal", "Katı", [2, 8, 18, 18]],
+  ["Ag", "Gümüş", 5, 11, "Metal", "Katı", [2, 8, 18, 18, 1]],
+  ["Cd", "Kadmiyum", 5, 12, "Metal", "Katı", [2, 8, 18, 18, 2]],
+  ["In", "İndiyum", 5, 13, "Metal", "Katı", [2, 8, 18, 18, 3]],
+  ["Sn", "Kalay", 5, 14, "Metal", "Katı", [2, 8, 18, 18, 4]],
+  ["Sb", "Antimon", 5, 15, "Yarı Metal", "Katı", [2, 8, 18, 18, 5]],
+  ["Te", "Tellür", 5, 16, "Yarı Metal", "Katı", [2, 8, 18, 18, 6]],
+  ["I", "İyot", 5, 17, "Ametal", "Katı", [2, 8, 18, 18, 7]],
+  ["Xe", "Ksenon", 5, 18, "Soygaz", "Gaz", [2, 8, 18, 18, 8]],
+  ["Cs", "Sezyum", 6, 1, "Metal", "Katı", [2, 8, 18, 18, 8, 1]],
+  ["Ba", "Baryum", 6, 2, "Metal", "Katı", [2, 8, 18, 18, 8, 2]],
+  ["La", "Lantan", 6, null, "Metal", "Katı", [2, 8, 18, 18, 9, 2]],
+  ["Ce", "Seryum", 6, null, "Metal", "Katı", [2, 8, 18, 19, 9, 2]],
+  ["Pr", "Praseodim", 6, null, "Metal", "Katı", [2, 8, 18, 21, 8, 2]],
+  ["Nd", "Neodim", 6, null, "Metal", "Katı", [2, 8, 18, 22, 8, 2]],
+  ["Pm", "Prometyum", 6, null, "Metal", "Katı", [2, 8, 18, 23, 8, 2]],
+  ["Sm", "Samaryum", 6, null, "Metal", "Katı", [2, 8, 18, 24, 8, 2]],
+  ["Eu", "Evropiyum", 6, null, "Metal", "Katı", [2, 8, 18, 25, 8, 2]],
+  ["Gd", "Gadolinyum", 6, null, "Metal", "Katı", [2, 8, 18, 25, 9, 2]],
+  ["Tb", "Terbiyum", 6, null, "Metal", "Katı", [2, 8, 18, 27, 8, 2]],
+  ["Dy", "Disprosyum", 6, null, "Metal", "Katı", [2, 8, 18, 28, 8, 2]],
+  ["Ho", "Holmiyum", 6, null, "Metal", "Katı", [2, 8, 18, 29, 8, 2]],
+  ["Er", "Erbiyum", 6, null, "Metal", "Katı", [2, 8, 18, 30, 8, 2]],
+  ["Tm", "Tulyum", 6, null, "Metal", "Katı", [2, 8, 18, 31, 8, 2]],
+  ["Yb", "İterbiyum", 6, null, "Metal", "Katı", [2, 8, 18, 32, 8, 2]],
+  ["Lu", "Lütesyum", 6, null, "Metal", "Katı", [2, 8, 18, 32, 9, 2]],
+  ["Hf", "Hafniyum", 6, 4, "Metal", "Katı", [2, 8, 18, 32, 10, 2]],
+  ["Ta", "Tantal", 6, 5, "Metal", "Katı", [2, 8, 18, 32, 11, 2]],
+  ["W", "Volfram", 6, 6, "Metal", "Katı", [2, 8, 18, 32, 12, 2]],
+  ["Re", "Renyum", 6, 7, "Metal", "Katı", [2, 8, 18, 32, 13, 2]],
+  ["Os", "Osmiyum", 6, 8, "Metal", "Katı", [2, 8, 18, 32, 14, 2]],
+  ["Ir", "İridyum", 6, 9, "Metal", "Katı", [2, 8, 18, 32, 15, 2]],
+  ["Pt", "Platin", 6, 10, "Metal", "Katı", [2, 8, 18, 32, 17, 1]],
+  ["Au", "Altın", 6, 11, "Metal", "Katı", [2, 8, 18, 32, 18, 1]],
+  ["Hg", "Cıva", 6, 12, "Metal", "Sıvı", [2, 8, 18, 32, 18, 2]],
+  ["Tl", "Talyum", 6, 13, "Metal", "Katı", [2, 8, 18, 32, 18, 3]],
+  ["Pb", "Kurşun", 6, 14, "Metal", "Katı", [2, 8, 18, 32, 18, 4]],
+  ["Bi", "Bizmut", 6, 15, "Metal", "Katı", [2, 8, 18, 32, 18, 5]],
+  ["Po", "Polonyum", 6, 16, "Yarı Metal", "Katı", [2, 8, 18, 32, 18, 6]],
+  ["At", "Astatin", 6, 17, "Ametal", "Katı", [2, 8, 18, 32, 18, 7]],
+  ["Rn", "Radon", 6, 18, "Soygaz", "Gaz", [2, 8, 18, 32, 18, 8]],
+  ["Fr", "Fransiyum", 7, 1, "Metal", "Katı", [2, 8, 18, 32, 18, 8, 1]],
+  ["Ra", "Radyum", 7, 2, "Metal", "Katı", [2, 8, 18, 32, 18, 8, 2]],
+  ["Ac", "Aktinyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 18, 9, 2]],
+  ["Th", "Toryum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 18, 10, 2]],
+  ["Pa", "Protaktinyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 20, 9, 2]],
+  ["U", "Uranyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 21, 9, 2]],
+  ["Np", "Neptünyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 22, 9, 2]],
+  ["Pu", "Plütonyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 24, 8, 2]],
+  ["Am", "Amerikyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 25, 8, 2]],
+  ["Cm", "Küriyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 25, 9, 2]],
+  ["Bk", "Berkelyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 27, 8, 2]],
+  ["Cf", "Kaliforniyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 28, 8, 2]],
+  ["Es", "Einsteinyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 29, 8, 2]],
+  ["Fm", "Fermiyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 30, 8, 2]],
+  ["Md", "Mendelevyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 31, 8, 2]],
+  ["No", "Nobelyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 32, 8, 2]],
+  ["Lr", "Lavrensiyum", 7, null, "Metal", "Katı", [2, 8, 18, 32, 32, 8, 3], true],
+  ["Rf", "Rutherfordiyum", 7, 4, "Metal", null, [2, 8, 18, 32, 32, 10, 2], true],
+  ["Db", "Dubniyum", 7, 5, "Metal", null, [2, 8, 18, 32, 32, 11, 2], true],
+  ["Sg", "Seaborgiyum", 7, 6, "Metal", null, [2, 8, 18, 32, 32, 12, 2], true],
+  ["Bh", "Bohriyum", 7, 7, "Metal", null, [2, 8, 18, 32, 32, 13, 2], true],
+  ["Hs", "Hassiyum", 7, 8, "Metal", null, [2, 8, 18, 32, 32, 14, 2], true],
+  ["Mt", "Meitneriyum", 7, 9, "Metal", null, [2, 8, 18, 32, 32, 15, 2], true],
+  ["Ds", "Darmstadtiyum", 7, 10, "Metal", null, [2, 8, 18, 32, 32, 16, 2], true],
+  ["Rg", "Röntgenyum", 7, 11, "Metal", null, [2, 8, 18, 32, 32, 17, 2], true],
+  ["Cn", "Kopernikyum", 7, 12, "Metal", null, [2, 8, 18, 32, 32, 18, 2], true],
+  ["Nh", "Nihonyum", 7, 13, "Metal", null, [2, 8, 18, 32, 32, 18, 3], true],
+  ["Fl", "Flerovyum", 7, 14, "Metal", null, [2, 8, 18, 32, 32, 18, 4], true],
+  ["Mc", "Moskovyum", 7, 15, "Metal", null, [2, 8, 18, 32, 32, 18, 5], true],
+  ["Lv", "Livermoryum", 7, 16, "Metal", null, [2, 8, 18, 32, 32, 18, 6], true],
+  ["Ts", "Tenesin", 7, 17, "Ametal", null, [2, 8, 18, 32, 32, 18, 7], true],
+  ["Og", "Oganesson", 7, 18, "Soygaz", null, [2, 8, 18, 32, 32, 18, 8], true],
+];
+
+export const FULL_PERIODIC_TABLE: TableElement[] = [
+  ...PERIODIC_ELEMENTS.map((lesson): TableElement => ({
+    atomicNumber: lesson.atomicNumber,
+    symbol: lesson.symbol,
+    name: lesson.name,
+    period: lesson.period,
+    group: lesson.column > 2 ? lesson.column + 10 : lesson.column,
+    category: lesson.category,
+    phase: lesson.stateAtRoom,
+    shells: lesson.shells,
+    lesson,
+  })),
+  ...additionalElements.map(([symbol, name, period, group, category, phase, shells, predictedShells], index) => ({
+    atomicNumber: index + 21,
+    symbol,
+    name,
+    period,
+    group,
+    category,
+    phase,
+    shells,
+    predictedShells,
+  })),
+];
