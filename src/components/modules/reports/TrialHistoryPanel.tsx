@@ -9,14 +9,15 @@ import {
 } from 'recharts';
 import type { PracticeExamRecord, Student } from '../../../types/academy';
 import { calculateTrialHistory, type TrialHistoryPoint, type TrialSubjectHistory } from '../../../utils/trialHistory';
+import { trialSubjectColors } from '../../../utils/subjectColors';
 
-export const trialSubjectColors = {
-  turkce: { color: '#db2777', light: '#f472b6', icon: BookOpen },
-  matematik: { color: '#7c3aed', light: '#a78bfa', icon: Calculator },
-  fen: { color: '#047857', light: '#34d399', icon: FlaskConical },
-  inkilap: { color: '#c2410c', light: '#fb923c', icon: Landmark },
-  din: { color: '#0369a1', light: '#38bdf8', icon: MoonStar },
-  ingilizce: { color: '#4f46e5', light: '#818cf8', icon: Languages },
+const trialSubjectIcons = {
+  turkce: BookOpen,
+  matematik: Calculator,
+  fen: FlaskConical,
+  inkilap: Landmark,
+  din: MoonStar,
+  ingilizce: Languages,
 };
 
 const chartTypes = [
@@ -105,7 +106,8 @@ function SubjectHistoryCard({ subject, chartType, limit }: {
   chartType: ChartType;
   limit: number;
 }) {
-  const { color, light, icon: Icon } = trialSubjectColors[subject.key];
+  const { color, light } = trialSubjectColors[subject.key];
+  const Icon = trialSubjectIcons[subject.key];
   const points = limit ? subject.points.slice(-limit) : subject.points;
   const latest = subject.points.at(-1);
   const previous = subject.points.at(-2);

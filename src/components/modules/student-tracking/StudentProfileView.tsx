@@ -15,6 +15,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -40,6 +41,7 @@ import {
   formatTurkishDate,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { getSubjectColor, trialSubjectColors } from '../../../utils/subjectColors';
 
 interface StudentProfileViewProps {
   student: Student;
@@ -217,7 +219,7 @@ export function StudentProfileView({
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap shrink-0 no-print"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Yazılı Notu Ekle</span>
+              <span>Not Ekle</span>
             </button>
           )}
         </div>
@@ -242,12 +244,12 @@ export function StudentProfileView({
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Yazılı Ortalaması</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Not Ortalaması</p>
             <p className="mt-1 text-2xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
               {grades.length > 0 ? avgScore.toFixed(1) : '—'}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-              {grades.length} yazılı değerlendirmesi
+              {grades.length} değerlendirme
             </p>
           </div>
           <div>
@@ -288,7 +290,11 @@ export function StudentProfileView({
                   <XAxis dataKey="shortLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
                   <YAxis domain={[0, 20]} tick={{ fontSize: 11, fill: '#64748b' }} />
                   <Tooltip formatter={(val) => [`${val ?? 0} net`, 'Ortalama Net']} />
-                  <Bar dataKey="avgNet" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={42} />
+                  <Bar dataKey="avgNet" radius={[6, 6, 0, 0]} maxBarSize={42}>
+                    {trialSummary.subjectAverages.map(({ key }) => (
+                      <Cell key={key} fill={trialSubjectColors[key].color} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
@@ -476,12 +482,12 @@ export function StudentProfileView({
         <div className="xl:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
             <h3 className="text-base font-semibold text-navy-900 dark:text-white">
-              Yazılı Notları ({grades.length})
+              Notlar ({grades.length})
             </h3>
           </div>
           {grades.length === 0 ? (
             <p className="p-6 text-sm text-slate-500 dark:text-slate-400">
-              Henüz yazılı notu kaydedilmemiş.
+              Henüz not kaydedilmemiş.
             </p>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -491,8 +497,9 @@ export function StudentProfileView({
                   className="px-4 py-3 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-navy-900 dark:text-white truncate">
-                      {g.subjectName}
+                    <p className="flex items-center gap-2 text-sm font-medium text-navy-900 dark:text-white">
+                      <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: getSubjectColor(g.subjectName) }} />
+                      <span className="truncate">{g.subjectName}</span>
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                       {g.examTitle} · {formatTurkishDate(g.examDate)}

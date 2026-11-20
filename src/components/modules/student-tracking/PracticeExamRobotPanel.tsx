@@ -4,6 +4,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -28,6 +29,7 @@ import {
   LGS_SUBJECT_CONFIG,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { trialSubjectColors } from '../../../utils/subjectColors';
 
 interface PracticeExamRobotPanelProps {
   students: Student[];
@@ -606,7 +608,11 @@ export function PracticeExamRobotPanel({
                     <XAxis dataKey="shortLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
                     <YAxis domain={[0, 20]} tick={{ fontSize: 11, fill: '#64748b' }} />
                     <Tooltip formatter={(val) => [`${val ?? 0}`, 'Ortalama Net']} />
-                    <Bar dataKey="avgNet" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={38} />
+                    <Bar dataKey="avgNet" radius={[6, 6, 0, 0]} maxBarSize={38}>
+                      {robotSummary.subjectAverages.map(({ key }) => (
+                        <Cell key={key} fill={trialSubjectColors[key].color} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -616,7 +622,10 @@ export function PracticeExamRobotPanel({
                     key={sub.key}
                     className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800"
                   >
-                    <p className="font-medium text-navy-900 dark:text-white">{sub.shortLabel}</p>
+                    <p className="flex items-center gap-2 font-medium text-navy-900 dark:text-white">
+                      <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: trialSubjectColors[sub.key].color }} />
+                      {sub.shortLabel}
+                    </p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       Ort. {sub.avgCorrect}D ·{' '}
                       <strong className="text-teal-700 dark:text-teal-400">{sub.avgNet} Net</strong>

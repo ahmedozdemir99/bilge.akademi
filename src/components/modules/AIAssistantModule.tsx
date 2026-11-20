@@ -106,7 +106,7 @@ export function AIAssistantModule() {
         } else if (response.status === 429) {
           setError('Yapay zekâ kullanım kotası geçici olarak doldu. Kısa bir süre sonra tekrar deneyin.');
         } else if (response.status === 504) {
-          setError('Yapay zekâ isteği zaman aşımına uğradı. Lütfen sorunuzu kısaltıp tekrar deneyin.');
+          setError('Yapay zekâ isteği zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.');
         } else if (response.status === 503) {
           setError('Yapay zekâ servisi şu anda yapılandırılmamış veya bakımda.');
         } else {

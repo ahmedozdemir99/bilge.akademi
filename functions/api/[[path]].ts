@@ -17,6 +17,7 @@ const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩
 
 const PRIMARY_TIMEOUT_MS = 15000;
 const FALLBACK_TIMEOUT_MS = 12000;
+const ASSISTANT_FAST_TIMEOUT_MS = 20000;
 const DISCOVERY_TIMEOUT_MS = 6000;
 const DISCOVERY_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -121,7 +122,7 @@ function formatGeminiError(rawOrErr: unknown): { status: number; message: string
       status: 504,
       code: 'TIMEOUT',
       message:
-        'Yapay zekâ isteği zaman aşımına uğradı. Lütfen sorunuzu kısaltıp birkaç saniye sonra tekrar deneyin.',
+        'Yapay zekâ isteği zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.',
     };
   }
   if (isQuotaError(raw)) {
@@ -350,6 +351,7 @@ async function callGeminiModel(
       }>;
     };
 
+    controller.signal.throwIfAborted();
     if (!res.ok) {
       const errMsg = data.error?.message || data.error?.status || `HTTP ${res.status}`;
       throw new Error(`${res.status} ${errMsg}`);
@@ -379,6 +381,7 @@ async function generateResilient(
     systemInstruction?: string;
     responseMimeType?: string;
     responseSchema?: Record<string, unknown>;
+    preferFastModel?: boolean;
   } = {}
 ): Promise<GeminiRestResult> {
   const keyHash = getKeyFingerprint(apiKey);
@@ -396,6 +399,9 @@ async function generateResilient(
     initialQueue.push({ model, useLowThinking, timeoutMs });
   };
 
+  if (opts.preferFastModel) {
+    pushUnique(cached?.fallback ?? FALLBACK_MODEL, false, ASSISTANT_FAST_TIMEOUT_MS);
+  }
   if (cached?.primary) {
     pushUnique(cached.primary, true, PRIMARY_TIMEOUT_MS);
     pushUnique(cached.fallback, false, FALLBACK_TIMEOUT_MS);
@@ -759,6 +765,7 @@ Kullanıcının bulunduğu modül bağlamı: ${safeModule}.
 
 Görevlerin:
 - Türkçe doğal, akıcı ve akademik açıdan özenli bir dille yanıt ver.
+- Basit sorulara kısa ve doğrudan yanıt ver. Ayrıntılı açıklama ve materyal taleplerinde istenen kapsamı karşıla.
 - Ders anlat, örnekler sun, çalışma planı öner ve öğretmenlere ders materyali / rubrik / soru taslağı hazırlamada destek ol.
 - Öğrenci hakkında kesin psikolojik veya akademik teşhis koyma; yapıcı rehberlik sun.
 - Tarihî veya bilimsel konularda kesin kaynak yoksa belirsizliği açıkça ifade et.
@@ -768,7 +775,7 @@ Görevlerin:
         ? `Önceki konuşma özeti:\n${conversationLines}\n\nYeni kullanıcı mesajı:\n${message.slice(0, 2000)}`
         : message.slice(0, 2000);
 
-      const res = await generateResilient(apiKey, fullPrompt, { systemInstruction });
+      const res = await generateResilient(apiKey, fullPrompt, { systemInstruction, preferFastModel: true });
       const reply = res.text.trim();
       if (!reply) {
         return jsonResponse({ error: 'Yapay zekâ yanıt üretemedi. Sorunuzu başka bir şekilde yazıp tekrar deneyin.', code: 'EMPTY_REPLY' }, 502);

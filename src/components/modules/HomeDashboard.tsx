@@ -42,7 +42,7 @@ const CORE_MODULES: ModuleCardConfig[] = [
     title: 'Öğrenci Takip ve Deneme Net Robotu',
     subtitle: 'Ortaokul Sınıfları, Ders Ders D/Y/Net Robotu ve Yapay Zekâ Analizi',
     description:
-      '5–8. sınıf öğrenci kayıtlarını, yazılı notlarını ve 6 derslik LGS/Ortaokul deneme doğru-yanlış-net hesaplama robotunu yönetin; ortalama grafikler ve Excel/PDF raporları alın.',
+      '5–8. sınıf öğrenci kayıtlarını, öğrenci notlarını ve 6 derslik LGS/Ortaokul deneme doğru-yanlış-net hesaplama robotunu yönetin; ortalama grafikler ve Excel/PDF raporları alın.',
     stageLabel: 'Ortaokul & LGS · Deneme Robotu',
     icon: Users,
   },

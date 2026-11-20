@@ -540,8 +540,8 @@ export function GradeFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={editingGrade ? 'Sınav Notunu Düzenle' : 'Yeni Sınav Notu Kaydet'}
-      subtitle="Yazılı, deneme, sözlü veya proje değerlendirmesi girin."
+      title={editingGrade ? 'Notu Düzenle' : 'Yeni Not Kaydet'}
+      subtitle="Yazılı, deneme, sözlü, proje veya performans notu girin."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
@@ -590,7 +590,7 @@ export function GradeFormModal({
 
           <div>
             <label htmlFor="grd-type" className={labelClass}>
-              Sınav Türü *
+              Not Türü *
             </label>
             <select
               id="grd-type"
@@ -609,7 +609,7 @@ export function GradeFormModal({
 
         <div>
           <label htmlFor="grd-title" className={labelClass}>
-            Sınav / Değerlendirme Adı *
+            Değerlendirme Adı *
           </label>
           <input
             id="grd-title"

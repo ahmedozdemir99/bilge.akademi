@@ -1588,7 +1588,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       notify(
         'success',
         'Ortaokul örnek sınıfları hesabınıza yüklendi',
-        'Sınıflar, öğrenciler, yazılı notları ve LGS deneme kayıtları Firestore veritabanına eklendi.'
+        'Sınıflar, öğrenciler, notlar ve LGS deneme kayıtları Firestore veritabanına eklendi.'
       );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'seedDemoToFirestore');

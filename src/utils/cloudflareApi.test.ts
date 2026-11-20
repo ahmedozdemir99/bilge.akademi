@@ -96,11 +96,11 @@ async function runTests() {
     assert.ok(connectionDeniedBody.includes('AUTH_ERROR'));
     assert.ok(!connectionDeniedBody.includes(fakeSecretKey));
 
-    // 4. Primary Flash model succeeds directly
-    const calledUrlsPrimary: string[] = [];
+    // 4. The assistant answers a short question with Flash-Lite on the first attempt.
+    const calledUrlsFast: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
-      calledUrlsPrimary.push(url);
+      calledUrlsFast.push(url);
       return new Response(
         JSON.stringify({
           candidates: [{ content: { parts: [{ text: 'Merhaba öğrenci!' }] } }],
@@ -109,37 +109,34 @@ async function runTests() {
       );
     }) as typeof fetch;
 
-    const primaryRes = await onRequest(
+    const fastRes = await onRequest(
       createContext(
         'https://bilgeakademi.pages.dev/api/ai/assistant',
         {
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ message: 'Fotosentez nedir?' }),
+          body: JSON.stringify({ message: 'İnsan neden çok düşünür' }),
         },
         { GEMINI_API_KEY: 'AIzaSyTEST_PRIMARY_KEY_0002' }
       )
     );
-    assert.equal(primaryRes.status, 200);
-    const primaryBody = (await primaryRes.json()) as { reply?: string };
-    assert.equal(primaryBody.reply, 'Merhaba öğrenci!');
-    assert.equal(calledUrlsPrimary.length, 1);
-    assert.ok(calledUrlsPrimary[0].includes('/models/gemini-3.8-flash:generateContent'));
+    assert.equal(fastRes.status, 200);
+    const fastBody = (await fastRes.json()) as { reply?: string };
+    assert.equal(fastBody.reply, 'Merhaba öğrenci!');
+    assert.equal(calledUrlsFast.length, 1);
+    assert.ok(calledUrlsFast[0].includes('/models/gemini-3.5-flash-lite:generateContent'));
 
-    // 5. Fallback to Flash-Lite when Primary hits 429 quota
+    // 5. Flash answers the same request when Flash-Lite times out.
     const calledUrlsFallback: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       calledUrlsFallback.push(url);
-      if (url.includes('gemini-3.8-flash')) {
-        return new Response(
-          JSON.stringify({ error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' } }),
-          { status: 429, headers: { 'Content-Type': 'application/json' } }
-        );
+      if (url.includes('gemini-3.5-flash-lite')) {
+        throw new DOMException('The operation was aborted', 'AbortError');
       }
       return new Response(
         JSON.stringify({
-          candidates: [{ content: { parts: [{ text: 'Yedek Flash-Lite yanıtı' }] } }],
+          candidates: [{ content: { parts: [{ text: 'Yedek Flash yanıtı' }] } }],
         }),
         { status: 200, headers: { 'Content-Type': 'application/json' } }
       );
@@ -158,9 +155,10 @@ async function runTests() {
     );
     assert.equal(fallbackRes.status, 200);
     const fallbackBody = (await fallbackRes.json()) as { reply?: string };
-    assert.equal(fallbackBody.reply, 'Yedek Flash-Lite yanıtı');
+    assert.equal(fallbackBody.reply, 'Yedek Flash yanıtı');
     assert.equal(calledUrlsFallback.length, 2);
-    assert.ok(calledUrlsFallback[1].includes('/models/gemini-3.5-flash-lite:generateContent'));
+    assert.ok(calledUrlsFallback[0].includes('/models/gemini-3.5-flash-lite:generateContent'));
+    assert.ok(calledUrlsFallback[1].includes('/models/gemini-3.8-flash:generateContent'));
 
     // 6. Dynamic discovery when static IDs return 404 on external API key
     const calledUrlsDiscovery: string[] = [];

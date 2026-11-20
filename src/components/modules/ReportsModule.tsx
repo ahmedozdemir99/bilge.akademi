@@ -18,7 +18,8 @@ import {
   exportToCsv,
   triggerPrintReport,
 } from '../../utils/exportUtils';
-import { TrialHistoryPanel, trialSubjectColors } from './reports/TrialHistoryPanel';
+import { getSubjectColor, trialSubjectColors } from '../../utils/subjectColors';
+import { TrialHistoryPanel } from './reports/TrialHistoryPanel';
 
 const metricColors = [
   'border-sky-200 bg-sky-50 dark:border-sky-900 dark:bg-sky-950/45',
@@ -28,8 +29,6 @@ const metricColors = [
   'border-rose-200 bg-rose-50 dark:border-rose-900 dark:bg-rose-950/45',
   'border-indigo-200 bg-indigo-50 dark:border-indigo-900 dark:bg-indigo-950/45',
 ];
-
-const subjectPalette = Object.values(trialSubjectColors);
 
 export function ReportsModule() {
   const {
@@ -228,7 +227,7 @@ export function ReportsModule() {
           <div className="h-64 w-full">
             {subjectAverages.length === 0 ? (
               <p className="text-sm text-slate-500 py-12 text-center">
-                Henüz sınav notu kaydedilmemiş.
+                Henüz not kaydedilmemiş.
               </p>
             ) : (
               <ResponsiveContainer width="100%" height="100%">
@@ -238,8 +237,8 @@ export function ReportsModule() {
                   <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                   <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Ortalama']} />
                   <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={44}>
-                    {subjectAverages.map(({ subject }, index) => (
-                      <Cell key={subject} fill={subjectPalette[index % subjectPalette.length].color} />
+                    {subjectAverages.map(({ subject }) => (
+                      <Cell key={subject} fill={getSubjectColor(subject)} />
                     ))}
                   </Bar>
                 </BarChart>

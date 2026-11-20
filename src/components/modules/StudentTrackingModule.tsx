@@ -19,6 +19,7 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -48,6 +49,7 @@ import {
   StudentFormModal,
 } from './student-tracking/StudentForms';
 import { normalizeSearchText } from '../../utils/searchText';
+import { classChartColors, getSubjectColor } from '../../utils/subjectColors';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
 type TrackingTab = 'students' | 'grades' | 'trials' | 'analytics';
@@ -172,11 +174,13 @@ export function StudentTrackingModule() {
     [analyticsGrades]
   );
   const classComparisonData = useMemo(() => {
-    return classes.map((cls) => {
+    return classes.map((cls, index) => {
       const clsGrades = grades.filter((g) => g.classId === cls.id);
       const clsStudents = students.filter((s) => s.classId === cls.id);
       return {
+        id: cls.id,
         name: cls.name,
+        color: classChartColors[index % classChartColors.length],
         average: calculateAverageScore(clsGrades),
         studentCount: clsStudents.length,
         examCount: clsGrades.length,
@@ -206,7 +210,7 @@ export function StudentTrackingModule() {
       <div className="space-y-4">
         <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-3.5 text-xs text-slate-600 dark:text-slate-300">
           <strong>Öğrenci Görünümü:</strong> Diğer öğrencilerin kayıtları gizlidir. Yalnızca
-          kendi yazılı notlarınız, LGS deneme netleriniz ve yapay zekâ çalışma önerileriniz gösterilir.
+          kendi notlarınız, LGS deneme netleriniz ve yapay zekâ çalışma önerileriniz gösterilir.
         </div>
         <StudentProfileView
           student={personalStudent}
@@ -244,7 +248,7 @@ export function StudentTrackingModule() {
           onDeleteGrade={(g) =>
             setConfirmState({
               open: true,
-              title: 'Sınav Notunu Sil',
+              title: 'Notu Sil',
               message: `${g.subjectName} — ${g.examTitle} (${g.score}/${g.maxScore}) not kaydını silmek istediğinize emin misiniz?`,
               action: async () => {
                 await deleteGrade(g.id);
@@ -346,7 +350,7 @@ export function StudentTrackingModule() {
   const handleExportStudentsCsv = () => {
     exportToCsv(
       'bilge_akademi_ogrenciler',
-      ['Okul No', 'Ad Soyad', 'Sınıf', 'Seviye', 'Yazılı Ort.', 'Deneme Sayısı', 'Deneme Ort. Net', 'Durum'],
+      ['Okul No', 'Ad Soyad', 'Sınıf', 'Seviye', 'Not Ort.', 'Deneme Sayısı', 'Deneme Ort. Net', 'Durum'],
       filteredStudents.map((stu) => {
         const sGrades = grades.filter((g) => g.studentId === stu.id);
         const sTrials = calculateTrialRobotSummary(
@@ -369,7 +373,7 @@ export function StudentTrackingModule() {
   const handleExportGradesCsv = () => {
     exportToCsv(
       'bilge_akademi_sinav_notlari',
-      ['Tarih', 'Öğrenci', 'Okul No', 'Sınıf', 'Ders', 'Sınav', 'Tür', 'Puan', 'Tam Puan'],
+      ['Tarih', 'Öğrenci', 'Okul No', 'Sınıf', 'Ders', 'Değerlendirme', 'Tür', 'Puan', 'Tam Puan'],
       filteredGrades.map((g) => {
         const stu = studentMap.get(g.studentId);
         return [
@@ -401,7 +405,7 @@ export function StudentTrackingModule() {
             Öğrenci Takip ve Analiz Sistemi
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Ortaokul (5–8. Sınıf &amp; LGS) sınıflarını, yazılı notlarını, ders ders deneme doğru-yanlış-net
+            Ortaokul (5–8. Sınıf &amp; LGS) sınıflarını, öğrenci notlarını, ders ders deneme doğru-yanlış-net
             hesaplama robotunu ve yapay zekâ analizlerini yönetin.
           </p>
         </div>
@@ -440,7 +444,7 @@ export function StudentTrackingModule() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5 text-gold-600 dark:text-gold-400" />
-            <span>Yazılı Notu Gir</span>
+            <span>Not Gir</span>
           </button>
           <button
             type="button"
@@ -496,7 +500,7 @@ export function StudentTrackingModule() {
             [
               { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
               { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
-              { id: 'grades', label: `Yazılı Notları (${grades.length})` },
+              { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
             ] as { id: TrackingTab; label: string }[]
           ).map((tab) => (
@@ -691,7 +695,7 @@ export function StudentTrackingModule() {
                       <th className="py-3 px-4 font-medium">No</th>
                       <th className="py-3 px-4 font-medium">Öğrenci</th>
                       <th className="py-3 px-4 font-medium">Sınıf</th>
-                      <th className="py-3 px-4 font-medium text-right">Yazılı Ort.</th>
+                      <th className="py-3 px-4 font-medium text-right">Not Ort.</th>
                       <th className="py-3 px-4 font-medium text-right">Deneme Ort. Net</th>
                       <th className="py-3 px-4 font-medium">Durum</th>
                       <th className="py-3 px-4 font-medium text-right no-print">İşlemler</th>
@@ -827,12 +831,12 @@ export function StudentTrackingModule() {
               </select>
 
               <select
-                aria-label="Sınav türü filtresi"
+                aria-label="Not türü filtresi"
                 value={examTypeFilter}
                 onChange={(e) => setExamTypeFilter(e.target.value as 'all' | ExamType)}
                 className="px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200"
               >
-                <option value="all">Tüm Sınav Türleri</option>
+                <option value="all">Tüm Not Türleri</option>
                 <option value="Yazılı">Yazılı</option>
                 <option value="Deneme">Deneme</option>
                 <option value="Sözlü">Sözlü</option>
@@ -859,7 +863,7 @@ export function StudentTrackingModule() {
 
           {filteredGrades.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
-              Seçili kriterlere uygun sınav kaydı bulunmuyor.
+              Seçili ölçütlere uygun not bulunmuyor.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -869,7 +873,7 @@ export function StudentTrackingModule() {
                     <th className="py-3 px-4 font-medium">Tarih</th>
                     <th className="py-3 px-4 font-medium">Öğrenci</th>
                     <th className="py-3 px-4 font-medium">Sınıf</th>
-                    <th className="py-3 px-4 font-medium">Ders / Sınav</th>
+                    <th className="py-3 px-4 font-medium">Ders / Değerlendirme</th>
                     <th className="py-3 px-4 font-medium">Tür</th>
                     <th className="py-3 px-4 font-medium text-right">Puan</th>
                     <th className="py-3 px-4 font-medium text-right no-print">İşlem</th>
@@ -897,7 +901,10 @@ export function StudentTrackingModule() {
                           {cls?.name ?? '—'}
                         </td>
                         <td className={`${rowPad} px-4`}>
-                          <p className="font-medium text-slate-900 dark:text-slate-100">{g.subjectName}</p>
+                          <p className="flex items-center gap-2 font-medium text-slate-900 dark:text-slate-100">
+                            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: getSubjectColor(g.subjectName) }} />
+                            {g.subjectName}
+                          </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">{g.examTitle}</p>
                         </td>
                         <td className={`${rowPad} px-4 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap`}>
@@ -1027,7 +1034,7 @@ export function StudentTrackingModule() {
               </p>
               <div className="h-64 w-full">
                 {analyticsSubjectBreakdown.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-10 text-center">Yeterli sınav verisi yok.</p>
+                  <p className="text-sm text-slate-500 py-10 text-center">Grafik için kayıtlı not bulunmuyor.</p>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={analyticsSubjectBreakdown} margin={{ top: 8, right: 12, left: -16, bottom: 8 }}>
@@ -1035,7 +1042,11 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="subject" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Ortalama']} />
-                      <Bar dataKey="average" fill="#0B1F3A" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                        {analyticsSubjectBreakdown.map(({ subject }) => (
+                          <Cell key={subject} fill={getSubjectColor(subject)} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -1059,7 +1070,9 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Sınıf Ortalaması']} />
-                      <Bar dataKey="average" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                        {classComparisonData.map(({ id, color }) => <Cell key={id} fill={color} />)}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
