@@ -3,6 +3,8 @@ import {
   AlertCircle,
   ArrowLeft,
   Bot,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Edit3,
   Loader2,
@@ -53,6 +55,12 @@ interface StudentProfileViewProps {
   attendance: AttendanceRecord[];
   readOnly?: boolean;
   onBack?: () => void;
+  classNavigation?: {
+    position: number;
+    count: number;
+    onPrevious?: () => void;
+    onNext?: () => void;
+  };
   onEditStudent?: () => void;
   onAddGrade?: () => void;
   onEditGrade?: (grade: Grade) => void;
@@ -68,6 +76,7 @@ export function StudentProfileView({
   attendance,
   readOnly = false,
   onBack,
+  classNavigation,
   onEditStudent,
   onAddGrade,
   onEditGrade,
@@ -183,6 +192,22 @@ export function StudentProfileView({
           </button>
         </div>
       </div>
+
+      {classNavigation && !readOnly && (
+        <nav aria-label="Sınıftaki öğrenciler" className="flex flex-wrap items-center justify-between gap-2 no-print">
+          <button type="button" onClick={classNavigation.onPrevious} disabled={!classNavigation.onPrevious}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-45 dark:border-slate-700 dark:hover:bg-slate-800">
+            <ChevronLeft className="size-4" aria-hidden="true" /> Önceki
+          </button>
+          <span className="text-sm tabular-nums text-slate-600 dark:text-slate-300" aria-live="polite">
+            {classNavigation.position} / {classNavigation.count}
+          </span>
+          <button type="button" onClick={classNavigation.onNext} disabled={!classNavigation.onNext}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-45 dark:border-slate-700 dark:hover:bg-slate-800">
+            Sonraki <ChevronRight className="size-4" aria-hidden="true" />
+          </button>
+        </nav>
+      )}
 
       {/* Student Identity & KPI Summary */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
