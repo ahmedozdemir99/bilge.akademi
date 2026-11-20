@@ -1,4 +1,4 @@
-import { collection, doc, getDocs, query, serverTimestamp, setDoc, where } from 'firebase/firestore';
+import { collection, doc, getDocs, query, serverTimestamp, runTransaction, where } from 'firebase/firestore';
 import { db } from './firebase';
 import {
   DEMO_ATTENDANCE, DEMO_CLASSES, DEMO_GRADES, DEMO_MATH_ATTEMPTS,
@@ -63,17 +63,17 @@ export async function uploadLocalToCloud(uid: string): Promise<number> {
     const ownerField = ['classes', 'students', 'grades', 'attendance', 'practiceExams'].includes(name) ? 'teacherId' : 'ownerId';
     for (const record of pending[name]) {
       const { id, isDemo, createdAt, updatedAt, teacherId, ownerId, ...fields } = record;
-      // Create-only precondition is enforced by checking server state again before writing.
-      // Existing IDs are always skipped rather than overwritten.
       const ref = doc(db, name, id);
-      const { getDocFromServer } = await import('firebase/firestore');
-      if ((await getDocFromServer(ref)).exists()) continue;
-      await setDoc(ref, {
-        ...fields, [ownerField]: uid,
-        createdAt: serverTimestamp(),
-        ...(name === 'quizAttempts' || name === 'mathAttempts' ? {} : { updatedAt: serverTimestamp() }),
+      const created = await runTransaction(db, async transaction => {
+        if ((await transaction.get(ref)).exists()) return false;
+        transaction.set(ref, {
+          ...fields, [ownerField]: uid,
+          createdAt: serverTimestamp(),
+          ...(name === 'quizAttempts' || name === 'mathAttempts' ? {} : { updatedAt: serverTimestamp() }),
+        });
+        return true;
       });
-      count++;
+      if (created) count++;
     }
   }
   return count;
