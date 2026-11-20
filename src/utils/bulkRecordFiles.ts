@@ -12,7 +12,7 @@ export interface ImportSheet {
 const MAX_ROWS = 5000;
 const MAX_COLUMNS = 80;
 const SCHOOL_NUMBER_HEADER = /^(okul|ogrenci) (no|numara|numarasi)$|^(okulno|ogrencino)$/;
-const NAME_HEADER = /^(isim|ad(ı)? (ve )?soyad(ı)?|adi (ve )?soyadi|ogrenci( adi( soyadi)?)?)$/;
+const NAME_HEADER = /^(isim|ad(ı)? (ve )?soyad(ı)?|adi (ve )?soyadi|ogrenci( adi( soyadi)?| ad soyad)?)$/;
 const SCORE_HEADER = /^(puan(i)?|not(u)?|sinav puani|toplam puan|yazili( (sinav|notu|puanı|puani))?)$/;
 const EXTRA_HEADER = /^(sira( no)?|no|tc( kimlik( no)?)?|sinif|sube|net|bos|lgs|toplam.*)$/;
 const SUMMARY_ROW = /^(?:(?:genel|sinif|sube|okul|ilce|il|kurum|grup|turkiye) ortalama(?:si)?\b|ortalama(?:si)?\b|(?:sinif|sube)(?: adi)?(?= [1-9])|(?:toplam )?katilimci sayisi\b)/;
@@ -87,7 +87,8 @@ export async function readPdfImport(
   file: File,
   selection: string,
   imageScan: boolean,
-  onProgress: (message: string) => void
+  onProgress: (message: string) => void,
+  keepPages = false,
 ): Promise<ImportSheet[]> {
   const task = await loadPdf(file);
   let reader: Awaited<ReturnType<typeof import('./bulkOcr').createBulkOcr>> | undefined;
@@ -95,10 +96,12 @@ export async function readPdfImport(
     const pdf = await task.promise;
     const { first, last } = parsePdfPages(selection, pdf.numPages);
     const rows: string[][] = [];
+    const pageSheets: ImportSheet[] = [];
     for (let pageNumber = first; pageNumber <= last; pageNumber += 1) {
       onProgress(`${pageNumber}. sayfa okunuyor…`);
       const page = await pdf.getPage(pageNumber);
       try {
+        const start = rows.length;
         const content = imageScan ? null : await page.getTextContent();
         const textRows = content ? extractTableRows(content.items) : [];
         const isTable = textRows.some((row) => row.filter(Boolean).length >= 2 && row.some((cell) => /^\d+(?:[.,]\d+)?$/.test(cell)));
@@ -120,6 +123,7 @@ export async function readPdfImport(
           }
         }
         checkedRows(rows);
+        if (keepPages && rows.length > start) pageSheets.push({ name: 'Sayfa ' + pageNumber, rows: rows.slice(start) });
       } finally {
         page.cleanup();
       }
@@ -128,7 +132,7 @@ export async function readPdfImport(
       throw new Error('Seçilen PDF sayfalarında okunabilir tablo bulunamadı. Daha net bir sayfa görüntüsü veya Excel dosyası kullanın.');
     }
     const pageLabel = first === last ? String(first) : `${first}–${last}`;
-    return [{ name: `PDF · Sayfa ${pageLabel}`, rows }];
+    return keepPages ? pageSheets : [{ name: `PDF · Sayfa ${pageLabel}`, rows }];
   } finally {
     try {
       await reader?.close();
@@ -190,9 +194,9 @@ function studentName(value: string): string {
   return normalizeSearchText(value).replace(/\s+/g, ' ');
 }
 
-function studentLookup(students: Classmate[]) {
-  const numbers = new Map<string, Classmate[]>();
-  const names = new Map<string, Classmate[]>();
+function studentLookup<T extends Classmate>(students: T[]) {
+  const numbers = new Map<string, T[]>();
+  const names = new Map<string, T[]>();
   for (const student of students) {
     const number = student.studentNumber.trim();
     const name = studentName(student.fullName);
@@ -240,8 +244,8 @@ function subjectForHeading(label: string): number {
     ['turkce', 'turk', 'trk'],
     ['matematik', 'mat'],
     ['fen bilimleri', 'fen'],
-    ['inkilap tarihi sosyal', 'inkilap', 'ink', 'sosyal', 'tc inkilap tarihi ve ataturkculuk', 'inkilap tarihi'],
-    ['din kulturu', 'din k', 'din', 'dkab', 'din kulturu ve ahlak bilgisi'],
+    ['inkilap tarihi sosyal', 'inkilap', 'ink', 'sosyal', 'sosyal bilgiler', 'tc inkilap tarihi ve ataturkculuk', 'tc inkilap', 'inkilap tarihi'],
+    ['din kulturu', 'din k', 'din', 'dkab', 'din kulturu ve ahlak bilgisi', 'din kulturu ahlak bilgisi'],
     ['ingilizce', 'ing', 'yabanci dil'],
   ];
   return aliases.findIndex((subject) => subject.includes(label));
@@ -294,6 +298,22 @@ export function inferImportColumns(rows: string[][], fields: string[], range: Im
       const splitSlot = trialSlot(after[column] ?? '', sameRowSubject);
       if (slot > 0) candidates[slot].push(column);
       if (splitSlot > 0 && splitSlot !== slot) candidates[splitSlot].push(column);
+    }
+  }
+  if (fields.length > 2) {
+    // Group labels can be centered above several columns. Use the printed
+    // subject order and the actual D/Y positions when both sequences are complete.
+    const layouts = [[before, header.labels], [header.labels, after]];
+    for (const [subjects, marks] of layouts) {
+      const order = indices.map((column) => subjectForHeading(subjects[column] ?? '')).filter((subject) => subject >= 0);
+      const pairs = indices.filter((column) => /^[dy]$/.test(markForHeading(marks[column] ?? '')));
+      if (order.length !== LGS_SUBJECT_CONFIG.length || new Set(order).size !== order.length ||
+        pairs.length !== order.length * 2 || !pairs.every((column, index) => markForHeading(marks[column]) === (index % 2 ? 'y' : 'd'))) continue;
+      order.forEach((subject, index) => {
+        candidates[1 + subject * 2] = [pairs[index * 2]];
+        candidates[2 + subject * 2] = [pairs[index * 2 + 1]];
+      });
+      break;
     }
   }
   const only = (columns: number[]) => columns.length === 1 ? columns[0] : -1;
@@ -354,7 +374,7 @@ function isReportSummary(row: string[]): boolean {
   return Boolean(first && SUMMARY_ROW.test(normalizeColumn(first)));
 }
 
-export function extractMappedRows(rows: string[][], columns: number[], range: ImportRange, students?: Classmate[]): string {
+export function extractMappedRows(rows: string[][], columns: number[], range: ImportRange, students?: Classmate[], ignoreReportRows = true): string {
   checkImportRange(rows, range);
   const { firstRow, lastRow, firstColumn, lastColumn } = range;
   if (columns.some((column) => column < firstColumn - 1 || column >= lastColumn) || new Set(columns).size !== columns.length) {
@@ -364,7 +384,7 @@ export function extractMappedRows(rows: string[][], columns: number[], range: Im
   const roster = students ? studentLookup(students) : null;
   for (let rowIndex = firstRow - 1; rowIndex < lastRow; rowIndex += 1) {
     const row = rows[rowIndex];
-    if (isTableHeader(row) || isReportSummary(row)) continue;
+    if (ignoreReportRows && (isTableHeader(row) || isReportSummary(row))) continue;
     const [identifier, ...values] = columns.map((column) => (row[column] ?? '').replace(/[\t\n\r]+/g, ' ').trim());
     if (!identifier && !values.some(Boolean)) continue;
     if (roster && !values.some(Boolean)) continue;
@@ -384,4 +404,80 @@ export function extractMappedRows(rows: string[][], columns: number[], range: Im
   }
   if (!selected.length) throw new Error('Seçilen aralıkta kullanılabilir öğrenci kaydı bulunamadı.');
   return selected.join('\n');
+}
+
+export function readTrialPdfResults(sheets: ImportSheet[], students: Student[], fields: string[]) {
+  const groups = new Map<string, string[][]>();
+  const issues: string[] = [];
+  const seen = new Map<string, string>();
+  const roster = studentLookup(students);
+  const byNumber = new Map<string, Student[]>();
+  const byName = new Map<string, Student[]>();
+  for (const student of students) {
+    const number = student.studentNumber.trim();
+    const name = studentName(student.fullName);
+    byNumber.set(number, [...(byNumber.get(number) ?? []), student]);
+    byName.set(name, [...(byName.get(name) ?? []), student]);
+  }
+
+  let previous: { width: number; columns: number[]; numberColumn: number; nameColumn: number } | undefined;
+  for (const sheet of sheets) {
+    const { rows } = sheet;
+    if (!rows.some((row) => row.filter(Boolean).length >= 3)) continue;
+    const range = suggestImportRange(rows);
+    const header = detectedHeader(rows, 1, range.lastColumn, range.firstRow);
+    let columns = inferImportColumns(rows, fields, range, students);
+    let numberColumn = header.labels.findIndex((label) => SCHOOL_NUMBER_HEADER.test(label));
+    let nameColumn = header.labels.findIndex((label) => NAME_HEADER.test(label));
+    const complete = (mapping: number[]) => mapping.every((column) => column >= 0) && new Set(mapping).size === fields.length;
+    if (header.rowIndex < 0 && previous?.width === range.lastColumn) {
+      ({ columns, numberColumn, nameColumn } = previous);
+    } else if (complete(columns)) {
+      previous = { width: range.lastColumn, columns, numberColumn, nameColumn };
+    }
+    if (!complete(columns)) {
+      issues.push(sheet.name + ' · Altı dersin doğru ve yanlış sütunları belirlenemedi.');
+      previous = undefined;
+      continue;
+    }
+
+    for (const [index, row] of rows.entries()) {
+      if (index + 1 < range.firstRow || isTableHeader(row) || isReportSummary(row)) continue;
+      const values = columns.slice(1).map((column) => row[column]?.trim() ?? '');
+      if (values.every((value) => !value)) continue;
+      const line = sheet.name + ' · ' + (index + 1) + '. satır';
+      const identifier = row[columns[0]]?.trim() ?? '';
+      const rawName = nameColumn >= 0 ? (row[nameColumn] ?? '').trim() : '';
+      const names = rawName ? byName.get(studentName(rawName)) : undefined;
+      const numbers = numberColumn >= 0 ? byNumber.get(row[numberColumn]?.trim() ?? '') : undefined;
+      const matches = names?.length && numbers?.length
+        ? names.filter((item) => numbers.some((student) => student.id === item.id))
+        : names?.length ? names : numbers?.length ? numbers : roster.match(identifier);
+      const student = matches.length === 1 && !(rawName && PERSON_NAME_VALUE.test(rawName) && !names?.length) ? matches[0] : undefined;
+      if (!student) {
+        issues.push(line + ' · Öğrenci Bilge Akademi’de tek bir kayıtla eşleşmedi.');
+        continue;
+      }
+
+      const valid = LGS_SUBJECT_CONFIG.every(({ maxQuestions }, subject) => {
+        const [d, y] = values.slice(subject * 2, subject * 2 + 2);
+        return /^\d+$/.test(d) && /^\d+$/.test(y) && Number(d) + Number(y) <= maxQuestions;
+      });
+      if (!valid) {
+        issues.push(line + ' · Doğru ve yanlış sayılarında eksik veya geçersiz değer var.');
+        continue;
+      }
+      const scores = values.map((value) => String(Number(value)));
+      const signature = scores.join(',');
+      if (seen.has(student.id)) {
+        if (seen.get(student.id) !== signature) throw new Error(line + ' · Aynı öğrenci için iki farklı sonuç bulundu. PDF sayfalarını ayrı ayrı seçin.');
+        continue;
+      }
+      seen.set(student.id, signature);
+      const group = groups.get(student.classId) ?? [];
+      group.push([student.studentNumber, ...scores]);
+      groups.set(student.classId, group);
+    }
+  }
+  return { groups, issues };
 }

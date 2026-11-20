@@ -20,6 +20,6 @@ self.addEventListener('fetch', (event) => {
   const request = event.request;
   if (request.method !== 'GET' || request.mode !== 'navigate') return;
   const url = new URL(request.url);
-  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/')) return;
+  if (url.origin !== self.location.origin || url.pathname.startsWith('/api/') || url.pathname.startsWith('/deneme-aktarim')) return;
   event.respondWith(fetch(request).catch(() => caches.match('/')));
 });

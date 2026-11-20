@@ -16,8 +16,6 @@ import {
   BarChart,
   CartesianGrid,
   Cell,
-  Line,
-  LineChart,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -38,10 +36,10 @@ import {
   calculateSubjectAverages,
   calculateTrialRobotSummary,
   exportToCsv,
-  formatShortTurkishDate,
   formatTurkishDate,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { ExamNetTrend } from './ExamNetTrend';
 import { summarizePracticeForAnalysis } from '../../../utils/practiceAnalysis';
 import { getSubjectColor, trialSubjectColors } from '../../../utils/subjectColors';
 
@@ -82,18 +80,6 @@ export function StudentProfileView({
   const subjectAverages = useMemo(() => calculateSubjectAverages(grades), [grades]);
   const trialSummary = useMemo(
     () => calculateTrialRobotSummary(practiceExams),
-    [practiceExams]
-  );
-  const trialTrend = useMemo(
-    () =>
-      [...practiceExams]
-        .sort((a, b) => a.examDate.localeCompare(b.examDate))
-        .map((ex) => ({
-          label: formatShortTurkishDate(ex.examDate),
-          examTitle: ex.examTitle,
-          totalNet: ex.totalNet,
-          lgsScore: ex.estimatedLgsScore,
-        })),
     [practiceExams]
   );
   const anonymizedPreview = useMemo(
@@ -306,44 +292,7 @@ export function StudentProfileView({
           )}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
-          <h3 className="text-base font-semibold text-navy-900 dark:text-white">
-            Deneme Sınavı Toplam Net Gelişimi
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-5">
-            Deneme tarihlerine göre 90 soru üzerinden toplam net eğilimi
-          </p>
-          {trialTrend.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 py-10 text-center">
-              Net gelişim grafiği için deneme kaydı ekleyin.
-            </p>
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trialTrend} margin={{ top: 8, right: 12, left: -16, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.25} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis domain={[0, 90]} tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <Tooltip
-                    formatter={(val) => [`${val ?? 0} net`, 'Toplam Net']}
-                    labelFormatter={(label, payload) => {
-                      const item = payload?.[0]?.payload as { examTitle?: string } | undefined;
-                      return item ? `${label} · ${item.examTitle}` : String(label);
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="totalNet"
-                    stroke="#C89B3C"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: '#0B1F3A', strokeWidth: 2, stroke: '#C89B3C' }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+        <ExamNetTrend exams={practiceExams} />
       </section>
 
       {/* AI Pedagogical Analysis Panel */}

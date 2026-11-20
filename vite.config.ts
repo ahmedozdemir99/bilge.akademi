@@ -47,6 +47,10 @@ export default defineConfig(() => {
     ],
     build: {
       rolldownOptions: {
+        input: {
+          academy: path.resolve(__dirname, 'index.html'),
+          trialImport: path.resolve(__dirname, 'deneme-aktarim/index.html'),
+        },
         output: {
           assetFileNames: ({ names }) => names.includes('tur.traineddata.gz')
             ? 'assets/ocr/v1/tur.traineddata.gz'

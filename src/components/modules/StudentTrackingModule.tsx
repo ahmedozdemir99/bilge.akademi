@@ -53,11 +53,12 @@ import { normalizeSearchText } from '../../utils/searchText';
 import { classChartColors, getSubjectColor } from '../../utils/subjectColors';
 import { summarizePracticeForAnalysis } from '../../utils/practiceAnalysis';
 import { BulkRecordsPanel } from './student-tracking/BulkRecordsPanel';
+import { ExamNetTrend } from './student-tracking/ExamNetTrend';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
 type TrackingTab = 'students' | 'grades' | 'trials' | 'analytics' | 'bulk';
 
-export function StudentTrackingModule() {
+export function StudentTrackingModule({ initialAnalysis = false }: { initialAnalysis?: boolean }) {
   const {
     classes,
     students,
@@ -82,7 +83,7 @@ export function StudentTrackingModule() {
     seedDemoToFirestore,
   } = useAcademy();
 
-  const [activeTab, setActiveTab] = useState<TrackingTab>('students');
+  const [activeTab, setActiveTab] = useState<TrackingTab>(initialAnalysis ? 'analytics' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // Filters
@@ -965,7 +966,9 @@ export function StudentTrackingModule() {
 
       {/* TAB 3: PRACTICE EXAMS & NET ROBOT */}
       {activeTab === 'trials' && (
-        <PracticeExamRobotPanel
+        <div className="space-y-4">
+          <a href="/deneme-aktarim/" className="inline-flex rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">Deneme PDF’si Aktar</a>
+          <PracticeExamRobotPanel
           students={students}
           classes={classes}
           practiceExams={practiceExams}
@@ -981,25 +984,10 @@ export function StudentTrackingModule() {
             })
           }
         />
+        </div>
       )}
 
-      {activeTab === 'bulk' && (
-        <BulkRecordsPanel
-          initialMode="roster"
-          onClassAnalysis={(id) => {
-            setAnalyticsClassId(id);
-            setClassAI(null);
-            setClassAIError('');
-            setActiveTab('analytics');
-          }}
-          onStudents={(id) => {
-            setClassFilter(id);
-            setSearchQuery('');
-            setStatusFilter('all');
-            setActiveTab('students');
-          }}
-        />
-      )}
+      {activeTab === 'bulk' && <BulkRecordsPanel />}
 
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
       {activeTab === 'analytics' && (
@@ -1125,6 +1113,8 @@ export function StudentTrackingModule() {
               </dl>
             </section>
           )}
+
+          <ExamNetTrend exams={analyticsPracticeExams} group />
 
           {/* Class AI Result */}
           {classAIError && (

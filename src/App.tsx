@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { AcademyProvider, useAcademy } from './context/AcademyContext';
 import { AppShell } from './components/layout/AppShell';
 import { AIAssistantModule } from './components/modules/AIAssistantModule';
@@ -20,7 +20,11 @@ const SettingsModule = lazy(() => import('./components/modules/SettingsModule').
 const StudentTrackingModule = lazy(() => import('./components/modules/StudentTrackingModule').then(({ StudentTrackingModule }) => ({ default: StudentTrackingModule })));
 
 function BilgeAkademiRouter() {
-  const { activeModule, workshopActivityId } = useAcademy();
+  const { activeModule, workshopActivityId, workspaceView, setActiveModule } = useAcademy();
+  const initialAnalysis = new URLSearchParams(window.location.search).get('denemeAnalizi') === '1';
+  useEffect(() => {
+    if (initialAnalysis && workspaceView === 'teacher') setActiveModule('student-tracking');
+  }, [initialAnalysis, setActiveModule, workspaceView]);
 
   switch (activeModule) {
     case 'home':
@@ -28,7 +32,7 @@ function BilgeAkademiRouter() {
     case 'activity-workshop':
       return <ActivityWorkshop key={workshopActivityId ?? 'workshop'} initialActivityId={workshopActivityId} />;
     case 'student-tracking':
-      return <StudentTrackingModule />;
+      return <StudentTrackingModule initialAnalysis={initialAnalysis} />;
     case 'literature':
       return <LiteratureModule />;
     case 'history':
