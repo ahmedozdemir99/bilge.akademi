@@ -1,10 +1,10 @@
-import { useEffect, useRef, useState, type FormEvent } from 'react';
+import { useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import { Download, Upload } from 'lucide-react';
 import { useAcademy } from '../../../context/AcademyContext';
 import { DEFAULT_SUBJECT_NAMES, DEMO_TEACHER_ID } from '../../../data/demoData';
 import type { ExamType } from '../../../types/academy';
 import { buildBulkPlan, bulkHeaders, BULK_EXAM_TYPES, type BulkInput, type BulkMode, type BulkPlan } from '../../../utils/bulkStudentRecords';
-import { isScreenshot, readImportWorkbook, readPdfImport, readPdfPageCount, type ImportSheet } from '../../../utils/bulkRecordFiles';
+import { extractMappedRows, inferImportColumns, isScreenshot, suggestImportRange, readImportWorkbook, readPdfImport, readPdfPageCount, type ImportSheet } from '../../../utils/bulkRecordFiles';
 import { BulkFileMapper } from './BulkFileMapper';
 import { exportToCsv } from '../../../utils/exportUtils';
 
@@ -34,7 +34,7 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
     const year = today.getFullYear() - (today.getMonth() < 8 ? 1 : 0);
     return `${year}-${year + 1}`;
   });
-  const [title, setTitle] = useState('');
+  const [title, setTitle] = useState<string | null>(null);
   const [date, setDate] = useState(() => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Istanbul' }).format(new Date()));
   const [subjectName, setSubjectName] = useState(DEFAULT_SUBJECT_NAMES[0]);
   const [examType, setExamType] = useState<ExamType>('Yazılı');
@@ -43,8 +43,13 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
   const [text, setText] = useState('');
   const [workbook, setWorkbook] = useState<{ filename: string; sheets: ImportSheet[] } | null>(null);
   const [mappingOpen, setMappingOpen] = useState(false);
+  const [sheetIndex, setSheetIndex] = useState(0);
+  const [adjustedRows, setAdjustedRows] = useState('');
+  const [fileActive, setFileActive] = useState(false);
+  const [manualEntry, setManualEntry] = useState(false);
   const [pdfSource, setPdfSource] = useState<{ file: File; pageCount: number } | null>(null);
   const [pdfPages, setPdfPages] = useState('1');
+  const [pdfOptions, setPdfOptions] = useState(false);
   const [forceOcr, setForceOcr] = useState(false);
   const [fileProgress, setFileProgress] = useState('');
   const [preview, setPreview] = useState<{ input: BulkInput; plan: BulkPlan } | null>(null);
@@ -52,16 +57,52 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const locked = useRef(false);
-  const previewRef = useRef<HTMLElement>(null);
+  const classId = choice || (mode !== 'roster' ? classes[0]?.id ?? '' : '');
+  const classStudents = useMemo(() => students.filter((student) => student.classId === classId)
+    .sort((a, b) => a.studentNumber.localeCompare(b.studentNumber, 'tr', { numeric: true })), [classId, students]);
+  const headers = useMemo(() => bulkHeaders(mode), [mode]);
+  const sheet = workbook?.sheets[sheetIndex];
+  const filenameTitle = workbook?.filename.replace(/\.[^.]+$/, '').replace(/[_-]+/g, ' ').trim().slice(0, 120) ?? '';
+  const examTitle = title ?? filenameTitle;
+  const rosterReady = mode === 'roster' || classStudents.length > 0;
+  const detection = useMemo(() => {
+    if (!sheet || !rosterReady || adjustedRows) return null;
+    const roster = mode === 'roster' ? undefined : classStudents;
+    try {
+      const range = suggestImportRange(sheet.rows);
+      const columns = inferImportColumns(sheet.rows, headers, range, roster ?? []);
+      return { rows: extractMappedRows(sheet.rows, columns, range, roster) };
+    } catch (issue) {
+      return { error: issue instanceof Error ? issue.message : 'Tablo otomatik okunamadı.' };
+    }
+  }, [sheet, adjustedRows, classStudents, headers, mode, rosterReady]);
+  const fileRows = fileActive && !mappingOpen ? adjustedRows || detection?.rows || '' : '';
+  const newClassReady = Boolean(classId || (name.trim() && section.trim() && academicYear.trim()));
+  const assessmentReady = Boolean(examTitle.trim() && date && (mode !== 'grades' || (subjectName.trim() && maxScore)));
+  const makeInput = useMemo(() => (rows: string): BulkInput => {
+    const common = { classId, text: rows };
+    const assessment = { examTitle, examDate: date };
+    if (mode === 'roster') return {
+      ...common, mode, newClass: classId ? undefined : { name, gradeLevel: Number(gradeLevel), section, academicYear },
+    };
+    if (mode === 'grades') return {
+      ...common, mode, assessment: { ...assessment, examType, subjectName, maxScore: Number(maxScore) },
+    };
+    return { ...common, mode, assessment: { ...assessment, wrongPenalty } };
+  }, [academicYear, classId, date, examTitle, examType, gradeLevel, maxScore, mode, name, section, subjectName, wrongPenalty]);
 
   useEffect(() => {
-    if (preview) previewRef.current?.scrollIntoView({ block: 'nearest' });
-  }, [preview]);
+    if (!fileRows || dataLoading || !rosterReady || (mode === 'roster' ? !newClassReady : !assessmentReady)) return;
+    let current = true;
+    const input = makeInput(fileRows);
+    void buildBulkPlan(input, { classes, students, grades, practiceExams }, user?.uid ?? DEMO_TEACHER_ID)
+      .then((plan) => { if (current) setPreview({ input, plan }); })
+      .catch((issue: unknown) => {
+        if (current) setError(issue instanceof Error ? issue.message : 'Liste okunamadı.');
+      });
+    return () => { current = false; };
+  }, [assessmentReady, classes, dataLoading, fileRows, grades, makeInput, mode, newClassReady, practiceExams, rosterReady, students, user?.uid]);
 
-  const classId = choice || (mode !== 'roster' ? classes[0]?.id ?? '' : '');
-  const classStudents = students.filter((student) => student.classId === classId)
-    .sort((a, b) => a.studentNumber.localeCompare(b.studentNumber, 'tr', { numeric: true }));
-  const headers = bulkHeaders(mode);
   const sample = mode === 'roster' ? '101\tAyşe Yılmaz' : mode === 'grades'
     ? '101\t85,5' : '101\t15\t3\t14\t4\t17\t1\t9\t1\t8\t2\t8\t1';
 
@@ -72,35 +113,29 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
   }
 
   function changeMode(next: BulkMode) {
+    if (next === mode) return;
     setMode(next);
     setText('');
-    setTitle('');
+    setTitle(null);
+    setAdjustedRows('');
+    setMappingOpen(false);
+    setFileActive(Boolean(workbook));
     if (!choice && next !== 'roster') setChoice(classes[0]?.id ?? '');
     invalidate();
   }
 
   async function previewRows(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    await previewText(text);
-  }
-
-  async function previewText(rows: string, fromFile = false) {
     if (locked.current || dataLoading) return;
     invalidate();
-    const common = { classId, text: rows };
-    const assessment = { examTitle: title, examDate: date };
-    const input: BulkInput = mode === 'roster' ? {
-      ...common, mode, newClass: classId ? undefined : { name, gradeLevel: Number(gradeLevel), section, academicYear },
-    } : mode === 'grades' ? {
-      ...common, mode, assessment: { ...assessment, examType, subjectName, maxScore: Number(maxScore) },
-    } : { ...common, mode, assessment: { ...assessment, wrongPenalty } };
-
+    setFileActive(false);
+    setMappingOpen(false);
+    const input = makeInput(text);
     locked.current = true;
     setBusy(true);
     try {
       const plan = await buildBulkPlan(input, { classes, students, grades, practiceExams }, user?.uid ?? DEMO_TEACHER_ID);
       setPreview({ input, plan });
-      if (fromFile) setMappingOpen(false);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : 'Liste okunamadı.');
     } finally {
@@ -121,6 +156,7 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
       else {
         setPreview(null);
         setChoice(outcome.classId);
+        setFileActive(false);
       }
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : 'Kayıt işlemi tamamlanamadı.');
@@ -140,18 +176,18 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
     setBusy(true);
     setFileProgress(isScreenshot(file) ? 'Görüntü okuma hazırlanıyor…' : 'Dosya açılıyor…');
     try {
-      if (/\.(csv|tsv|txt)$/i.test(file.name)) {
-        if (file.size > 400000) throw new Error('CSV çok büyük. Bir sınıf ve bir değerlendirme içeren daha küçük bir dosya seçin.');
-        setWorkbook({ filename: file.name, sheets: await readImportWorkbook(file) });
-        setMappingOpen(true);
-      } else if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+      if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
         const pageCount = await readPdfPageCount(file);
         setPdfSource({ file, pageCount });
         setPdfPages('1');
+        setPdfOptions(pageCount > 1);
         setForceOcr(false);
+        if (pageCount === 1) await loadPdfPages(file, '1', false);
       } else {
-        setWorkbook({ filename: file.name, sheets: await readImportWorkbook(file, setFileProgress) });
-        setMappingOpen(true);
+        if (/\.(csv|tsv|txt)$/i.test(file.name) && file.size > 400000) {
+          throw new Error('CSV çok büyük. Bir sınıf ve bir değerlendirme içeren daha küçük bir dosya seçin.');
+        }
+        setLoadedFile(file.name, await readImportWorkbook(file, setFileProgress));
       }
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : 'Dosya okunamadı.');
@@ -160,6 +196,18 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
       setBusy(false);
       setFileProgress('');
     }
+  }
+
+  function setLoadedFile(filename: string, sheets: ImportSheet[]) {
+    setWorkbook({ filename, sheets });
+    setSheetIndex(0);
+    setAdjustedRows('');
+    setFileActive(true);
+  }
+
+  async function loadPdfPages(file: File, pages: string, imageScan: boolean) {
+    setLoadedFile(file.name, await readPdfImport(file, pages, imageScan, setFileProgress));
+    setPdfOptions(false);
   }
 
   async function readSelectedPdf() {
@@ -171,9 +219,7 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
     setBusy(true);
     setFileProgress('PDF açılıyor…');
     try {
-      const sheets = await readPdfImport(pdfSource.file, pdfPages, forceOcr, setFileProgress);
-      setWorkbook({ filename: pdfSource.file.name + ' · ' + sheets[0].name, sheets });
-      setMappingOpen(true);
+      await loadPdfPages(pdfSource.file, pdfPages, forceOcr);
     } catch (issue) {
       setError(issue instanceof Error ? issue.message : 'PDF sayfaları okunamadı.');
     } finally {
@@ -187,7 +233,6 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
     <section className="space-y-5 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <div className="space-y-1">
         <h2 className="text-lg font-semibold text-navy-900 dark:text-white">Sınıf Bazında Toplu Giriş</h2>
-        <p className="text-sm text-slate-600 dark:text-slate-300">Sınıf listenizi, bir değerlendirmenin notlarını veya bir denemenin sonuçlarını birlikte kaydedin.</p>
       </div>
 
       <div role="group" aria-label="Toplu giriş türü" className="flex flex-wrap gap-2">
@@ -201,7 +246,11 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
         <fieldset disabled={busy} className="min-w-0 space-y-4">
           <label className="block space-y-1 text-sm font-medium">
             <span>Sınıf</span>
-            <select className={controls} value={classId} onChange={(event) => setChoice(event.target.value)} required={mode !== 'roster'}>
+            <select className={controls} value={classId} onChange={(event) => {
+              setChoice(event.target.value);
+              setAdjustedRows('');
+              setMappingOpen(false);
+            }} required={mode !== 'roster'}>
               <option value="">{mode === 'roster' ? 'Yeni sınıf oluştur' : 'Sınıf seçin'}</option>
               {classes.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.academicYear}</option>)}
             </select>
@@ -222,10 +271,84 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
               </label>
             </div>
           )}
-          {mode !== 'roster' && (
+          {mode !== 'roster' && classStudents.length === 0 && (
+            <div className="space-y-1 text-sm text-amber-800 dark:text-amber-200">
+              <p>Bu sınıfta henüz öğrenci yok.</p>
+              <button type="button" className="font-medium underline" onClick={() => changeMode('roster')}>{workbook ? 'Aynı dosyadan öğrenci listesini oluştur' : 'Öğrenci listesini ekle'}</button>
+            </div>
+          )}
+          <div className="space-y-2">
+            <div className="flex flex-wrap gap-2">
+              <label className={primary + ' inline-flex cursor-pointer items-center gap-2 focus-within:outline-2'}>
+                <Upload className="size-4" /> Dosya Seç
+                <input className="sr-only" type="file" accept=".xlsx,.pdf,.csv,.tsv,.txt,.png,.jpg,.jpeg,.webp"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0];
+                    if (file) void openFile(file);
+                    event.target.value = '';
+                  }} />
+              </label>
+              {workbook && !fileActive && (
+                <button type="button" className={secondary} onClick={() => { invalidate(); setFileActive(true); }}>Aynı Dosyayı Kullan</button>
+              )}
+            </div>
+            {!workbook && !pdfSource && <p className="text-sm text-slate-600 dark:text-slate-300">Excel, PDF, CSV veya ekran görüntüsü</p>}
+          </div>
+          {pdfSource && (
+            <details open={pdfOptions} onToggle={(event) => setPdfOptions(event.currentTarget.open)} className="space-y-2">
+              <summary className="cursor-pointer text-sm font-medium underline">{pdfSource.pageCount > 1 ? 'PDF sayfalarını seç' : 'PDF okuma seçenekleri'}</summary>
+              <p className="break-all text-sm">{pdfSource.file.name} · {pdfSource.pageCount} sayfa</p>
+              <label className="block space-y-1 text-sm font-medium">
+                <span>PDF sayfası veya aralığı</span>
+                <input className={controls + ' max-w-48'} type="text" value={pdfPages} placeholder="Örn. 3 veya 3-5"
+                  onChange={(event) => { event.stopPropagation(); setPdfPages(event.target.value); }} />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={forceOcr} onChange={(event) => { event.stopPropagation(); setForceOcr(event.target.checked); }} />
+                Görüntü olarak tara (OCR)
+              </label>
+              <button type="button" className={secondary} onClick={() => void readSelectedPdf()}>Seçimi Oku</button>
+            </details>
+          )}
+          {fileProgress && <p role="status" className="text-sm text-teal-700 dark:text-teal-300">{fileProgress}</p>}
+          {workbook && fileActive && (
+            <div className="space-y-2">
+              {workbook.sheets.length > 1 && <label className="block space-y-1 text-sm font-medium">
+                <span>Excel çalışma sayfası</span>
+                <select className={controls} value={sheetIndex} onChange={(event) => {
+                  setSheetIndex(Number(event.target.value));
+                  setAdjustedRows('');
+                  setMappingOpen(false);
+                }}>
+                  {workbook.sheets.map(({ name }, index) => <option key={index} value={index}>{name}</option>)}
+                </select>
+              </label>}
+              {!mappingOpen && (
+                <div className="space-y-2 rounded-lg bg-slate-50 p-3 text-sm dark:bg-slate-950">
+                  <p className="break-all">{workbook.filename}{pdfSource && sheet && ' · ' + sheet.name}</p>
+                  {rosterReady && !dataLoading && <div className="space-y-1">
+                    {!adjustedRows && detection?.error && <p role="status" className="text-amber-800 dark:text-amber-200">{detection.error}</p>}
+                    {fileRows && mode === 'roster' && !newClassReady && <p>Önizlemeyi görmek için sınıf adını ve şubeyi girin.</p>}
+                    <button type="button" className="font-medium underline" onClick={() => {
+                      invalidate();
+                      setMappingOpen(true);
+                    }}>{fileRows ? 'Tablo Alanını Değiştir' : 'Tablo Alanını Seç'}</button>
+                  </div>}
+                </div>
+              )}
+              {sheet && mappingOpen && <BulkFileMapper key={mode + workbook.filename + sheetIndex} sheet={sheet}
+                fields={headers} students={mode === 'roster' ? undefined : classStudents}
+                onClose={() => setMappingOpen(false)} onApply={(rows) => {
+                  invalidate();
+                  setAdjustedRows(rows);
+                  setMappingOpen(false);
+                }} />}
+            </div>
+          )}
+          {mode !== 'roster' && (fileRows || manualEntry) && (
             <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
               <label className="space-y-1 text-sm font-medium"><span>{mode === 'grades' ? 'Değerlendirme adı' : 'Deneme adı'}</span>
-                <input className={controls} value={title} onChange={(event) => setTitle(event.target.value)} required maxLength={120} />
+                <input className={controls} value={examTitle} onChange={(event) => setTitle(event.target.value)} required maxLength={120} />
               </label>
               <label className="space-y-1 text-sm font-medium"><span>Tarih</span>
                 <input className={controls} type="date" value={date} onChange={(event) => setDate(event.target.value)} required />
@@ -254,56 +377,8 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
             </div>
           )}
 
-          {mode !== 'roster' && classStudents.length === 0 && (
-            <div className="space-y-1 text-sm text-amber-800 dark:text-amber-200">
-              <p>Bu sınıfta henüz öğrenci yok.</p>
-              <button type="button" className="font-medium underline" onClick={() => {
-                changeMode('roster');
-                if (workbook) setMappingOpen(true);
-              }}>{workbook ? 'Aynı dosyadan öğrenci listesini oluştur' : 'Öğrenci listesini ekle'}</button>
-            </div>
-          )}
-          <div className="space-y-2">
-            <div className="flex flex-wrap gap-2">
-              <label className={secondary + ' cursor-pointer focus-within:outline-2'}>
-                <Upload className="size-4" /> Dosya veya Ekran Görüntüsü Aç
-                <input className="sr-only" type="file" accept=".xlsx,.pdf,.csv,.tsv,.txt,.png,.jpg,.jpeg,.webp"
-                  onChange={(event) => {
-                    const file = event.target.files?.[0];
-                    if (file) void openFile(file);
-                    event.target.value = '';
-                  }} />
-              </label>
-              {workbook && !mappingOpen && (
-                <button type="button" className={secondary} onClick={() => setMappingOpen(true)}>Aynı Dosyayı Kullan</button>
-              )}
-            </div>
-          </div>
-          {pdfSource && (
-            <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
-              <p className="break-all text-sm">{pdfSource.file.name} · {pdfSource.pageCount} sayfa</p>
-              <label className="block space-y-1 text-sm font-medium">
-                <span>PDF sayfası veya aralığı</span>
-                <input className={controls + ' max-w-48'} type="text" value={pdfPages} placeholder="Örn. 3 veya 3-5"
-                  onChange={(event) => setPdfPages(event.target.value)} />
-              </label>
-              <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={forceOcr} onChange={(event) => setForceOcr(event.target.checked)} />
-                Görüntü olarak tara (OCR)
-              </label>
-              <button type="button" className={secondary} onClick={() => void readSelectedPdf()}>Seçilen Sayfaları Oku</button>
-            </div>
-          )}
-          {fileProgress && <p role="status" className="text-sm text-teal-700 dark:text-teal-300">{fileProgress}</p>}
-          {workbook && mappingOpen && <BulkFileMapper key={mode + workbook.filename} filename={workbook.filename} sheets={workbook.sheets}
-            fields={headers} students={mode === 'roster' ? undefined : classStudents}
-            hasRoster={!dataLoading && (mode === 'roster' || classStudents.length > 0)}
-            onClose={() => setMappingOpen(false)} onApply={(rows) => {
-              setText(rows);
-              void previewText(rows, true);
-            }} />}
-          <details className="space-y-2">
-            <summary className="cursor-pointer text-sm font-medium underline">Elle gir veya şablon indir</summary>
+          <details className="space-y-2" onToggle={(event) => setManualEntry(event.currentTarget.open)}>
+            <summary className="cursor-pointer text-sm font-medium underline">Yapıştır veya şablon indir</summary>
             <label className="block text-sm font-medium" htmlFor="bulk-rows">Kayıt listesi</label>
             <p id="bulk-columns" className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
               Excel’den sütunları kopyalayın ya da Excel (.xlsx), PDF, CSV veya ekran görüntüsü açın.
@@ -311,7 +386,7 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
               {mode !== 'roster' && 'Katılmayan öğrencinin puan veya sonuç hücrelerini boş bırakın. Sıfır sonuç için 0 yazın.'}
             </p>
             <textarea id="bulk-rows" className={controls + ' min-h-32 font-mono'} aria-describedby="bulk-columns"
-              rows={6} value={text} onChange={(event) => setText(event.target.value)} placeholder={sample}
+              rows={6} value={text} onChange={(event) => { setFileActive(false); setText(event.target.value); }} placeholder={sample}
               maxLength={100000} spellCheck={false} />
               <button type="button" className={secondary} onClick={() => exportToCsv('bilge_akademi_toplu_' + mode, headers,
                 mode === 'roster' ? [['', '']] : classStudents.map((item) => [item.studentNumber, ...Array(headers.length - 1).fill('')]))}>
@@ -324,8 +399,9 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
 
       {error && <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950/40 dark:text-red-200">{error}</p>}
       {preview && (
-        <section ref={previewRef} className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800 sm:p-4">
-          <h3 className="font-semibold">{preview.plan.className} · {preview.plan.rows.filter((row) => !row.skip).length} yeni kayıt</h3>
+        <section aria-label="Aktarım önizlemesi" className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800 sm:p-4">
+          <h3 className="font-semibold">Kayıt önizlemesi</h3>
+          <p className="text-sm">{preview.plan.className} · {preview.plan.rows.filter((row) => !row.skip).length} yeni kayıt</p>
           {preview.plan.newClass && <p className="text-sm text-slate-600 dark:text-slate-300">Yeni sınıf oluşturulacak.</p>}
           <ul aria-label="Kayıt önizlemesi" className="max-h-56 divide-y divide-slate-200 overflow-y-auto text-sm dark:divide-slate-800">
             {preview.plan.rows.map((row) => (

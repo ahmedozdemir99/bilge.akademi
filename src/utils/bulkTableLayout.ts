@@ -31,7 +31,16 @@ export function extractTableRows(items: (PdfTextItem | { type: string })[], from
         cells.push({ x: piece.x, end, value: piece.value });
       }
     }
-    return cells;
+    // Some reports print the school number and name together in one text object.
+    return cells.flatMap((cell) => {
+      const pair = /^(\d{1,12})\s+(\p{L}[\p{L}'’.-]*(?:\s+\p{L}[\p{L}'’.-]*)+)$/u.exec(cell.value);
+      if (!pair) return [cell];
+      const characterWidth = (cell.end - cell.x) / cell.value.length;
+      return [
+        { ...cell, end: cell.x + pair[1].length * characterWidth, value: pair[1] },
+        { ...cell, x: cell.end - pair[2].length * characterWidth, value: pair[2] },
+      ];
+    });
   });
   const frequencies = new Map<number, number>();
   for (const row of pageRows) {

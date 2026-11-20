@@ -15,6 +15,11 @@ const SCHOOL_NUMBER_HEADER = /^(okul|ogrenci) (no|numara|numarasi)$|^(okulno|ogr
 const NAME_HEADER = /^(isim|ad(ı)? (ve )?soyad(ı)?|adi (ve )?soyadi|ogrenci( adi( soyadi)?)?)$/;
 const SCORE_HEADER = /^(puan(i)?|not(u)?|sinav puani|toplam puan|yazili( (sinav|notu|puanı|puani))?)$/;
 const EXTRA_HEADER = /^(sira( no)?|no|tc( kimlik( no)?)?|sinif|sube|net|bos|lgs|toplam.*)$/;
+const SUMMARY_ROW = /^(?:(?:genel|sinif|sube|okul|ilce|il|kurum|grup|turkiye) ortalama(?:si)?\b|ortalama(?:si)?\b|(?:sinif|sube)(?: adi)?(?= [1-9])|(?:toplam )?katilimci sayisi\b)/;
+const SCHOOL_NUMBER_VALUE = /^\d{1,24}$/;
+const PERSON_NAME_VALUE = /^\p{L}[\p{L}'’.-]*(?: +\p{L}[\p{L}'’.-]*)+$/u;
+const ROSTER_NAME_VALUE = /^\p{L}[\p{L}'’.-]*(?: +\p{L}[\p{L}'’.-]*)*$/u;
+const ROSTER_NUMBER_VALUE = /^[\p{L}\d-]*\d[\p{L}\d-]*$/u;
 const SCORE_VALUE = /^\d+(?:[.,]\d+)?$/;
 type Classmate = Pick<Student, 'studentNumber' | 'fullName'>;
 
@@ -258,7 +263,7 @@ export function inferImportColumns(rows: string[][], fields: string[], range: Im
   const header = detectedHeader(rows, firstColumn, lastColumn, firstRow);
   const before = rows[header.rowIndex - 1]?.map(normalizeColumn) ?? [];
   const after = rows[header.rowIndex + 1]?.map(normalizeColumn) ?? [];
-  const data = rows.slice(firstRow - 1, lastRow).filter((row) => !isTableHeader(row));
+  const data = rows.slice(firstRow - 1, lastRow).filter((row) => !isTableHeader(row) && !isReportSummary(row));
   const names: number[] = [];
   let aboveSubject = -1;
   let sameRowSubject = -1;
@@ -289,13 +294,21 @@ export function inferImportColumns(rows: string[][], fields: string[], range: Im
 
   if (fields[1] === 'Ad Soyad') {
     columns[1] = only(names);
-    if (indices.length === 2) {
-      const numbers = indices.filter((column) => numeric(column));
-      if (columns[0] < 0) columns[0] = only(numbers);
-      if (columns[1] < 0 && columns[0] >= 0) {
-        const nameColumn = indices.find((column) => column !== columns[0]);
-        if (nameColumn !== undefined && values(nameColumn).some((cell) => /\p{L}/u.test(cell))) columns[1] = nameColumn;
-      }
+    if (columns[1] < 0 && names.length === 0) {
+      const people = indices.filter((column) => {
+        const cells = values(column);
+        return cells.length > 0 && cells.every((cell) => PERSON_NAME_VALUE.test(cell));
+      });
+      columns[1] = only(people);
+    }
+    if (columns[0] < 0 && candidates[0].length === 0 && columns[1] >= 0) {
+      const nameColumn = columns[1];
+      const namedRows = data.filter((row) => PERSON_NAME_VALUE.test(row[nameColumn] ?? ''));
+      const identifiers = indices.filter((column) => column !== nameColumn && namedRows.length > 0 &&
+        !EXTRA_HEADER.test(header.labels[column] ?? '') &&
+        namedRows.every((row) => SCHOOL_NUMBER_VALUE.test(row[column] ?? '')));
+      const beforeName = identifiers.filter((column) => column < nameColumn);
+      columns[0] = only(beforeName.length ? beforeName : identifiers);
     }
   } else {
     if (columns[0] < 0 && candidates[0].length === 0) columns[0] = only(names);
@@ -324,17 +337,22 @@ function isTableHeader(row: string[]): boolean {
     cells.filter((value) => /^(d|y|dogru|yanlis|net|bos)$/.test(value)).length >= 2;
 }
 
+function isReportSummary(row: string[]): boolean {
+  const first = row.find(Boolean);
+  return Boolean(first && SUMMARY_ROW.test(normalizeColumn(first)));
+}
+
 export function extractMappedRows(rows: string[][], columns: number[], range: ImportRange, students?: Classmate[]): string {
   checkImportRange(rows, range);
   const { firstRow, lastRow, firstColumn, lastColumn } = range;
   if (columns.some((column) => column < firstColumn - 1 || column >= lastColumn) || new Set(columns).size !== columns.length) {
-    throw new Error('Sütunlar kesin eşleşmedi. Aralığı daraltın veya sütun seçimini düzeltin.');
+    throw new Error('Tablo alanı belirlenemedi. Öğrenci bilgilerinin bulunduğu alanı seçin.');
   }
   const selected: string[] = [];
   const roster = students ? studentLookup(students) : null;
   for (let rowIndex = firstRow - 1; rowIndex < lastRow; rowIndex += 1) {
     const row = rows[rowIndex];
-    if (isTableHeader(row)) continue;
+    if (isTableHeader(row) || isReportSummary(row)) continue;
     const [identifier, ...values] = columns.map((column) => (row[column] ?? '').replace(/[\t\n\r]+/g, ' ').trim());
     if (!identifier && !values.some(Boolean)) continue;
     if (roster && !values.some(Boolean)) continue;
@@ -346,6 +364,9 @@ export function extractMappedRows(rows: string[][], columns: number[], range: Im
       }
       selected.push([matches[0].studentNumber, ...values].join('\t'));
     } else {
+      if (!ROSTER_NUMBER_VALUE.test(identifier) || !ROSTER_NAME_VALUE.test(values[0] ?? '')) {
+        throw new Error(`${rowIndex + 1}. satırda okul numarası ve ad soyad doğrulanamadı. Tabloda öğrenci satırlarını seçin.`);
+      }
       selected.push([identifier, ...values].join('\t'));
     }
   }
