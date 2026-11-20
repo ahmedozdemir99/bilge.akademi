@@ -16,12 +16,14 @@ const primary = 'inline-flex min-h-11 items-center gap-2 rounded-lg bg-teal-700 
 const numberFormat = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 2 });
 const trialFields = bulkHeaders('trials');
 const statisticsLink = '/?denemeAnalizi=1';
+const requestedPage = new URLSearchParams(window.location.search).get('sayfa') ?? '';
 type TrialInput = Extract<BulkInput, { mode: 'trials' }>;
 
 function TrialImporter() {
   const { user, authLoading, dataLoading, workspaceView, classes, students, practiceExams, grades, signInWithGoogle, saveBulkRecords } = useAcademy();
   const [pdf, setPdf] = useState<{ file: File; count: number; schoolPages: string }>();
   const [selection, setSelection] = useState('');
+  const [readSelection, setReadSelection] = useState('');
   const [sheets, setSheets] = useState<ImportSheet[]>([]);
   const [title, setTitle] = useState('');
   const [date, setDate] = useState('');
@@ -76,6 +78,7 @@ function TrialImporter() {
     setSheets([]);
     setSavedCount(undefined);
     setSheets(await readPdfImport(file, pages, false, setProgress, true));
+    setReadSelection(pages);
   }
 
   function open(file: File) {
@@ -85,12 +88,13 @@ function TrialImporter() {
       setSavedCount(undefined);
       setProgress('PDF açılıyor…');
       const { count, schoolPages } = await inspectTrialPdf(file);
-      const pages = schoolPages || (count === 1 ? '1' : '1-' + Math.min(count, 60));
+      const preset = /^\d+$/.test(requestedPage) && Number(requestedPage) >= 1 && Number(requestedPage) <= count;
+      const pages = preset ? String(Number(requestedPage)) : schoolPages || (count === 1 ? '1' : '1-' + Math.min(count, 60));
       setPdf({ file, count, schoolPages });
       setSelection(pages);
       setTitle(file.name.replace(/\.pdf$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 120));
       setDate(/\b\d{4}-\d{2}-\d{2}\b/.exec(file.name)?.[0] ?? '');
-      if (schoolPages || count <= 60) await readPages(file, pages);
+      if (preset || schoolPages || count <= 60) await readPages(file, pages);
     });
   }
 
@@ -131,6 +135,7 @@ function TrialImporter() {
       <section className="space-y-4 rounded-2xl bg-navy-900 p-5 text-white sm:p-8">
         <h1 className="text-2xl font-bold sm:text-3xl">Deneme PDF Aktarımı</h1>
         <p className="max-w-xl text-white/85">LGS sonuç PDF’sini açın, eşleşen öğrencileri kontrol edin ve sonuçları Bilge Akademi’ye kaydedin.</p>
+        {/^\d+$/.test(requestedPage) && <p className="text-sm text-white/85">Önceden seçilen sayfa {requestedPage}</p>}
         {authLoading || dataLoading ? <p role="status" className="text-sm">Hesap yükleniyor…</p> : !user ? (
           <div className="flex flex-wrap items-center gap-3">
             <button className={primary} type="button" onClick={() => void signInWithGoogle()}>Google ile Giriş Yap</button>
@@ -148,7 +153,7 @@ function TrialImporter() {
             <input className="sr-only" type="file" accept=".pdf,application/pdf"
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) open(file); }} />
           </label>
-          {pdf && <p className="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300">{pdf.file.name} · {pdf.count} sayfa{pdf.schoolPages && ' · Okul sonuçları ' + pdf.schoolPages + '. sayfa'}</p>}
+          {pdf && <p className="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300">{pdf.file.name} · {pdf.count} sayfa{sheets.length > 0 && ' · Okunan sayfa: ' + readSelection}</p>}
         </div>
         {pdf && pdf.count > 1 && <details className="space-y-2" open={pdf.count > 60 && !pdf.schoolPages && sheets.length === 0 ? true : undefined}>
           <summary className="cursor-pointer text-sm font-medium underline">PDF sayfalarını seç</summary>
