@@ -24,6 +24,7 @@ import {
   YAxis,
 } from 'recharts';
 import type {
+  AttendanceRecord,
   Grade,
   PracticeExamRecord,
   SchoolClass,
@@ -41,6 +42,7 @@ import {
   formatTurkishDate,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { summarizePracticeForAnalysis } from '../../../utils/practiceAnalysis';
 import { getSubjectColor, trialSubjectColors } from '../../../utils/subjectColors';
 
 interface StudentProfileViewProps {
@@ -48,6 +50,7 @@ interface StudentProfileViewProps {
   schoolClass?: SchoolClass;
   grades: Grade[];
   practiceExams: PracticeExamRecord[];
+  attendance: AttendanceRecord[];
   readOnly?: boolean;
   onBack?: () => void;
   onEditStudent?: () => void;
@@ -62,6 +65,7 @@ export function StudentProfileView({
   schoolClass,
   grades,
   practiceExams,
+  attendance,
   readOnly = false,
   onBack,
   onEditStudent,
@@ -93,13 +97,14 @@ export function StudentProfileView({
     [practiceExams]
   );
   const anonymizedPreview = useMemo(
-    () => anonymizeStudentForAI(student, grades, []),
-    [grades, student]
+    () => ({ ...anonymizeStudentForAI(student, grades, attendance), practiceExamSummary: summarizePracticeForAnalysis(practiceExams) }),
+    [attendance, grades, practiceExams, student]
   );
 
   const handleRunAIAnalysis = async () => {
     setAiLoading(true);
     setAiError('');
+    setAiAnalysis(null);
     try {
       const response = await fetch('/api/ai/student-analysis', {
         method: 'POST',
@@ -355,14 +360,14 @@ export function StudentProfileView({
               <ShieldCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
               <span>
                 Gizlilik Koruması: Ad-soyad ve kişisel notlar gönderilmez; yalnızca anonim kod (
-                {anonymizedPreview.anonymousCode}) ve ders ortalamaları iletilir.
+                {anonymizedPreview.anonymousCode}), notlar ve deneme özetleri iletilir.
               </span>
             </p>
           </div>
           <button
             type="button"
             onClick={() => void handleRunAIAnalysis()}
-            disabled={aiLoading || grades.length === 0}
+            disabled={aiLoading || (grades.length === 0 && practiceExams.length === 0)}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0 no-print"
           >
             {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}

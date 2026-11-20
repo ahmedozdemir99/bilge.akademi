@@ -34,6 +34,7 @@ import type {
   Student,
 } from '../../types/academy';
 import {
+  calculateAttendanceSummary,
   calculateAverageScore,
   calculateSubjectAverages,
   calculateTrialRobotSummary,
@@ -50,9 +51,11 @@ import {
 } from './student-tracking/StudentForms';
 import { normalizeSearchText } from '../../utils/searchText';
 import { classChartColors, getSubjectColor } from '../../utils/subjectColors';
+import { summarizePracticeForAnalysis } from '../../utils/practiceAnalysis';
+import { BulkRecordsPanel } from './student-tracking/BulkRecordsPanel';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
-type TrackingTab = 'students' | 'grades' | 'trials' | 'analytics';
+type TrackingTab = 'students' | 'grades' | 'trials' | 'analytics' | 'bulk';
 
 export function StudentTrackingModule() {
   const {
@@ -60,6 +63,7 @@ export function StudentTrackingModule() {
     students,
     grades,
     practiceExams,
+    attendance,
     isDemoMode,
     workspaceView,
     compactMode,
@@ -169,6 +173,7 @@ export function StudentTrackingModule() {
     [analyticsClassId, students]
   );
 
+  const classPracticeAnalysis = useMemo(() => summarizePracticeForAnalysis(analyticsPracticeExams), [analyticsPracticeExams]);
   const analyticsSubjectBreakdown = useMemo(
     () => calculateSubjectAverages(analyticsGrades),
     [analyticsGrades]
@@ -217,6 +222,7 @@ export function StudentTrackingModule() {
           schoolClass={classMap.get(personalStudent.classId)}
           grades={grades.filter((g) => g.studentId === personalStudent.id)}
           practiceExams={practiceExams.filter((p) => p.studentId === personalStudent.id)}
+          attendance={attendance.filter((item) => item.studentId === personalStudent.id)}
           readOnly
         />
       </div>
@@ -228,10 +234,12 @@ export function StudentTrackingModule() {
     return (
       <>
         <StudentProfileView
+          key={selectedStudent.id}
           student={selectedStudent}
           schoolClass={classMap.get(selectedStudent.classId)}
           grades={grades.filter((g) => g.studentId === selectedStudent.id)}
           practiceExams={practiceExams.filter((p) => p.studentId === selectedStudent.id)}
+          attendance={attendance.filter((item) => item.studentId === selectedStudent.id)}
           onBack={() => setSelectedStudentId(null)}
           onEditStudent={() => {
             setEditingStudent(selectedStudent);
@@ -310,14 +318,14 @@ export function StudentTrackingModule() {
   const handleRunClassAI = async () => {
     setClassAILoading(true);
     setClassAIError('');
+    setClassAI(null);
     const targetClass = analyticsClassId === 'all' ? null : classMap.get(analyticsClassId);
-    const trialSummary = calculateTrialRobotSummary(analyticsPracticeExams);
     try {
       const response = await fetch('/api/ai/class-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          className: targetClass ? targetClass.name : 'Tüm Ortaokul Sınıfları Geneli',
+          className: targetClass ? 'Seçilen şube' : 'Tüm Ortaokul Sınıfları Geneli',
           gradeLevel: targetClass ? targetClass.gradeLevel : 8,
           studentCount: analyticsStudents.length,
           overallAverage: calculateAverageScore(analyticsGrades),
@@ -326,12 +334,11 @@ export function StudentTrackingModule() {
             average: s.average,
             examCount: s.count,
           })),
-          practiceExamSummary: {
-            examCount: trialSummary.examCount,
-            avgTotalNet: trialSummary.avgTotalNet,
-            avgTotalCorrect: trialSummary.avgTotalCorrect,
-            avgLgsScore: trialSummary.avgLgsScore,
-          },
+          gradeCount: analyticsGrades.length,
+          practiceExamSummary: classPracticeAnalysis,
+          attendanceTotals: calculateAttendanceSummary(analyticsClassId === 'all'
+            ? attendance
+            : attendance.filter((item) => item.classId === analyticsClassId)),
         }),
       });
       const data = await response.json();
@@ -502,6 +509,7 @@ export function StudentTrackingModule() {
               { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
               { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
+              { id: 'bulk', label: 'Toplu Giriş' },
             ] as { id: TrackingTab; label: string }[]
           ).map((tab) => (
             <button
@@ -975,6 +983,24 @@ export function StudentTrackingModule() {
         />
       )}
 
+      {activeTab === 'bulk' && (
+        <BulkRecordsPanel
+          initialMode="roster"
+          onClassAnalysis={(id) => {
+            setAnalyticsClassId(id);
+            setClassAI(null);
+            setClassAIError('');
+            setActiveTab('analytics');
+          }}
+          onStudents={(id) => {
+            setClassFilter(id);
+            setSearchQuery('');
+            setStatusFilter('all');
+            setActiveTab('students');
+          }}
+        />
+      )}
+
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
       {activeTab === 'analytics' && (
         <div className="space-y-6">
@@ -1006,7 +1032,7 @@ export function StudentTrackingModule() {
               <button
                 type="button"
                 onClick={() => void handleRunClassAI()}
-                disabled={classAILoading || analyticsGrades.length === 0}
+                disabled={classAILoading || (analyticsGrades.length === 0 && analyticsPracticeExams.length === 0)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-60 cursor-pointer whitespace-nowrap"
               >
                 {classAILoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
@@ -1079,6 +1105,26 @@ export function StudentTrackingModule() {
               </div>
             </div>
           </div>
+
+          {classPracticeAnalysis.examCount > 0 && (
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="font-semibold text-navy-900 dark:text-white">Sınıfın Deneme Özeti</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {classPracticeAnalysis.examCount} sonuç · Ortalama {classPracticeAnalysis.avgTotalNet.toLocaleString('tr-TR')} net
+                </p>
+              </div>
+              <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                {classPracticeAnalysis.subjects.map(({ label, avgNet, maxQuestions }) => (
+                  <div key={label} className="rounded-lg border border-slate-200 p-2.5 dark:border-slate-800"
+                    style={{ borderTop: '3px solid ' + getSubjectColor(label) }}>
+                    <dt className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</dt>
+                    <dd className="text-sm font-semibold tabular-nums">{avgNet.toLocaleString('tr-TR')} net / {maxQuestions} soru</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
 
           {/* Class AI Result */}
           {classAIError && (

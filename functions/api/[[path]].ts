@@ -1,3 +1,5 @@
+import { formatPracticeForAnalysis } from '../../src/utils/practiceAnalysis';
+
 interface PagesEnv {
   GEMINI_API_KEY?: string;
   'Gemini API Key'?: string;
@@ -1083,7 +1085,7 @@ Her dizenin hece sayısını seçilen ölçüye mümkün olduğunca tam uydur.`;
 
     /* ---------------- STUDENT ANALYSIS ---------------- */
     if (route === 'ai/student-analysis') {
-      const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary } = body;
+      const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary, practiceExamSummary } = body;
       if (!anonymousCode || !Array.isArray(subjectAverages)) {
         return jsonResponse({ error: 'Geçersiz analiz isteği. Anonim öğrenci akademik verileri eksik.' }, 400);
       }
@@ -1109,8 +1111,11 @@ ${
       (g: { date?: string; subject?: string; examType?: string; score?: number; maxScore?: number }) =>
         `- ${String(g.date ?? '').slice(0, 10)} | ${String(g.subject ?? '').slice(0, 40)} (${String(g.examType ?? '').slice(0, 20)}): ${Number(g.score ?? 0)}/${Number(g.maxScore ?? 100)}`
     )
-    .join('\n') || 'Henüz sınav kaydı bulunmuyor.'
+    .join('\n') || 'Henüz not kaydı bulunmuyor.'
 }
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excused || 0)}, Mazeretsiz ${Number(att.unexcused || 0)}, Geç ${Number(att.late || 0)}.`;
 
@@ -1143,7 +1148,7 @@ Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excu
 
     /* ---------------- CLASS ANALYSIS ---------------- */
     if (route === 'ai/class-analysis') {
-      const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals } = body;
+      const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals, gradeCount, practiceExamSummary } = body;
       if (!className || !Array.isArray(subjectBreakdown)) {
         return jsonResponse({ error: 'Sınıf analizi için gerekli özet veriler eksik.' }, 400);
       }
@@ -1152,7 +1157,7 @@ Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excu
 
 Sınıf: ${String(className).slice(0, 60)} (${Number(gradeLevel) || '?'}. Sınıf)
 Öğrenci Sayısı: ${Number(studentCount) || 0}
-Genel Not Ortalaması: ${Number(overallAverage || 0).toFixed(1)}
+Genel Not Ortalaması: ${gradeCount === 0 ? 'Not kaydı yok' : Number(overallAverage || 0).toFixed(1)}
 
 Ders Dağılımı:
 ${subjectBreakdown
@@ -1162,6 +1167,9 @@ ${subjectBreakdown
       `- ${String(item.subject ?? '').slice(0, 60)}: ${Number(item.average ?? 0).toFixed(1)} (${Number(item.examCount ?? 0)} not kaydı)`
   )
   .join('\n')}
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Toplam Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excused || 0)}, Mazeretsiz ${Number(att.unexcused || 0)}, Geç ${Number(att.late || 0)}.`;
 

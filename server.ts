@@ -1,3 +1,4 @@
+import { formatPracticeForAnalysis } from './src/utils/practiceAnalysis';
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
@@ -227,7 +228,7 @@ app.post('/api/ai/student-analysis', async (req, res) => {
   const ai = ensureClient(res);
   if (!ai) return;
 
-  const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary } = req.body ?? {};
+  const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary, practiceExamSummary } = req.body ?? {};
   if (!anonymousCode || !Array.isArray(subjectAverages)) {
     res.status(400).json({ error: 'Geçersiz analiz isteği. Anonim öğrenci akademik verileri eksik.' });
     return;
@@ -253,7 +254,10 @@ ${subjectAverages
 Son Sınav Seyri:
 ${(Array.isArray(recentGrades) ? recentGrades.slice(0, 15) : [])
   .map((g: { date: string; subject: string; examType: string; score: number; maxScore: number }) => `- ${String(g.date).slice(0, 10)} | ${String(g.subject).slice(0, 40)} (${String(g.examType).slice(0, 20)}): ${Number(g.score)}/${Number(g.maxScore)}`)
-  .join('\n') || 'Henüz sınav kaydı bulunmuyor.'}
+  .join('\n') || 'Henüz not kaydı bulunmuyor.'}
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Devam Özeti:
 - Katılım: ${Number(attendanceSummary?.present || 0)} gün
@@ -298,7 +302,7 @@ app.post('/api/ai/class-analysis', async (req, res) => {
   const ai = ensureClient(res);
   if (!ai) return;
 
-  const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals } =
+  const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals, gradeCount, practiceExamSummary } =
     req.body ?? {};
   if (!className || !Array.isArray(subjectBreakdown)) {
     res.status(400).json({ error: 'Sınıf analizi için gerekli özet veriler eksik.' });
@@ -311,13 +315,16 @@ Kesin yargılar yerine pedagojik stratejiler ve uygulanabilir sınıf içi etkin
 
 Sınıf: ${String(className).slice(0, 60)} (${Number(gradeLevel) || '?'}. Sınıf)
 Öğrenci Sayısı: ${Number(studentCount) || 0}
-Genel Not Ortalaması: ${Number(overallAverage || 0).toFixed(1)}
+Genel Not Ortalaması: ${gradeCount === 0 ? 'Not kaydı yok' : Number(overallAverage || 0).toFixed(1)}
 
 Ders Dağılımı:
 ${subjectBreakdown
   .slice(0, 20)
   .map((item: { subject: string; average: number; examCount: number }) => `- ${String(item.subject).slice(0, 60)}: ${Number(item.average).toFixed(1)} (${Number(item.examCount)} not kaydı)`)
   .join('\n')}
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Toplam Devam Özeti: Katılım ${Number(attendanceTotals?.present || 0)}, Mazeretli ${Number(attendanceTotals?.excused || 0)}, Mazeretsiz ${Number(attendanceTotals?.unexcused || 0)}, Geç ${Number(attendanceTotals?.late || 0)}.
 `;

@@ -6,12 +6,14 @@ import {
   deleteDoc,
   doc,
   getDoc,
+  getDocFromServer,
   onSnapshot,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
@@ -45,6 +47,7 @@ import type {
   WorkspaceView,
 } from '../types/academy';
 import { computePracticeExamTotals } from '../utils/exportUtils';
+import { buildBulkPlan, bulkRecordId, type BulkInput } from '../utils/bulkStudentRecords';
 
 const DEMO_STORAGE_KEY = 'bilge_akademi_demo_v2';
 const THEME_STORAGE_KEY = 'bilge_akademi_theme_v1';
@@ -243,6 +246,7 @@ interface AcademyContextValue {
 
   addPracticeExam: (input: PracticeExamInput) => Promise<void>;
   deletePracticeExam: (id: string) => Promise<void>;
+  saveBulkRecords: (input: BulkInput) => Promise<{ classId: string; saved: number; skipped: number; error?: string }>;
 
   addPoem: (input: PoemInput) => Promise<string>;
   updatePoem: (id: string, input: PoemInput) => Promise<void>;
@@ -738,6 +742,92 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     },
     [notify, user]
   );
+
+  const saveBulkRecords = useCallback(async (input: BulkInput) => {
+    if (workspaceView !== 'teacher' || authLoading || (user && dataLoading)) {
+      throw new Error('Kayıtların yüklenmesini bekleyin ve öğretmen görünümünden tekrar deneyin.');
+    }
+    if (user && !navigator.onLine) throw new Error('Buluta kaydetmek için internet bağlantınızı kontrol edin.');
+    const teacherId = user?.uid ?? DEMO_TEACHER_ID;
+    const snapshot = user
+      ? { classes: cloudClasses, students: cloudStudents, grades: cloudGrades, practiceExams: cloudPracticeExams }
+      : demoStore;
+    const plan = await buildBulkPlan(input, snapshot, teacherId);
+    const skipped = plan.rows.filter((row) => row.skip).length;
+    const records = await Promise.all(plan.rows.filter((row) => !row.skip).map(async (row) => ({
+      ...row,
+      id: await bulkRecordId(teacherId, row.collection, row.key),
+    })));
+    if (auth.currentUser?.uid !== user?.uid) throw new Error('Oturum değişti. İşlemi yeniden açın.');
+
+    if (!user) {
+      setDemoStore((current) => {
+        const students: Student[] = [];
+        const grades: Grade[] = [];
+        const practiceExams: PracticeExamRecord[] = [];
+        for (const row of records) {
+          const meta = { id: row.id, teacherId, isDemo: true };
+          if (row.collection === 'students') students.push({ ...row.data, ...meta });
+          if (row.collection === 'grades') grades.push({ ...row.data, ...meta });
+          if (row.collection === 'practiceExams') practiceExams.push({ ...row.data, ...meta });
+        }
+        const merge = <T extends { id: string },>(existing: T[], added: T[]): T[] => {
+          const existingIds = new Set(existing.map(({ id }) => id));
+          return [...added.filter(({ id }) => !existingIds.has(id)), ...existing];
+        };
+        return {
+          ...current,
+          classes: plan.newClass
+            ? merge(current.classes, [{ ...plan.newClass, id: plan.classId, teacherId, isDemo: true }])
+            : current.classes,
+          students: merge(current.students, students),
+          grades: merge(current.grades, grades),
+          practiceExams: merge(current.practiceExams, practiceExams),
+        };
+      });
+      return { classId: plan.classId, saved: records.length, skipped };
+    }
+
+    const writeRecords = async (entries: { collection: string; id: string; data: object }[]) => {
+      if (auth.currentUser?.uid !== teacherId) throw new Error('Oturum değişti.');
+      const batch = writeBatch(db);
+      for (const entry of entries) {
+        batch.set(doc(db, entry.collection, entry.id), {
+          ...entry.data, teacherId, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        });
+      }
+      try {
+        await batch.commit();
+      } catch (error) {
+        // A retry after an interrupted response may find the same deterministic IDs already saved.
+        const matches = await Promise.all(entries.map(async (entry) => {
+          try {
+            const existing = (await getDocFromServer(doc(db, entry.collection, entry.id))).data();
+            return existing?.teacherId === teacherId &&
+              Object.entries(entry.data).every(([key, value]) => existing[key] === value);
+          } catch {
+            return false;
+          }
+        }));
+        if (matches.some((match) => !match)) throw error;
+      }
+    };
+
+    let saved = 0;
+    try {
+      if (plan.newClass) await writeRecords([{ collection: 'classes', id: plan.classId, data: plan.newClass }]);
+      // Current rules look up the owning class and student for every score write.
+      // Five writes per commit stay within Firestore's twenty rule document accesses.
+      for (let offset = 0; offset < records.length; offset += 5) {
+        const chunk = records.slice(offset, offset + 5);
+        await writeRecords(chunk);
+        saved += chunk.length;
+      }
+      return { classId: plan.classId, saved, skipped };
+    } catch {
+      return { classId: plan.classId, saved, skipped, error: 'Bulut kaydı tamamlanamadı. Bağlantınızı kontrol edip aynı listeyi tekrar kaydedebilirsiniz.' };
+    }
+  }, [authLoading, cloudClasses, cloudGrades, cloudPracticeExams, cloudStudents, dataLoading, demoStore, user, workspaceView]);
 
   // --- CRUD: Classes ---
   const addClass = useCallback(
@@ -1662,6 +1752,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       deleteAttendance,
       addPracticeExam,
       deletePracticeExam,
+      saveBulkRecords,
       addPoem,
       updatePoem,
       deletePoem,
@@ -1681,6 +1772,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       addGrade,
       addPoem,
       addPracticeExam,
+      saveBulkRecords,
       addStudent,
       assistantInitialContext,
       authLoading,
