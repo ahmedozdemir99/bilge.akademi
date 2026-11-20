@@ -458,8 +458,9 @@ export function readTrialPdfResults(sheets: ImportSheet[], students: Student[], 
       for (const row of results) {
         const section = normalizeSearchText(row.section).replace(/[^a-z0-9]/g, '');
         const candidates = (byNumber.get(row.number) ?? []).filter((item) => sections.get(item.classId) === section);
-        const named = candidates.filter((item) => studentName(item.fullName) === studentName(row.name));
-        const student = candidates.length === 1 ? candidates[0] : named.length === 1 ? named[0] : undefined;
+        const pdfName = studentName(row.name).replace(/\s/g, '');
+        const named = candidates.filter((item) => studentName(item.fullName).replace(/\s/g, '') === pdfName);
+        const student = named.length === 1 ? named[0] : undefined;
         if (!student) { unmatched += 1; continue; }
         const signature = [...row.scores, row.totalNet, row.score].join(',');
         if (seen.has(student.id)) {
@@ -502,11 +503,12 @@ export function readTrialPdfResults(sheets: ImportSheet[], students: Student[], 
       const line = sheet.name + ' · ' + (index + 1) + '. satır';
       const identifier = row[columns[0]]?.trim() ?? '';
       const rawName = nameColumn >= 0 ? (row[nameColumn] ?? '').trim() : '';
-      const names = rawName ? byName.get(studentName(rawName)) : undefined;
-      const numbers = numberColumn >= 0 ? byNumber.get(row[numberColumn]?.trim() ?? '') : undefined;
-      const matches = names?.length && numbers?.length
+      const rawNumber = numberColumn >= 0 ? (row[numberColumn] ?? '').trim() : '';
+      const names = rawName ? byName.get(studentName(rawName)) ?? [] : undefined;
+      const numbers = rawNumber ? byNumber.get(rawNumber) ?? [] : undefined;
+      const matches = names && numbers
         ? names.filter((item) => numbers.some((student) => student.id === item.id))
-        : names?.length ? names : numbers?.length ? numbers : roster.match(identifier);
+        : names ?? numbers ?? roster.match(identifier);
       const student = matches.length === 1 && !(rawName && PERSON_NAME_VALUE.test(rawName) && !names?.length) ? matches[0] : undefined;
       if (!student) {
         issues.push(line + ' · Öğrenci Bilge Akademi’de tek bir kayıtla eşleşmedi.');

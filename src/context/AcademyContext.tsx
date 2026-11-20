@@ -756,7 +756,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     const skipped = plan.rows.filter((row) => row.skip).length;
     const records = await Promise.all(plan.rows.filter((row) => !row.skip).map(async (row) => ({
       ...row,
-      id: await bulkRecordId(teacherId, row.collection, row.key, row.collection === 'practiceExams' && row.published),
+      id: await bulkRecordId(teacherId, row.collection, row.key, row.collection === 'practiceExams' && row.published, row.collection === 'practiceExams' && row.fromFile),
     })));
     if (auth.currentUser?.uid !== user?.uid) throw new Error('Oturum değişti. İşlemi yeniden açın.');
 

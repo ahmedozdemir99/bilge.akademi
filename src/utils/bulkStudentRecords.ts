@@ -1,3 +1,4 @@
+import { classKind } from './classKinds';
 import type { ClassInput, GradeInput, PracticeExamInput, StudentInput } from '../context/AcademyContext';
 import type { ExamType, Grade, PracticeExamRecord, SchoolClass, Student } from '../types/academy';
 import { computePracticeExamTotals, LGS_SUBJECT_CONFIG } from './exportUtils';
@@ -13,7 +14,7 @@ export const hasPublishedTrialScore = (id: string) => id.startsWith('bulk_pdf_')
 export type BulkInput =
   | { mode: 'roster'; classId: string; newClass?: ClassInput; text: string }
   | { mode: 'grades'; classId: string; text: string; assessment: Pick<GradeInput, 'subjectName' | 'examTitle' | 'examType' | 'examDate' | 'maxScore'> }
-  | { mode: 'trials'; classId: string; text: string; assessment: Pick<PracticeExamInput, 'examTitle' | 'examDate' | 'wrongPenalty'>; publishedResults?: ReadonlyMap<string, PublishedBulkTrial>; roster?: { text: string; newClass?: ClassInput } };
+  | { mode: 'trials'; classId: string; text: string; assessment: Pick<PracticeExamInput, 'examTitle' | 'examDate' | 'wrongPenalty'>; source?: 'file'; publishedResults?: ReadonlyMap<string, PublishedBulkTrial>; roster?: { text: string; newClass?: ClassInput } };
 
 interface BulkSnapshot {
   classes: SchoolClass[];
@@ -27,7 +28,7 @@ type BulkPracticeExam = PracticeExamInput & Pick<PracticeExamRecord, 'totalCorre
 export type BulkRow = { key: string; student: string; detail: string; skip: boolean } & (
   | { collection: 'students'; data: StudentInput }
   | { collection: 'grades'; data: GradeInput }
-  | { collection: 'practiceExams'; data: BulkPracticeExam; published?: boolean }
+  | { collection: 'practiceExams'; data: BulkPracticeExam; published?: boolean; fromFile?: boolean }
 );
 
 export interface BulkPlan {
@@ -71,13 +72,13 @@ function cleanLabel(value: string, max: number, label: string): string {
   return trimmed;
 }
 
-function classIdentity(value: Pick<ClassInput, 'academicYear' | 'gradeLevel' | 'section'>): string {
-  return [value.academicYear.trim().replace(/[–—]/g, '-').replace(/\s/g, ''), value.gradeLevel, normalizeSearchText(value.section)].join('|');
+function classIdentity(value: Pick<ClassInput, 'academicYear' | 'gradeLevel' | 'section' | 'subjectFocus'>): string {
+  return [value.academicYear.trim().replace(/[–—]/g, '-').replace(/\s/g, ''), value.gradeLevel, normalizeSearchText(value.section)].join('|') + (classKind(value) === 'course' ? '|course' : '');
 }
 
-export async function bulkRecordId(teacherId: string, collection: string, key: string, published = false): Promise<string> {
+export async function bulkRecordId(teacherId: string, collection: string, key: string, published = false, fromFile = false): Promise<string> {
   const hash = await crypto.subtle.digest('SHA-256', new TextEncoder().encode(JSON.stringify([teacherId, collection, key])));
-  return (published ? 'bulk_pdf_' : 'bulk_') + Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
+  return (published ? 'bulk_pdf_' : fromFile ? 'bulk_file_' : 'bulk_') + Array.from(new Uint8Array(hash), (byte) => byte.toString(16).padStart(2, '0')).join('');
 }
 
 const gradeKey = (record: Pick<GradeInput, 'classId' | 'studentId' | 'subjectName' | 'examTitle' | 'examDate' | 'examType'>) =>
@@ -121,7 +122,7 @@ export async function buildBulkPlan(input: BulkInput, snapshot: BulkSnapshot, te
     if (!Number.isInteger(candidate.gradeLevel) || candidate.gradeLevel < 1 || candidate.gradeLevel > 12 || !section || section.length > 10 || !/^\d{4}[-–]\d{4}$/.test(academicYear)) {
       throw new Error('Sınıf düzeyi, şube ve öğretim yılını kontrol edin (ör. 2026-2027).');
     }
-    const classData = { name, section, academicYear, gradeLevel: candidate.gradeLevel };
+    const classData = { name, section, academicYear, gradeLevel: candidate.gradeLevel, ...(candidate.subjectFocus ? { subjectFocus: candidate.subjectFocus } : {}) };
     const matches = classes.filter((value) => classIdentity(value) === classIdentity(classData));
     selected = matches[0];
     if (matches.length > 1 || (selected && normalizeSearchText(selected.name) !== normalizeSearchText(name))) {
@@ -224,7 +225,7 @@ export async function buildBulkPlan(input: BulkInput, snapshot: BulkSnapshot, te
       if (prior && published && (prior.totalNet !== totalNet || prior.estimatedLgsScore !== estimatedLgsScore || !hasPublishedTrialScore(prior.id))) {
         throw new Error('Bu deneme daha önce tahmini veya farklı puanla kaydedildi. Arşivdeki kaydı kontrol edin.');
       }
-      rows.push({ collection: 'practiceExams', key, published: Boolean(published), student: match.fullName, detail: `${totalCorrect} D / ${totalWrong} Y · ${totalNet.toLocaleString('tr-TR')} net`, skip: Boolean(prior), data: { ...common, ...scores, totalCorrect, totalWrong, totalNet, estimatedLgsScore } });
+      rows.push({ collection: 'practiceExams', key, published: Boolean(published), fromFile: input.source === 'file', student: match.fullName, detail: `${totalCorrect} D / ${totalWrong} Y · ${totalNet.toLocaleString('tr-TR')} net`, skip: Boolean(prior), data: { ...common, ...scores, totalCorrect, totalWrong, totalNet, estimatedLgsScore } });
     } catch (error) {
       errors.push(`Satır ${index + 1} — ${error instanceof Error ? error.message : 'Geçersiz kayıt.'}`);
     } finally {

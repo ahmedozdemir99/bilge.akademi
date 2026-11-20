@@ -5,18 +5,20 @@ import { DEFAULT_SUBJECT_NAMES, DEMO_TEACHER_ID } from '../../../data/demoData';
 import type { ExamType } from '../../../types/academy';
 import { buildBulkPlan, BULK_EXAM_TYPES, type BulkInput, type BulkPlan } from '../../../utils/bulkStudentRecords';
 import { extractMappedRows, importSheetWidth, readImportWorkbook, readPdfImport, readPdfPageCount, type ImportSheet } from '../../../utils/bulkRecordFiles';
+import { encodeClassFocus, type ClassKind } from '../../../utils/classKinds';
 import { BulkFileMapper } from './BulkFileMapper';
 
 const field = 'w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950';
 const primary = 'inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-700';
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Istanbul' }).format(new Date());
 
-export function BulkRecordsPanel() {
+export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void }) {
   const { classes, students, grades, practiceExams, dataLoading, saveBulkRecords, user } = useAcademy();
   const [mode, setMode] = useState<'roster' | 'grades'>('roster');
   const [choice, setChoice] = useState<string>();
   const classId = choice ?? classes[0]?.id ?? '';
   const classStudents = students.filter((student) => student.classId === classId);
+  const [kind, setKind] = useState<ClassKind>('school');
   const [name, setName] = useState('');
   const [gradeLevel, setGradeLevel] = useState('8');
   const [section, setSection] = useState('');
@@ -99,7 +101,7 @@ export function BulkRecordsPanel() {
         firstRow: first + 1, lastRow: last + 1, firstColumn: 1, lastColumn: importSheetWidth(sheet.rows),
       }, mode === 'grades' ? classStudents : undefined, false);
       const input: BulkInput = mode === 'roster'
-        ? { mode, classId, text, newClass: classId ? undefined : { name, gradeLevel: Number(gradeLevel), section, academicYear } }
+        ? { mode, classId, text, newClass: classId ? undefined : { name, gradeLevel: Number(gradeLevel), section, academicYear, subjectFocus: encodeClassFocus(kind) } }
         : { mode, classId, text, assessment: { examTitle: title, examDate: date, examType, subjectName, maxScore: Number(maxScore) } };
       const plan = await buildBulkPlan(input, { classes, students, grades, practiceExams }, user?.uid ?? DEMO_TEACHER_ID);
       setPreview({ input, plan });
@@ -122,7 +124,7 @@ export function BulkRecordsPanel() {
     <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
         <h2 className="text-lg font-semibold">PDF veya Excel’den Toplu Giriş</h2>
-        <a href="/deneme-aktarim/" className="text-sm font-semibold text-teal-700 underline dark:text-teal-300">Deneme PDF Aktarımı</a>
+        <button type="button" onClick={onTrialImport} className="text-sm font-semibold text-teal-700 underline dark:text-teal-300">Deneme Sonuçlarını Yükle</button>
       </header>
       <fieldset className="min-w-0 space-y-4" disabled={busy || dataLoading} onChange={clearPreview}>
         <div className="grid gap-3 sm:grid-cols-2">
@@ -142,6 +144,11 @@ export function BulkRecordsPanel() {
           <label className="space-y-1 text-sm font-medium">Sınıf adı<input className={field} value={name} onChange={(event) => setName(event.target.value)} maxLength={60} /></label>
           <label className="space-y-1 text-sm font-medium">Düzey<input className={field} type="number" min="1" max="12" value={gradeLevel} onChange={(event) => setGradeLevel(event.target.value)} /></label>
           <label className="space-y-1 text-sm font-medium">Şube<input className={field} value={section} onChange={(event) => setSection(event.target.value)} maxLength={10} /></label>
+          <label className="space-y-1 text-sm font-medium">Sınıf türü
+            <select className={field} value={kind} onChange={(event) => setKind(event.target.value === 'course' ? 'course' : 'school')}>
+              <option value="school">Okul</option><option value="course">Kurs</option>
+            </select>
+          </label>
           <label className="space-y-1 text-sm font-medium">Öğretim yılı<input className={field} value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} maxLength={9} /></label>
         </div>}
         {mode === 'grades' && !classStudents.length && <p className="text-sm text-amber-800 dark:text-amber-200">Not girmek için öğrencileri olan bir sınıf seçin.</p>}

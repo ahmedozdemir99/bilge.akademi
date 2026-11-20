@@ -1,5 +1,5 @@
 import React, { useMemo, useState } from 'react';
-import { Calculator, Download, Plus, Printer, Trash2 } from 'lucide-react';
+import { Calculator, Download, FileUp, Plus, Printer, Trash2 } from 'lucide-react';
 import {
   Bar,
   BarChart,
@@ -31,6 +31,7 @@ import {
 } from '../../../utils/exportUtils';
 import { orderStudentsByNet, STUDENT_NET_ORDERS, summarizeStudentNets, type StudentNetOrder } from '../../../utils/studentNetOrder';
 import { hasPublishedTrialScore } from '../../../utils/bulkStudentRecords';
+import { CLASS_KINDS, classKind } from '../../../utils/classKinds';
 import { trialSubjectColors } from '../../../utils/subjectColors';
 
 interface PracticeExamRobotPanelProps {
@@ -41,6 +42,7 @@ interface PracticeExamRobotPanelProps {
   onDeletePracticeExam: (exam: PracticeExamRecord) => void;
   lockedStudentId?: string;
   initialClassId?: string;
+  onTrialImport?: () => void;
 }
 
 type SubjectInputs = Record<MiddleSchoolTrialSubjectKey, { d: number | ''; y: number | '' }>;
@@ -62,6 +64,7 @@ export function PracticeExamRobotPanel({
   onDeletePracticeExam,
   lockedStudentId,
   initialClassId = 'all',
+  onTrialImport,
 }: PracticeExamRobotPanelProps) {
   const today = new Date().toISOString().slice(0, 10);
   const [selectedStudentId, setSelectedStudentId] = useState('');
@@ -72,7 +75,7 @@ export function PracticeExamRobotPanel({
 
   const [examTitle, setExamTitle] = useState('LGS Kurumsal Deneme Sınavı');
   const [examDate, setExamDate] = useState(today);
-  const wrongPenalty: 3 = 3;
+  const [resultChoice, setResultChoice] = useState<{ studentId: string; id: string }>();
   const [targetLgsScore, setTargetLgsScore] = useState(440);
   const [draft, setDraft] = useState<{ studentId: string; subjects: SubjectInputs }>();
   const [entryError, setEntryError] = useState('');
@@ -92,19 +95,22 @@ export function PracticeExamRobotPanel({
     ? studentMap.get(lockedStudentId)
     : entryStudents.find(({ id }) => id === selectedStudentId) ?? entryStudents[0];
 
-  const subjects = draft && draft.studentId === targetStudent?.id ? draft.subjects : EMPTY_SUBJECT_INPUTS;
+  const studentResults = useMemo(() => practiceExams.filter((exam) => exam.studentId === targetStudent?.id)
+    .sort((a, b) => b.examDate.localeCompare(a.examDate)), [practiceExams, targetStudent?.id]);
+  const latestResult = studentResults[0];
+  const savedResult = resultChoice && resultChoice.studentId === targetStudent?.id
+    ? studentResults.find(({ id }) => id === resultChoice.id)
+    : studentResults.find(({ id }) => hasPublishedTrialScore(id) || id.startsWith('bulk_file_'));
+  const wrongPenalty = savedResult?.wrongPenalty ?? 3;
+  const subjects = savedResult
+    ? Object.fromEntries(LGS_SUBJECT_CONFIG.map(({ key }) => [key, { d: savedResult[`${key}D`], y: savedResult[`${key}Y`] }])) as SubjectInputs
+    : draft && draft.studentId === targetStudent?.id ? draft.subjects : EMPTY_SUBJECT_INPUTS;
   const hasEntry = Object.values(subjects).some(({ d, y }) => d !== '' || y !== '');
-  const latestResult = useMemo(() => {
-    if (!targetStudent) return undefined;
-    return practiceExams.reduce<PracticeExamRecord | undefined>((latest, exam) => {
-      if (exam.studentId !== targetStudent.id) return latest;
-      return !latest || exam.examDate > latest.examDate ? exam : latest;
-    }, undefined);
-  }, [practiceExams, targetStudent]);
 
   function selectStudent(id: string) {
     if (id !== targetStudent?.id) {
       setDraft(undefined);
+      setResultChoice(undefined);
       setEntryError('');
     }
     setSelectedStudentId(id);
@@ -197,7 +203,7 @@ export function PracticeExamRobotPanel({
   const handleSaveExam = async (e: React.FormEvent) => {
     e.preventDefault();
     const stu = targetStudent;
-    if (!stu || !hasEntry || saving || examTitle.trim().length < 2) return;
+    if (!stu || savedResult || !hasEntry || saving || examTitle.trim().length < 2) return;
     setEntryError('');
 
     setSaving(true);
@@ -295,7 +301,7 @@ export function PracticeExamRobotPanel({
           <div className="text-xs text-slate-600 dark:text-slate-300 self-start md:self-center">
             <span className="font-semibold text-teal-700 dark:text-teal-400">LGS Standardı</span>
             <span className="mx-1.5 text-slate-400" aria-hidden="true">·</span>
-            <span>3 Yanlış 1 Doğruyu Götürür</span>
+            <span>{wrongPenalty} Yanlış 1 Doğruyu Götürür</span>
           </div>
         </div>
 
@@ -311,7 +317,9 @@ export function PracticeExamRobotPanel({
                   selectStudent(nextStudents.find(({ id }) => id === targetStudent?.id)?.id ?? nextStudents[0]?.id ?? '');
                 }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                   <option value="all">Tüm Sınıflar</option>
-                  {classes.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.academicYear}</option>)}
+                  {CLASS_KINDS.map(({ value, label }) => <optgroup key={value} label={label}>
+                    {classes.filter((item) => classKind(item) === value).map((item) => <option value={item.id} key={item.id}>{item.name} · {item.academicYear}</option>)}
+                  </optgroup>)}
                 </select>
               </label>
               <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
@@ -344,13 +352,26 @@ export function PracticeExamRobotPanel({
               </label>
             </>}
 
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-3">
+              Gösterilecek deneme
+              <select value={savedResult?.id ?? ''} disabled={!targetStudent || saving} onChange={(event) => {
+                if (!targetStudent) return;
+                setResultChoice({ studentId: targetStudent.id, id: event.target.value });
+                setEntryError('');
+              }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                <option value="">Yeni deneme girişi</option>
+                {studentResults.map((exam) => <option key={exam.id} value={exam.id}>{formatTurkishDate(exam.examDate)} · {exam.examTitle}</option>)}
+              </select>
+            </label>
+
             <div className={lockedStudentId ? 'md:col-span-2' : ''}>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
                 Deneme Sınavı Adı
               </label>
               <input
                 type="text"
-                value={examTitle}
+                value={savedResult?.examTitle ?? examTitle}
+                readOnly={Boolean(savedResult)}
                 onChange={(e) => setExamTitle(e.target.value)}
                 maxLength={120}
                 required
@@ -365,7 +386,8 @@ export function PracticeExamRobotPanel({
               </label>
               <input
                 type="date"
-                value={examDate}
+                value={savedResult?.examDate ?? examDate}
+                readOnly={Boolean(savedResult)}
                 onChange={(e) => setExamDate(e.target.value)}
                 required
                 className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100"
@@ -373,7 +395,7 @@ export function PracticeExamRobotPanel({
             </div>
           </div>
 
-          {targetStudent && (
+          {targetStudent && !savedResult && (
             <section aria-label="Seçili öğrencinin kayıtlı denemesi" className="space-y-2 rounded-xl border border-teal-200 bg-teal-50/60 p-4 dark:border-teal-900 dark:bg-teal-950/30">
               <h3 className="text-sm font-semibold">{targetStudent.fullName} · Son kayıtlı deneme</h3>
               {latestResult ? (
@@ -401,11 +423,15 @@ export function PracticeExamRobotPanel({
           )}
 
           <div className="space-y-1">
-            <h3 className="text-sm font-semibold">Yeni deneme girişi</h3>
+            <h3 className="text-sm font-semibold">{savedResult ? targetStudent?.fullName + ' · Kayıtlı deneme' : 'Yeni deneme girişi'}</h3>
             <p className="text-xs text-slate-600 dark:text-slate-300">
-              {targetStudent ? 'Aşağıdaki alanlara bu öğrencinin yeni sonucunu girin. Boş bırakılan doğru ve yanlış alanları 0 sayılır.' : 'Yeni sonuç girmek için bir öğrenci seçin.'}
+              {savedResult ? 'Değerler seçilen deneme kaydından dolduruldu.' : targetStudent ? 'Aşağıdaki alanlara bu öğrencinin yeni sonucunu girin. Boş bırakılan doğru ve yanlış alanları 0 sayılır.' : 'Yeni sonuç girmek için bir öğrenci seçin.'}
             </p>
           </div>
+          {onTrialImport && <button type="button" onClick={onTrialImport}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700 underline dark:text-teal-300">
+            <FileUp className="size-4" aria-hidden="true" /> Deneme Sonuçlarını Yükle
+          </button>}
           {/* 6 Subjects Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {LGS_SUBJECT_CONFIG.map((cfg) => {
@@ -435,6 +461,7 @@ export function PracticeExamRobotPanel({
                         min={0}
                         max={cfg.maxQuestions}
                         aria-label={cfg.label + ' doğru'}
+                        readOnly={Boolean(savedResult)}
                         disabled={!targetStudent || saving}
                         value={pair.d}
                         onChange={(e) =>
@@ -452,6 +479,7 @@ export function PracticeExamRobotPanel({
                         min={0}
                         max={cfg.maxQuestions - Number(pair.d)}
                         aria-label={cfg.label + ' yanlış'}
+                        readOnly={Boolean(savedResult)}
                         disabled={!targetStudent || saving}
                         value={pair.y}
                         onChange={(e) =>
@@ -474,7 +502,7 @@ export function PracticeExamRobotPanel({
           </div>
 
           {entryError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{entryError}</p>}
-          {targetStudent && <p className="text-sm font-semibold" aria-live="polite">Yeni sonuç · {targetStudent.fullName} · No {targetStudent.studentNumber}</p>}
+          {targetStudent && !savedResult && <p className="text-sm font-semibold" aria-live="polite">Yeni sonuç · {targetStudent.fullName} · No {targetStudent.studentNumber}</p>}
 
           {/* Live Calculated Robot Strip + Save CTA */}
           <div className="p-4 rounded-xl bg-navy-900 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
@@ -494,25 +522,25 @@ export function PracticeExamRobotPanel({
               <div>
                 <p className="text-[11px] text-slate-300">Toplam Net</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-gold-400">
-                  {hasEntry ? liveTotals.totalNet.toFixed(2) : '—'}
+                  {hasEntry ? (savedResult?.totalNet ?? liveTotals.totalNet).toFixed(2) : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] text-slate-300">Tahmini LGS Puanı</p>
+                <p className="text-[11px] text-slate-300">{savedResult && hasPublishedTrialScore(savedResult.id) ? 'PDF’deki LGS Puanı' : 'Tahmini LGS Puanı'}</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-teal-300">
-                  {hasEntry ? liveTotals.estimatedLgsScore.toFixed(1) : '—'}
+                  {savedResult ? savedResult.estimatedLgsScore.toLocaleString('tr-TR', { maximumFractionDigits: 3 }) : hasEntry ? liveTotals.estimatedLgsScore.toFixed(1) : '—'}
                 </p>
               </div>
             </div>
 
-            <button
+            {!savedResult && <button
               type="submit"
               disabled={saving || !targetStudent || !hasEntry}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 hover:bg-gold-500 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>{saving ? 'Kaydediliyor...' : 'Deneme Sonucunu Kaydet'}</span>
-            </button>
+            </button>}
           </div>
         </form>
       </section>

@@ -14,7 +14,8 @@ import {
   Trash2,
   UserPlus,
   Users,
-  ExternalLink,
+  BarChart3,
+  FileUp,
 } from 'lucide-react';
 import {
   Bar,
@@ -55,13 +56,15 @@ import { summarizePracticeForAnalysis } from '../../utils/practiceAnalysis';
 import { BulkRecordsPanel } from './student-tracking/BulkRecordsPanel';
 import { orderStudentsByNet, STUDENT_NET_ORDERS, summarizeStudentNets, type StudentNetOrder } from '../../utils/studentNetOrder';
 import { ClassTrialArchive, ClassTrialDistribution } from './student-tracking/ClassTrialArchive';
+import { TrialImporter } from '../../trial-import/TrialImporter';
+import { CLASS_KINDS, classKind } from '../../utils/classKinds';
 import { ExamNetTrend } from './student-tracking/ExamNetTrend';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
 type TrackingTab = 'students' | 'grades' | 'trials' | 'archive' | 'analytics' | 'bulk';
 
-export function StudentTrackingModule({ initialAnalysis = false, initialArchive = false, initialClass = '' }: {
-  initialAnalysis?: boolean; initialArchive?: boolean; initialClass?: string;
+export function StudentTrackingModule({ initialAnalysis = false, initialArchive = false, initialImport = false, initialClass = '' }: {
+  initialAnalysis?: boolean; initialArchive?: boolean; initialImport?: boolean; initialClass?: string;
 }) {
   const {
     classes,
@@ -87,7 +90,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
     seedDemoToFirestore,
   } = useAcademy();
 
-  const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive ? 'archive' : initialAnalysis ? 'analytics' : 'students');
+  const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive || initialImport ? 'archive' : initialAnalysis ? 'analytics' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // Filters
@@ -98,7 +101,13 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [examTypeFilter, setExamTypeFilter] = useState<'all' | ExamType>('all');
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('all');
+  const [trialView, setTrialView] = useState<'archive' | 'import'>(initialImport ? 'import' : 'archive');
   const [archiveClassId, setArchiveClassId] = useState(initialClass);
+
+  function openTrialImport() {
+    setTrialView('import');
+    setActiveTab('archive');
+  }
 
   // Modals
   const [classModalOpen, setClassModalOpen] = useState(false);
@@ -481,15 +490,16 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             <Calculator className="w-3.5 h-3.5" />
             <span>Deneme Net Robotu</span>
           </button>
-          <a
-            href="https://lgs-deneme-analiz-arsivi.toughtamarind.chatgpt.site"
-            target="_blank"
-            rel="noopener noreferrer"
+          <button type="button" onClick={() => {
+            if (classFilter !== 'all') setArchiveClassId(classFilter);
+            setTrialView('archive');
+            setActiveTab('archive');
+          }}
             className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 px-3.5 py-2 text-xs font-semibold text-teal-800 transition-colors hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200 dark:hover:bg-teal-950"
           >
-            <ExternalLink className="size-3.5" aria-hidden="true" />
+            <BarChart3 className="size-3.5" aria-hidden="true" />
             Deneme Analiz
-          </a>
+          </button>
         </div>
       </div>
 
@@ -535,7 +545,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             [
               { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
               { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
-              { id: 'archive', label: 'Deneme Arşivi' },
+              { id: 'archive', label: 'Deneme Analiz ve Arşiv' },
               { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
               { id: 'bulk', label: 'Toplu Giriş' },
@@ -546,7 +556,10 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               type="button"
               role="tab"
               aria-selected={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (tab.id === 'archive') setTrialView('archive');
+                setActiveTab(tab.id);
+              }}
               className={`px-3.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-slate-800 text-navy-900 dark:text-white shadow-xs'
@@ -562,21 +575,17 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       {/* TAB 1: STUDENTS & CLASSES */}
       {activeTab === 'students' && (
         <div className="space-y-6">
-          {/* Classes Strip */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-navy-900 dark:text-white">
-                Sınıflar ve Şubeler ({classes.length})
-              </h2>
-            </div>
-
-            {classes.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-sm text-slate-500 dark:text-slate-400">
-                Henüz sınıf oluşturulmadı. Başlamak için yukarıdaki “Sınıf Ekle” butonunu kullanın.
-              </div>
-            ) : (
+          {CLASS_KINDS.map(({ value, label }) => {
+            const group = classes.filter((item) => classKind(item) === value);
+            return <section key={value} className="space-y-3">
+              <h2 className="text-base font-semibold text-navy-900 dark:text-white">{label} ({group.length})</h2>
+              {group.length === 0 ? (
+                <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                  {value === 'school' ? 'Henüz okul sınıfı yok.' : 'Henüz kurs sınıfı yok.'}
+                </p>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {classes.map((cls) => {
+                {group.map((cls) => {
                   const clsStudents = students.filter((s) => s.classId === cls.id);
                   const clsGrades = grades.filter((g) => g.classId === cls.id);
                   const clsAvg = calculateAverageScore(clsGrades);
@@ -650,8 +659,10 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                   );
                 })}
               </div>
-            )}
-          </section>
+              )}
+            </section>;
+          })}
+
 
           {/* Student Filter Toolbar + Data Table */}
           <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -1004,8 +1015,8 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       {/* TAB 3: PRACTICE EXAMS & NET ROBOT */}
       {activeTab === 'trials' && (
         <div className="space-y-4">
-          <a href="/deneme-aktarim/" className="inline-flex rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">Deneme PDF’si Aktar</a>
           <PracticeExamRobotPanel
+          onTrialImport={openTrialImport}
           initialClassId={classFilter}
           students={students}
           classes={classes}
@@ -1025,15 +1036,32 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
         </div>
       )}
 
-      {activeTab === 'archive' && <ClassTrialArchive classes={classes} students={students} exams={practiceExams} classId={archiveClassId}
-        onClassChange={setArchiveClassId} onReports={(id) => {
-          setAnalyticsClassId(id);
-          setClassAI(null);
-          setClassAIError('');
-          setActiveTab('analytics');
-        }} />}
+      {activeTab === 'archive' && (
+        <div className="min-w-0 space-y-4">
+          {trialView === 'import' ? <>
+            <button type="button" onClick={() => setTrialView('archive')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700">
+              Deneme Arşivine Dön
+            </button>
+            <TrialImporter initialClass={archiveClassId || (classFilter !== 'all' ? classFilter : '')} onArchive={(id) => {
+              setArchiveClassId(id);
+              setTrialView('archive');
+            }} />
+          </> : <>
+            <button type="button" onClick={openTrialImport} className="inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white dark:bg-teal-700">
+              <FileUp className="size-4" aria-hidden="true" /> PDF / Excel Yükle
+            </button>
+            <ClassTrialArchive classes={classes} students={students} exams={practiceExams} classId={archiveClassId}
+              onClassChange={setArchiveClassId} onStudent={setSelectedStudentId} onReports={(id) => {
+                setAnalyticsClassId(id);
+                setClassAI(null);
+                setClassAIError('');
+                setActiveTab('analytics');
+              }} />
+          </>}
+        </div>
+      )}
 
-      {activeTab === 'bulk' && <BulkRecordsPanel />}
+      {activeTab === 'bulk' && <BulkRecordsPanel onTrialImport={openTrialImport} />}
 
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
       {activeTab === 'analytics' && (

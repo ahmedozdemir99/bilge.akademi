@@ -2,6 +2,7 @@ import { useMemo } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { PracticeExamRecord, SchoolClass, Student } from '../../../types/academy';
 import { calculateNet, formatTurkishDate, LGS_SUBJECT_CONFIG } from '../../../utils/exportUtils';
+import { CLASS_KINDS, classKind } from '../../../utils/classKinds';
 import { normalizeSearchText } from '../../../utils/searchText';
 import { hasPublishedTrialScore } from '../../../utils/bulkStudentRecords';
 
@@ -51,13 +52,14 @@ function ResultCell({ d, y, questions, net }: { d: number; y: number; questions:
   </td>;
 }
 
-export function ClassTrialArchive({ classes, students, exams, classId, onClassChange, onReports }: {
+export function ClassTrialArchive({ classes, students, exams, classId, onClassChange, onReports, onStudent }: {
   classes: SchoolClass[];
   students: Student[];
   exams: PracticeExamRecord[];
   classId: string;
   onClassChange: (id: string) => void;
   onReports: (id: string) => void;
+  onStudent: (id: string) => void;
 }) {
   const current = classes.find((item) => item.id === classId) ?? classes.find((item) => exams.some((exam) => exam.classId === item.id)) ?? classes[0];
   const groups = useMemo(() => groupClassTrials(exams.filter((item) => item.classId === current?.id)), [exams, current?.id]);
@@ -72,7 +74,9 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
           <select value={current?.id ?? ''} onChange={(event) => onClassChange(event.target.value)}
             className="block max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950">
             {classes.length === 0 && <option value="">Sınıf bulunamadı</option>}
-            {classes.map((item) => <option key={item.id} value={item.id}>{item.name} · {item.academicYear}</option>)}
+            {CLASS_KINDS.map(({ value, label }) => <optgroup key={value} label={label}>
+              {classes.filter((item) => classKind(item) === value).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.academicYear}</option>)}
+            </optgroup>)}
           </select>
         </label>
       </div>
@@ -102,7 +106,8 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
                 const published = hasPublishedTrialScore(exam.id);
                 return <tr key={exam.id} className="border-t border-slate-200 dark:border-slate-800">
                   <th scope="row" className="sticky left-0 bg-white px-3 py-2 dark:bg-slate-900">
-                    <span className="block max-w-40 truncate" title={student?.fullName}>{student?.fullName ?? 'Öğrenci'}</span>
+                    {student ? <button type="button" onClick={() => onStudent(student.id)}
+                      className="block max-w-40 truncate text-left font-semibold text-teal-700 underline dark:text-teal-300" title={student.fullName}>{student.fullName}</button> : 'Öğrenci'}
                     {student && <span className="text-xs font-normal text-slate-600 dark:text-slate-300">{student.studentNumber}</span>}
                   </th>
                   {LGS_SUBJECT_CONFIG.map(({ key, maxQuestions }) => {

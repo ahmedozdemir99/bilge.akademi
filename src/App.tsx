@@ -22,12 +22,13 @@ const StudentTrackingModule = lazy(() => import('./components/modules/StudentTra
 function BilgeAkademiRouter() {
   const { activeModule, workshopActivityId, workspaceView, setActiveModule } = useAcademy();
   const params = new URLSearchParams(window.location.search);
+  const initialImport = params.get('denemeYukle') === '1';
   const initialAnalysis = params.get('denemeAnalizi') === '1';
   const initialArchive = params.get('denemeArsivi') === '1';
   const initialClass = params.get('sinif') ?? '';
   useEffect(() => {
-    if ((initialAnalysis || initialArchive) && workspaceView === 'teacher') setActiveModule('student-tracking');
-  }, [initialAnalysis, initialArchive, setActiveModule, workspaceView]);
+    if ((initialAnalysis || initialArchive || initialImport) && workspaceView === 'teacher') setActiveModule('student-tracking');
+  }, [initialAnalysis, initialArchive, initialImport, setActiveModule, workspaceView]);
 
   switch (activeModule) {
     case 'home':
@@ -35,7 +36,7 @@ function BilgeAkademiRouter() {
     case 'activity-workshop':
       return <ActivityWorkshop key={workshopActivityId ?? 'workshop'} initialActivityId={workshopActivityId} />;
     case 'student-tracking':
-      return <StudentTrackingModule initialAnalysis={initialAnalysis} initialArchive={initialArchive} initialClass={initialClass} />;
+      return <StudentTrackingModule initialImport={initialImport} initialAnalysis={initialAnalysis} initialArchive={initialArchive} initialClass={initialClass} />;
     case 'literature':
       return <LiteratureModule />;
     case 'history':

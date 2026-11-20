@@ -16,6 +16,8 @@ import type {
 } from '../../../context/AcademyContext';
 import { Modal } from '../../ui/Modal';
 
+import { classKind, classSubjectFocus, encodeClassFocus, type ClassKind } from '../../../utils/classKinds';
+
 const EXAM_TYPES: ExamType[] = ['Yazılı', 'Deneme', 'Sözlü', 'Proje', 'Performans'];
 
 const inputClass =
@@ -41,6 +43,7 @@ export function ClassFormModal({
   const [section, setSection] = useState('A');
   const [academicYear, setAcademicYear] = useState('2026-2027');
   const [subjectFocus, setSubjectFocus] = useState('');
+  const [kind, setKind] = useState<ClassKind>('school');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -51,13 +54,15 @@ export function ClassFormModal({
         setGradeLevel(editingClass.gradeLevel);
         setSection(editingClass.section);
         setAcademicYear(editingClass.academicYear);
-        setSubjectFocus(editingClass.subjectFocus ?? '');
+        setSubjectFocus(classSubjectFocus(editingClass));
+        setKind(classKind(editingClass));
       } else {
         setName('');
         setGradeLevel(8);
         setSection('A');
         setAcademicYear('2026-2027');
         setSubjectFocus('Ortaokul Müfredatı');
+        setKind('school');
       }
       setError('');
     }
@@ -94,7 +99,7 @@ export function ClassFormModal({
         gradeLevel,
         section: trimmedSection.toUpperCase(),
         academicYear: trimmedYear,
-        subjectFocus: subjectFocus.trim().slice(0, 80),
+        subjectFocus: encodeClassFocus(kind, subjectFocus),
       });
       onClose();
     } catch {
@@ -201,6 +206,14 @@ export function ClassFormModal({
             />
           </div>
         </div>
+
+        <label className={labelClass}>
+          Sınıf türü
+          <select className={inputClass + ' mt-1'} value={kind} onChange={(event) => setKind(event.target.value === 'course' ? 'course' : 'school')}>
+            <option value="school">Okul</option>
+            <option value="course">Kurs</option>
+          </select>
+        </label>
 
         <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
