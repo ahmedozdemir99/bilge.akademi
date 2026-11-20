@@ -215,7 +215,7 @@ export const PRAYER_POSTURE_STEPS: PrayerPostureStep[] = [
     title: 'Kıbleye Yönelme ve Niyet',
     postureKey: 'niyyah',
     ruleType: 'Farz',
-    recitationTr: 'Niyet ettim Allah rızası için bugünkü (ör. Sabah) namazının farzını kılmaya.',
+    recitationTr: 'Niyet ettim Allah rızası için bugünkü sabah namazının farzını kılmaya.',
     meaningTr: 'Gönülden Allah’a yönelmek ve hangi namazı kılacağını bilmek.',
     howToPerform: 'Kıbleye (Kâbe yönüne) dönülür, ayaklar omuz hizasına yakın doğal bir açıklıkta tutulur ve niyet edilir.',
   },
