@@ -11,6 +11,7 @@ import {
   UserCheck,
 } from 'lucide-react';
 import { useAcademy } from '../../context/AcademyContext';
+import { uploadLocalToCloud, downloadCloudToLocal } from '../../lib/cloudBackup';
 
 export function SettingsModule() {
   const {
@@ -35,6 +36,26 @@ export function SettingsModule() {
   const [branch, setBranch] = useState(profile?.branch ?? 'Genel Eğitim');
   const [savingProfile, setSavingProfile] = useState(false);
   const [seeding, setSeeding] = useState(false);
+  const [syncing, setSyncing] = useState(false);
+  const [syncMessage, setSyncMessage] = useState('');
+
+  const runBackup = async (direction: 'upload' | 'download') => {
+    if (!user || syncing) return;
+    setSyncing(true);
+    setSyncMessage('');
+    try {
+      const count = direction === 'upload'
+        ? await uploadLocalToCloud(user.uid)
+        : await downloadCloudToLocal(user.uid);
+      setSyncMessage(direction === 'upload'
+        ? `${count} yeni kayıt buluta eklendi. Mevcut bulut kayıtları korunmuştur.`
+        : `${count} yeni kayıt yerel arşive eklendi. Yerel kayıtları görmek için oturumu kapatıp sayfayı yenileyin.`);
+    } catch (error) {
+      setSyncMessage(`İşlem tamamlanamadı: ${error instanceof Error ? error.message : 'Bilinmeyen hata'}`);
+    } finally {
+      setSyncing(false);
+    }
+  };
 
   useEffect(() => {
     if (profile) {
@@ -271,6 +292,28 @@ export function SettingsModule() {
           analizine gönderilen verilerden ad-soyad, okul numarası ve kişisel rehberlik notları
           otomatik olarak çıkarılır.
         </p>
+
+        {user && (
+          <div className="space-y-3 rounded-xl border border-teal-500/30 p-4">
+            <h3 className="font-semibold text-sm">Bulut Yedekleme ve Güvenli Birleştirme</h3>
+            <p className="text-xs text-slate-500 dark:text-slate-400">
+              Yalnızca eksik kayıtlar eklenir; aynı kimliğe sahip kayıtlar değiştirilmez.
+              Hazır demo örnekleri buluta yüklenmez. Google hesabınız açık olmalıdır.
+            </p>
+            <div className="flex flex-wrap gap-3">
+              <button type="button" disabled={syncing} onClick={() => void runBackup('upload')}
+                className="rounded-lg bg-teal-600 px-4 py-2 text-sm text-white disabled:opacity-50">
+                Verilerimi Buluta Yükle
+              </button>
+              <button type="button" disabled={syncing} onClick={() => void runBackup('download')}
+                className="rounded-lg border border-slate-400 px-4 py-2 text-sm disabled:opacity-50">
+                Verilerimi Buluttan Geri Al
+              </button>
+            </div>
+            {syncing && <p role="status" className="text-sm">Kayıtlar işleniyor...</p>}
+            {syncMessage && <p role="status" className="text-sm">{syncMessage}</p>}
+          </div>
+        )}
 
         <div className="flex flex-wrap items-center gap-3 pt-2">
           {!isDemoMode ? (
