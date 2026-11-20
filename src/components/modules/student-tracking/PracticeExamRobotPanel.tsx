@@ -30,6 +30,7 @@ import {
   triggerPrintReport,
 } from '../../../utils/exportUtils';
 import { orderStudentsByNet, STUDENT_NET_ORDERS, summarizeStudentNets, type StudentNetOrder } from '../../../utils/studentNetOrder';
+import { hasPublishedTrialScore } from '../../../utils/bulkStudentRecords';
 import { trialSubjectColors } from '../../../utils/subjectColors';
 
 interface PracticeExamRobotPanelProps {
@@ -42,15 +43,15 @@ interface PracticeExamRobotPanelProps {
   initialClassId?: string;
 }
 
-type SubjectInputs = Record<MiddleSchoolTrialSubjectKey, { d: number; y: number }>;
+type SubjectInputs = Record<MiddleSchoolTrialSubjectKey, { d: number | ''; y: number | '' }>;
 
-const INITIAL_SUBJECT_INPUTS: SubjectInputs = {
-  turkce: { d: 16, y: 2 },
-  matematik: { d: 14, y: 3 },
-  fen: { d: 17, y: 2 },
-  inkilap: { d: 9, y: 1 },
-  din: { d: 9, y: 0 },
-  ingilizce: { d: 8, y: 1 },
+const EMPTY_SUBJECT_INPUTS: SubjectInputs = {
+  turkce: { d: '', y: '' },
+  matematik: { d: '', y: '' },
+  fen: { d: '', y: '' },
+  inkilap: { d: '', y: '' },
+  din: { d: '', y: '' },
+  ingilizce: { d: '', y: '' },
 };
 
 export function PracticeExamRobotPanel({
@@ -73,7 +74,8 @@ export function PracticeExamRobotPanel({
   const [examDate, setExamDate] = useState(today);
   const wrongPenalty: 3 = 3;
   const [targetLgsScore, setTargetLgsScore] = useState(440);
-  const [subjects, setSubjects] = useState<SubjectInputs>(INITIAL_SUBJECT_INPUTS);
+  const [draft, setDraft] = useState<{ studentId: string; subjects: SubjectInputs }>();
+  const [entryError, setEntryError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
@@ -90,22 +92,40 @@ export function PracticeExamRobotPanel({
     ? studentMap.get(lockedStudentId)
     : entryStudents.find(({ id }) => id === selectedStudentId) ?? entryStudents[0];
 
+  const subjects = draft && draft.studentId === targetStudent?.id ? draft.subjects : EMPTY_SUBJECT_INPUTS;
+  const hasEntry = Object.values(subjects).some(({ d, y }) => d !== '' || y !== '');
+  const latestResult = useMemo(() => {
+    if (!targetStudent) return undefined;
+    return practiceExams.reduce<PracticeExamRecord | undefined>((latest, exam) => {
+      if (exam.studentId !== targetStudent.id) return latest;
+      return !latest || exam.examDate > latest.examDate ? exam : latest;
+    }, undefined);
+  }, [practiceExams, targetStudent]);
+
+  function selectStudent(id: string) {
+    if (id !== targetStudent?.id) {
+      setDraft(undefined);
+      setEntryError('');
+    }
+    setSelectedStudentId(id);
+  }
+
   const liveTotals = useMemo(
     () =>
       computePracticeExamTotals({
         wrongPenalty,
-        turkceD: subjects.turkce.d,
-        turkceY: subjects.turkce.y,
-        matematikD: subjects.matematik.d,
-        matematikY: subjects.matematik.y,
-        fenD: subjects.fen.d,
-        fenY: subjects.fen.y,
-        inkilapD: subjects.inkilap.d,
-        inkilapY: subjects.inkilap.y,
-        dinD: subjects.din.d,
-        dinY: subjects.din.y,
-        ingilizceD: subjects.ingilizce.d,
-        ingilizceY: subjects.ingilizce.y,
+        turkceD: Number(subjects.turkce.d),
+        turkceY: Number(subjects.turkce.y),
+        matematikD: Number(subjects.matematik.d),
+        matematikY: Number(subjects.matematik.y),
+        fenD: Number(subjects.fen.d),
+        fenY: Number(subjects.fen.y),
+        inkilapD: Number(subjects.inkilap.d),
+        inkilapY: Number(subjects.inkilap.y),
+        dinD: Number(subjects.din.d),
+        dinY: Number(subjects.din.y),
+        ingilizceD: Number(subjects.ingilizce.d),
+        ingilizceY: Number(subjects.ingilizce.y),
       }),
     [subjects, wrongPenalty]
   );
@@ -158,25 +178,27 @@ export function PracticeExamRobotPanel({
   const updateSubjectValue = (
     key: MiddleSchoolTrialSubjectKey,
     field: 'd' | 'y',
-    rawValue: number,
+    rawValue: string,
     maxQ: number
   ) => {
-    const safeVal = Number.isFinite(rawValue) ? Math.max(0, Math.min(maxQ, Math.floor(rawValue))) : 0;
-    setSubjects((prev) => {
-      const current = prev[key];
-      if (field === 'd') {
-        const nextY = Math.min(current.y, maxQ - safeVal);
-        return { ...prev, [key]: { d: safeVal, y: nextY } };
-      }
-      const nextD = Math.min(current.d, maxQ - safeVal);
-      return { ...prev, [key]: { d: nextD, y: safeVal } };
+    if (!targetStudent) return;
+    const value = rawValue === '' ? '' : Math.max(0, Math.min(maxQ, Math.floor(Number(rawValue))));
+    const other = field === 'd' ? 'y' : 'd';
+    setEntryError('');
+    setDraft((previous) => {
+      const current = previous?.studentId === targetStudent.id ? previous.subjects : EMPTY_SUBJECT_INPUTS;
+      const pair = current[key];
+      const otherValue = pair[other] === '' ? '' : Math.min(pair[other], maxQ - Number(value));
+      const nextPair = field === 'd' ? { d: value, y: otherValue } : { d: otherValue, y: value };
+      return { studentId: targetStudent.id, subjects: { ...current, [key]: nextPair } };
     });
   };
 
   const handleSaveExam = async (e: React.FormEvent) => {
     e.preventDefault();
     const stu = targetStudent;
-    if (!stu || examTitle.trim().length < 2) return;
+    if (!stu || !hasEntry || saving || examTitle.trim().length < 2) return;
+    setEntryError('');
 
     setSaving(true);
     try {
@@ -186,19 +208,22 @@ export function PracticeExamRobotPanel({
         examTitle: examTitle.trim(),
         examDate,
         wrongPenalty,
-        turkceD: subjects.turkce.d,
-        turkceY: subjects.turkce.y,
-        matematikD: subjects.matematik.d,
-        matematikY: subjects.matematik.y,
-        fenD: subjects.fen.d,
-        fenY: subjects.fen.y,
-        inkilapD: subjects.inkilap.d,
-        inkilapY: subjects.inkilap.y,
-        dinD: subjects.din.d,
-        dinY: subjects.din.y,
-        ingilizceD: subjects.ingilizce.d,
-        ingilizceY: subjects.ingilizce.y,
+        turkceD: Number(subjects.turkce.d),
+        turkceY: Number(subjects.turkce.y),
+        matematikD: Number(subjects.matematik.d),
+        matematikY: Number(subjects.matematik.y),
+        fenD: Number(subjects.fen.d),
+        fenY: Number(subjects.fen.y),
+        inkilapD: Number(subjects.inkilap.d),
+        inkilapY: Number(subjects.inkilap.y),
+        dinD: Number(subjects.din.d),
+        dinY: Number(subjects.din.y),
+        ingilizceD: Number(subjects.ingilizce.d),
+        ingilizceY: Number(subjects.ingilizce.y),
       });
+      setDraft((current) => current === draft ? undefined : current);
+    } catch {
+      setEntryError('Deneme sonucu kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.');
     } finally {
       setSaving(false);
     }
@@ -283,7 +308,7 @@ export function PracticeExamRobotPanel({
                   const nextClass = event.target.value;
                   const nextStudents = orderStudentsByNet(students.filter((student) => nextClass === 'all' || student.classId === nextClass), studentNets, entryNetOrder);
                   setEntryClassId(nextClass);
-                  setSelectedStudentId(nextStudents.find(({ id }) => id === targetStudent?.id)?.id ?? nextStudents[0]?.id ?? '');
+                  selectStudent(nextStudents.find(({ id }) => id === targetStudent?.id)?.id ?? nextStudents[0]?.id ?? '');
                 }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
                   <option value="all">Tüm Sınıflar</option>
                   {classes.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.academicYear}</option>)}
@@ -302,7 +327,7 @@ export function PracticeExamRobotPanel({
                 Öğrenci
                 <select
                   value={targetStudent?.id ?? ''}
-                  onChange={(event) => setSelectedStudentId(event.target.value)}
+                  onChange={(event) => selectStudent(event.target.value)}
                   disabled={!entryStudents.length}
                   className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
                 >
@@ -348,6 +373,39 @@ export function PracticeExamRobotPanel({
             </div>
           </div>
 
+          {targetStudent && (
+            <section aria-label="Seçili öğrencinin kayıtlı denemesi" className="space-y-2 rounded-xl border border-teal-200 bg-teal-50/60 p-4 dark:border-teal-900 dark:bg-teal-950/30">
+              <h3 className="text-sm font-semibold">{targetStudent.fullName} · Son kayıtlı deneme</h3>
+              {latestResult ? (
+                <details key={latestResult.id} className="space-y-2 text-sm">
+                  <summary className="cursor-pointer">
+                    {latestResult.examTitle} · {formatTurkishDate(latestResult.examDate)} · <strong>{latestResult.totalNet.toFixed(2)} net</strong>
+                  </summary>
+                  <p>
+                    {latestResult.totalCorrect} doğru · {latestResult.totalWrong} yanlış · {90 - latestResult.totalCorrect - latestResult.totalWrong} boş ·{' '}
+                    {hasPublishedTrialScore(latestResult.id) ? 'PDF’deki LGS puanı' : 'Tahmini LGS puanı'} {latestResult.estimatedLgsScore.toLocaleString('tr-TR', { maximumFractionDigits: 3 })}
+                  </p>
+                  <dl className="grid gap-2 sm:grid-cols-3">
+                    {LGS_SUBJECT_CONFIG.map(({ key, label }) => {
+                      const d = latestResult[`${key}D`];
+                      const y = latestResult[`${key}Y`];
+                      return <div key={key}>
+                        <dt className="font-medium">{label}</dt>
+                        <dd>{d} D · {y} Y · {calculateNet(d, y, latestResult.wrongPenalty).toFixed(2)} net</dd>
+                      </div>;
+                    })}
+                  </dl>
+                </details>
+              ) : <p className="text-sm">Bu öğrencinin kayıtlı denemesi yok.</p>}
+            </section>
+          )}
+
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">Yeni deneme girişi</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {targetStudent ? 'Aşağıdaki alanlara bu öğrencinin yeni sonucunu girin. Boş bırakılan doğru ve yanlış alanları 0 sayılır.' : 'Yeni sonuç girmek için bir öğrenci seçin.'}
+            </p>
+          </div>
           {/* 6 Subjects Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {LGS_SUBJECT_CONFIG.map((cfg) => {
@@ -376,9 +434,11 @@ export function PracticeExamRobotPanel({
                         type="number"
                         min={0}
                         max={cfg.maxQuestions}
+                        aria-label={cfg.label + ' doğru'}
+                        disabled={!targetStudent || saving}
                         value={pair.d}
                         onChange={(e) =>
-                          updateSubjectValue(cfg.key, 'd', Number(e.target.value), cfg.maxQuestions)
+                          updateSubjectValue(cfg.key, 'd', e.target.value, cfg.maxQuestions)
                         }
                         className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -390,10 +450,12 @@ export function PracticeExamRobotPanel({
                       <input
                         type="number"
                         min={0}
-                        max={cfg.maxQuestions - pair.d}
+                        max={cfg.maxQuestions - Number(pair.d)}
+                        aria-label={cfg.label + ' yanlış'}
+                        disabled={!targetStudent || saving}
                         value={pair.y}
                         onChange={(e) =>
-                          updateSubjectValue(cfg.key, 'y', Number(e.target.value), cfg.maxQuestions)
+                          updateSubjectValue(cfg.key, 'y', e.target.value, cfg.maxQuestions)
                         }
                         className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -401,9 +463,9 @@ export function PracticeExamRobotPanel({
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200/80 dark:border-slate-800 tabular-nums">
-                    <span className="text-slate-500 dark:text-slate-400">Boş: {stat.blank}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Boş: {hasEntry ? stat.blank : '—'}</span>
                     <span className="font-mono font-semibold text-teal-700 dark:text-teal-400">
-                      Net: {stat.net.toFixed(2)}
+                      Net: {hasEntry ? stat.net.toFixed(2) : '—'}
                     </span>
                   </div>
                 </div>
@@ -411,38 +473,41 @@ export function PracticeExamRobotPanel({
             })}
           </div>
 
+          {entryError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{entryError}</p>}
+          {targetStudent && <p className="text-sm font-semibold" aria-live="polite">Yeni sonuç · {targetStudent.fullName} · No {targetStudent.studentNumber}</p>}
+
           {/* Live Calculated Robot Strip + Save CTA */}
           <div className="p-4 rounded-xl bg-navy-900 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
               <div>
                 <p className="text-[11px] text-slate-300">Toplam Doğru</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-emerald-300">
-                  {liveTotals.totalCorrect} / 90
+                  {hasEntry ? `${liveTotals.totalCorrect} / 90` : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-[11px] text-slate-300">Toplam Yanlış / Boş</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-white">
-                  {liveTotals.totalWrong}Y · {liveTotals.totalBlank}B
+                  {hasEntry ? `${liveTotals.totalWrong}Y · ${liveTotals.totalBlank}B` : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-[11px] text-slate-300">Toplam Net</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-gold-400">
-                  {liveTotals.totalNet.toFixed(2)}
+                  {hasEntry ? liveTotals.totalNet.toFixed(2) : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-[11px] text-slate-300">Tahmini LGS Puanı</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-teal-300">
-                  {liveTotals.estimatedLgsScore.toFixed(1)}
+                  {hasEntry ? liveTotals.estimatedLgsScore.toFixed(1) : '—'}
                 </p>
               </div>
             </div>
 
             <button
               type="submit"
-              disabled={saving || !targetStudent}
+              disabled={saving || !targetStudent || !hasEntry}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 hover:bg-gold-500 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4" />
