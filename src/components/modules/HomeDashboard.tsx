@@ -13,11 +13,12 @@ import {
   Users,
   Zap,
 } from 'lucide-react';
-import { useAcademy } from '../../context/AcademyContext';
+import { isModuleAvailable, useAcademy } from '../../context/AcademyContext';
 import type { ModuleId } from '../../types/academy';
 import { calculateAverageScore, calculateTrialRobotSummary } from '../../utils/exportUtils';
 import { normalizeSearchText } from '../../utils/searchText';
 import { ImageWithFallback } from '../ui/ImageWithFallback';
+import { WorkspaceRoleControl } from '../ui/WorkspaceRoleControl';
 import { isGeminiConfigured } from '../../utils/aiStatus';
 import { DailyPractice } from './DailyPractice';
 import { activityTitles, type ActivityId } from './workshop/activityTitles';
@@ -123,7 +124,6 @@ export function HomeDashboard() {
     mathAttempts,
     isDemoMode,
     workspaceView,
-    setWorkspaceView,
     signInWithGoogle,
   } = useAcademy();
 
@@ -144,12 +144,16 @@ export function HomeDashboard() {
     const searchableText = normalizeSearchText(value);
     return searchTerms.every((term) => searchableText.includes(term));
   };
-  const matchingModules = CORE_MODULES.filter(({ title, subtitle, description, stageLabel }) =>
-    matchesSearch([title, subtitle, description, stageLabel].join(' ')));
+  const matchingModules = CORE_MODULES.filter(({ id, title, subtitle, description, stageLabel }) =>
+    isModuleAvailable(id, workspaceView) && matchesSearch([title, subtitle, description, stageLabel].join(' ')));
   const showAssistant = matchesSearch('Ortak Yapay Zekâ Asistanı Gemini Ders Anlatımı Soru Taslağı Çalışma Planı');
   const matchingActivities = isSearching
     ? workshopActivityIds.filter((id) => matchesSearch(`Keşif Atölyesi ${activityTitles[id]}`))
     : [];
+  const assistantSpan = [
+    matchingModules.length % 2 === 0 ? 'md:col-span-2' : 'md:col-span-1',
+    ['xl:col-span-3', 'xl:col-span-2', 'xl:col-span-1'][matchingModules.length % 3],
+  ].join(' ');
   const moduleCount = matchingModules.length + Number(showAssistant);
   const hasResults = moduleCount > 0 || matchingActivities.length > 0;
 
@@ -185,7 +189,7 @@ export function HomeDashboard() {
                   if (workspaceView === 'teacher') setActiveModule('student-tracking');
                   else moduleSearchRef.current?.focus();
                 }}
-                className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-center rounded-lg text-sm font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-center rounded-lg text-sm font-medium bg-navy-900 text-white hover:bg-navy-800 active:bg-navy-800 dark:bg-teal-300 dark:text-navy-950 dark:hover:bg-teal-200 dark:active:bg-teal-200 transition-colors cursor-pointer"
               >
                 {workspaceView === 'teacher' ? 'Öğrenci Takip Sistemini Aç' : 'Ders ve Etkinlik Bul'}
               </button>
@@ -193,44 +197,14 @@ export function HomeDashboard() {
               <button
                 type="button"
                 onClick={() => setActiveModule('ai-assistant')}
-                className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-center rounded-lg text-sm font-medium border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+                className="inline-flex min-h-11 items-center justify-center gap-2 px-4 py-2 text-center rounded-lg text-sm font-medium border border-slate-400 dark:border-slate-500 text-slate-800 dark:text-slate-100 hover:bg-slate-100 active:bg-teal-100 dark:hover:bg-slate-800 dark:active:bg-slate-700 transition-colors cursor-pointer"
               >
-                <Bot className="w-4 h-4 text-teal-600 dark:text-teal-400" />
+                <Bot className="w-4 h-4 text-teal-700 dark:text-teal-300" />
                 <span>Yapay Zekâ Asistanı</span>
               </button>
             </div>
 
-            {/* Segmented Role Switcher */}
-            <div
-              className="grid w-full grid-cols-2 items-center p-1 rounded-lg bg-slate-100 dark:bg-slate-800"
-              role="group"
-              aria-label="Çalışma görünümü seçici"
-            >
-              <button
-                type="button"
-                onClick={() => setWorkspaceView('teacher')}
-                aria-pressed={workspaceView === 'teacher'}
-                className={`min-h-11 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  workspaceView === 'teacher'
-                    ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                Öğretmen
-              </button>
-              <button
-                type="button"
-                onClick={() => setWorkspaceView('student')}
-                aria-pressed={workspaceView === 'student'}
-                className={`min-h-11 px-3 py-1.5 text-sm font-medium rounded-md transition-colors cursor-pointer ${
-                  workspaceView === 'student'
-                    ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
-                    : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
-                }`}
-              >
-                Öğrenci
-              </button>
-            </div>
+            <WorkspaceRoleControl />
           </div>
         </div>
 
@@ -277,36 +251,40 @@ export function HomeDashboard() {
           </p>
         </div>
 
-        <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Toplam Öğrenci</p>
-            <p className="mt-2 text-2xl sm:text-3xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
-              {students.length}
-            </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-              {classes.length} aktif sınıf · {students.filter((s) => s.status === 'active').length} kayıtlı
-            </p>
-          </div>
+        <div className={workspaceView === 'teacher' ? "grid grid-cols-2 gap-4 lg:grid-cols-4" : "grid gap-4"}>
+          {workspaceView === 'teacher' && (
+            <>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Toplam Öğrenci</p>
+                <p className="mt-2 text-2xl sm:text-3xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
+                  {students.length}
+                </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                  {classes.length} aktif sınıf · {students.filter((s) => s.status === 'active').length} kayıtlı
+                </p>
+              </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Genel Sınav Ortalaması</p>
-            <p className="mt-2 text-2xl sm:text-3xl font-semibold font-mono tabular-nums text-teal-700 dark:text-teal-400">
-              {grades.length > 0 ? overallAverage.toFixed(1) : '—'}
-            </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-              {grades.length} kayıtlı sınav notu
-            </p>
-          </div>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Genel Sınav Ortalaması</p>
+                <p className="mt-2 text-2xl sm:text-3xl font-semibold font-mono tabular-nums text-teal-700 dark:text-teal-400">
+                  {grades.length > 0 ? overallAverage.toFixed(1) : '—'}
+                </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                  {grades.length} kayıtlı sınav notu
+                </p>
+              </div>
 
-          <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
-            <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Deneme Ortalama Net</p>
-            <p className="mt-2 text-2xl sm:text-3xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
-              {trialStats.examCount > 0 ? trialStats.avgTotalNet.toFixed(2) : '—'}
-            </p>
-            <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-              {trialStats.examCount} deneme · Ort. {trialStats.avgTotalCorrect.toFixed(1)} doğru
-            </p>
-          </div>
+              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
+                <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Deneme Ortalama Net</p>
+                <p className="mt-2 text-2xl sm:text-3xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
+                  {trialStats.examCount > 0 ? trialStats.avgTotalNet.toFixed(2) : '—'}
+                </p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400 tabular-nums">
+                  {trialStats.examCount} deneme · Ort. {trialStats.avgTotalCorrect.toFixed(1)} doğru
+                </p>
+              </div>
+            </>
+          )}
 
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
             <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Atölye ve Alıştırmalar</p>
@@ -331,14 +309,16 @@ export function HomeDashboard() {
               Ders, konu veya Keşif Atölyesi etkinliği arayın.
             </p>
           </div>
-          <button
-            type="button"
-            onClick={() => setActiveModule('reports')}
-            className="inline-flex min-h-11 items-center gap-1.5 text-left text-sm font-medium text-teal-700 dark:text-teal-400 hover:underline self-start sm:self-auto cursor-pointer"
-          >
-            <BarChart3 className="w-4 h-4" />
-            <span>Tüm Raporlar ve İstatistikler</span>
-          </button>
+          {isModuleAvailable('reports', workspaceView) && (
+            <button
+              type="button"
+              onClick={() => setActiveModule('reports')}
+              className="inline-flex min-h-11 items-center gap-1.5 text-left text-sm font-medium text-teal-700 dark:text-teal-400 hover:underline self-start sm:self-auto cursor-pointer"
+            >
+              <BarChart3 className="w-4 h-4" />
+              <span>Tüm Raporlar ve İstatistikler</span>
+            </button>
+          )}
         </div>
 
         <nav aria-label="Alıştırma kısayolları" className="control-grid mb-3 max-w-sm gap-2">
@@ -435,40 +415,42 @@ export function HomeDashboard() {
             );
           })}
 
-          {/* Common AI Assistant Quick Card */}
-          {showAssistant && <article className="bg-navy-900 text-white border border-navy-800 rounded-xl p-6 flex flex-col justify-between">
-            <div>
-              <div className="flex items-center justify-between gap-3 mb-4">
-                <div className="w-10 h-10 rounded-lg bg-white/10 text-gold-400 flex items-center justify-center">
-                  <Bot className="w-5 h-5" />
+          {showAssistant && (
+            <article className={`@container rounded-xl border border-navy-800 bg-navy-900 text-white ${assistantSpan}`}>
+              <div className="flex h-full flex-col justify-between gap-5 p-6 @xl:flex-row @xl:items-center @xl:p-8">
+                <div className="flex flex-col gap-4 @xl:flex-row @xl:items-start">
+                  <div className="grid size-10 shrink-0 place-items-center rounded-lg bg-white/10 text-gold-400 @xl:size-12">
+                    <Bot aria-hidden="true" className="size-5 @xl:size-6" />
+                  </div>
+                  <div className="max-w-2xl">
+                    <p className="mb-1.5 text-xs font-medium text-teal-300">
+                      {geminiConfigured === true ? 'Gemini anahtarı tanımlı'
+                        : geminiConfigured === false ? 'Gemini anahtarı bekleniyor' : 'Gemini API desteği'}
+                    </p>
+                    <h3 className="text-lg font-semibold leading-snug text-white @xl:text-2xl">
+                      Ortak Yapay Zekâ Asistanı
+                    </h3>
+                    <p className="mt-1 text-sm text-slate-300">
+                      Ders Anlatımı, Soru Taslağı ve Çalışma Planı
+                    </p>
+                    <p className="mt-3 text-sm leading-relaxed text-slate-200">
+                      Bulunduğunuz modüle ve rolünüze göre Türkçe rehberlik alın. Özel öğrenci verileri
+                      açık onayınız olmadan başka modüllere aktarılmaz.
+                    </p>
+                  </div>
                 </div>
-                <span className="text-xs font-mono text-gold-400/90">Ortak Servis</span>
+                <div className="border-t border-white/10 pt-4 @xl:shrink-0 @xl:border-0 @xl:pt-0">
+                  <button
+                    type="button"
+                    onClick={() => setActiveModule('ai-assistant')}
+                    className="min-h-11 w-full cursor-pointer rounded-lg bg-gold-400 px-4 py-2 text-sm font-semibold text-navy-950 transition-colors hover:bg-gold-500 @xl:w-auto"
+                  >
+                    Asistanı aç
+                  </button>
+                </div>
               </div>
-              <p className="text-xs font-medium text-teal-300 mb-1.5">
-                {geminiConfigured === true ? 'Gemini anahtarı tanımlı'
-                  : geminiConfigured === false ? 'Gemini anahtarı bekleniyor' : 'Gemini API desteği'}
-              </p>
-              <h3 className="text-lg font-semibold text-white leading-snug">
-                Ortak Yapay Zekâ Asistanı
-              </h3>
-              <p className="text-xs text-slate-300 mt-1">
-                Ders Anlatımı, Soru Taslağı ve Çalışma Planı
-              </p>
-              <p className="mt-3 text-sm text-slate-200/90 leading-relaxed">
-                Bulunduğunuz modüle ve rolünüze göre Türkçe rehberlik alın. Özel öğrenci verileri
-                açık onayınız olmadan başka modüllere aktarılmaz.
-              </p>
-            </div>
-            <div className="mt-6 pt-4 border-t border-white/10">
-              <button
-                type="button"
-                onClick={() => setActiveModule('ai-assistant')}
-                className="inline-flex min-h-11 w-full items-center justify-center px-4 py-2 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 hover:bg-gold-500 transition-colors cursor-pointer"
-              >
-                <span>Asistanı aç</span>
-              </button>
-            </div>
-          </article>}
+            </article>
+          )}
         </div>}
       </section>
 

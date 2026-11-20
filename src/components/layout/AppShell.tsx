@@ -23,7 +23,7 @@ import {
   X,
   Zap,
 } from 'lucide-react';
-import { useAcademy } from '../../context/AcademyContext';
+import { isModuleAvailable, useAcademy } from '../../context/AcademyContext';
 import type { ModuleId } from '../../types/academy';
 
 export interface NavItem {
@@ -68,7 +68,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const drawerRef = useRef<HTMLDialogElement>(null);
   const previousModule = useRef(activeModule);
 
-  const currentNav = NAV_ITEMS.find((item) => item.id === activeModule) ?? NAV_ITEMS[0];
+  const visibleNav = NAV_ITEMS.filter((item) => isModuleAvailable(item.id, workspaceView));
+  const currentNav = visibleNav.find((item) => item.id === activeModule) ?? NAV_ITEMS[0];
 
   useEffect(() => {
     if (previousModule.current === activeModule) return;
@@ -140,7 +141,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </div>
 
         <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-3">
-          {NAV_ITEMS.map((item) => {
+          {visibleNav.map((item) => {
             const Icon = item.icon;
             const isActive = activeModule === item.id;
             return (
@@ -153,11 +154,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 aria-current={isActive ? 'page' : undefined}
                 className={`w-full flex items-center min-h-10 gap-3 px-3 py-1 rounded-lg text-left text-sm font-medium leading-tight transition-colors cursor-pointer ${
                   isActive
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-teal-300 font-semibold text-navy-950'
                     : 'text-slate-300 hover:bg-white/8 hover:text-white'
                 } ${collapsed ? 'justify-center' : ''}`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gold-400/90'}`} />
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-navy-950' : 'text-gold-400/90'}`} />
                 {!collapsed && <span className="min-w-0 break-words">{item.label}</span>}
               </button>
             );
@@ -242,7 +243,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               </button>
             </div>
             <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
-              {NAV_ITEMS.map((item) => {
+              {visibleNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeModule === item.id;
                 return (
@@ -253,11 +254,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     aria-current={isActive ? 'page' : undefined}
                     className={`w-full flex items-center min-h-11 gap-3 px-3 py-1 rounded-lg text-left text-sm font-medium leading-tight transition-colors cursor-pointer ${
                       isActive
-                        ? 'bg-teal-600 text-white'
+                        ? 'bg-teal-300 font-semibold text-navy-950'
                         : 'text-slate-200 hover:bg-white/10 hover:text-white'
                     }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0 text-gold-400" />
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-navy-950' : 'text-gold-400'}`} />
                     <span className="min-w-0 break-words">{item.label}</span>
                   </button>
                 );
@@ -341,11 +342,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
+              aria-label="Koyu tema"
+              aria-pressed={theme === 'dark'}
               title={theme === 'dark' ? 'Açık tema' : 'Koyu tema'}
-              className="grid size-11 shrink-0 place-items-center rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="appearance-option size-11 shrink-0 cursor-pointer px-0"
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-gold-400" /> : <Moon className="w-4 h-4 text-navy-900" />}
+              {theme === 'dark' ? <Sun aria-hidden="true" className="size-4" /> : <Moon aria-hidden="true" className="size-4" />}
             </button>
             {user ? (
               <button

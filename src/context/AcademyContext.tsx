@@ -265,13 +265,13 @@ interface AcademyContextValue {
 
 const AcademyContext = createContext<AcademyContextValue | null>(null);
 
+export function isModuleAvailable(module: ModuleId, view: WorkspaceView): boolean {
+  return view === 'teacher' || (module !== 'student-tracking' && module !== 'reports');
+}
+
 export function AcademyProvider({ children }: { children: React.ReactNode }) {
-  const [activeModule, setModule] = useState<ModuleId>('home');
+  const [selectedModule, setModule] = useState<ModuleId>('home');
   const [workshopActivityId, setWorkshopActivityId] = useState<ActivityId | null>(null);
-  const setActiveModule = useCallback((module: ModuleId) => {
-    setWorkshopActivityId(null);
-    setModule(module);
-  }, []);
   const openWorkshopActivity = useCallback((id: ActivityId) => {
     setWorkshopActivityId(id);
     setModule('activity-workshop');
@@ -294,7 +294,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     }
     return 'light';
   });
-  const [workspaceView, setWorkspaceViewState] = useState<WorkspaceView>('teacher');
+  const [demoView, setDemoView] = useState<WorkspaceView>('teacher');
   const [compactMode, setCompactModeState] = useState<boolean>(false);
 
   // Demo state (used when signed out)
@@ -314,6 +314,22 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const isDemoMode = !user;
+  const isTeacherAccount = user !== null && profile?.uid === user.uid
+    && (profile.role === 'teacher' || profile.role === 'admin');
+  const workspaceView: WorkspaceView = isDemoMode && !authLoading
+    ? demoView
+    : isTeacherAccount ? 'teacher' : 'student';
+  const activeModule = isModuleAvailable(selectedModule, workspaceView) ? selectedModule : 'home';
+
+  const setActiveModule = useCallback((module: ModuleId) => {
+    if (!isModuleAvailable(module, workspaceView)) return;
+    setWorkshopActivityId(null);
+    setModule(module);
+  }, [workspaceView]);
+
+  useEffect(() => {
+    setModule((module) => isModuleAvailable(module, workspaceView) ? module : 'home');
+  }, [workspaceView]);
 
   const notify = useCallback((type: ToastItem['type'], title: string, description?: string) => {
     const id = generateValidId('toast');
@@ -383,8 +399,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const setWorkspaceView = useCallback(
     (next: WorkspaceView) => {
-      setWorkspaceViewState(next);
-      void persistUserSettings(theme, next, compactMode);
+      if (!isDemoMode || authLoading) return;
+      setDemoView(next);
       notify(
         'info',
         next === 'teacher' ? 'Öğretmen Görünümü Aktif' : 'Öğrenci Görünümü Aktif',
@@ -393,7 +409,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           : 'Öğrenci odaklı çalışma, takip ve yapay zekâ rehberlik görünümüne geçildi.'
       );
     },
-    [compactMode, notify, persistUserSettings, theme]
+    [authLoading, isDemoMode, notify]
   );
 
   const setCompactMode = useCallback(
@@ -406,17 +422,21 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   // Firebase Auth listener + profile bootstrap
   useEffect(() => {
+    let authRevision = 0;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const revision = ++authRevision;
       setUser(firebaseUser);
+      setProfile(null);
       if (!firebaseUser) {
-        setProfile(null);
         setAuthLoading(false);
         return;
       }
+      setAuthLoading(true);
 
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
+        if (revision !== authRevision) return;
         const safeName = (firebaseUser.displayName || 'Bilge Kullanıcı').trim().slice(0, 100);
         const isBootstrappedAdmin = firebaseUser.email === 'ahmedkadiri99@gmail.com';
 
@@ -430,6 +450,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
+          if (revision !== authRevision) return;
           if (firebaseUser.email) {
             await setDoc(doc(db, 'users', firebaseUser.uid, 'private', 'contact'), {
               ownerId: firebaseUser.uid,
@@ -437,6 +458,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
               updatedAt: serverTimestamp(),
             });
           }
+          if (revision !== authRevision) return;
           setProfile({
             uid: firebaseUser.uid,
             displayName: safeName,
@@ -459,13 +481,11 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
         // Load saved user settings if present
         const settingsSnap = await getDoc(doc(db, 'userSettings', firebaseUser.uid));
+        if (revision !== authRevision) return;
         if (settingsSnap.exists()) {
           const sData = settingsSnap.data();
           if (sData.theme === 'dark' || sData.theme === 'light') {
             setThemeState(sData.theme);
-          }
-          if (sData.workspaceView === 'teacher' || sData.workspaceView === 'student') {
-            setWorkspaceViewState(sData.workspaceView);
           }
           if (typeof sData.compactMode === 'boolean') {
             setCompactModeState(sData.compactMode);
@@ -474,11 +494,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Profil yüklenirken hata:', error);
       } finally {
-        setAuthLoading(false);
+        if (revision === authRevision) setAuthLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      authRevision += 1;
+      unsubscribe();
+    };
   }, []);
 
   // Firestore real-time subscriptions (only when signed in)

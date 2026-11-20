@@ -46,6 +46,43 @@
   }
 }
 
+@layer components {
+  .appearance-option {
+    @apply flex min-h-11 min-w-0 items-center justify-center gap-1.5 rounded-lg border
+      border-slate-500 bg-white px-2 py-1.5 text-center text-sm font-medium text-slate-900
+      transition-colors;
+    overflow-wrap: anywhere;
+  }
+
+  .dark .appearance-option {
+    @apply border-slate-400 bg-slate-800 text-slate-100;
+  }
+
+  button.appearance-option:is(:hover, :active) {
+    @apply bg-teal-50;
+  }
+
+  .dark button.appearance-option:is(:hover, :active) {
+    @apply bg-slate-700;
+  }
+
+  .appearance-option:is([aria-pressed="true"], [data-selected="true"]) {
+    @apply border-teal-800 bg-teal-800 font-semibold text-white shadow-sm;
+  }
+
+  button.appearance-option[aria-pressed="true"]:is(:hover, :active) {
+    @apply border-teal-900 bg-teal-900;
+  }
+
+  .dark .appearance-option:is([aria-pressed="true"], [data-selected="true"]) {
+    @apply border-teal-200 bg-teal-300 text-navy-950;
+  }
+
+  .dark button.appearance-option[aria-pressed="true"]:is(:hover, :active) {
+    @apply bg-teal-200;
+  }
+}
+
 .control-grid {
   display: grid;
   width: 100%;
