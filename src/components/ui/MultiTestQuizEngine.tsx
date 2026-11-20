@@ -1,13 +1,15 @@
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useRef, useState } from 'react';
 import {
   CheckCircle2,
   ChevronLeft,
   ChevronRight,
   ClipboardCheck,
+  Flag,
   RotateCcw,
   Shuffle,
   XCircle,
 } from 'lucide-react';
+import { Modal } from './Modal';
 
 export interface MultiTestQuestion {
   id: string;
@@ -50,9 +52,18 @@ export function MultiTestQuizEngine({
   const [currentIndex, setCurrentIndex] = useState(0);
   const [answers, setAnswers] = useState<Record<string, number>>({});
   const [submitted, setSubmitted] = useState(false);
+  const [markedQuestions, setMarkedQuestions] = useState<Set<string>>(() => new Set());
+  const [confirmation, setConfirmation] = useState<{
+    kind: 'switch' | 'finish';
+    proceed: () => void;
+  } | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+  const [saveError, setSaveError] = useState(false);
+  const [showMissedOnly, setShowMissedOnly] = useState(false);
+  const saving = useRef(false);
   const [completedScores, setCompletedScores] = useState<Record<string, { score: number; total: number }>>({});
 
-  const activePack: MultiTestPack = useMemo(() => {
+  const activePack = useMemo<MultiTestPack | undefined>(() => {
     if (selectedTestId === '__mixed__' && mixedQuestions) {
       return {
         id: '__mixed__',
@@ -66,7 +77,7 @@ export function MultiTestQuizEngine({
     return tests.find((t) => t.id === selectedTestId) ?? tests[0];
   }, [mixedQuestions, moduleLabel, selectedTestId, tests]);
 
-  const questions = activePack.questions;
+  const questions = activePack?.questions ?? [];
   const currentQuestion = questions[currentIndex] ?? questions[0];
 
   const answeredCount = useMemo(
@@ -79,54 +90,127 @@ export function MultiTestQuizEngine({
     [answers, questions]
   );
 
+  const blankCount = questions.length - answeredCount;
+
+  const confirmSwitch = (switchTest: () => void) => {
+    if (!submitted && (answeredCount > 0 || markedQuestions.size > 0)) {
+      setConfirmation({ kind: 'switch', proceed: switchTest });
+      return;
+    }
+    switchTest();
+  };
+
   const handleSelectPack = (id: string) => {
-    setSelectedTestId(id);
-    setMixedQuestions(null);
-    setCurrentIndex(0);
-    setAnswers({});
-    setSubmitted(false);
+    if (saving.current || id === activePack?.id) return;
+    confirmSwitch(() => {
+      setSelectedTestId(id);
+      setMixedQuestions(null);
+      handleResetActive();
+    });
   };
 
   const handleStartMixedTest = () => {
-    const allQuestions = tests.flatMap((t) => t.questions);
-    const shuffled = [...allQuestions].sort(() => Math.random() - 0.5).slice(0, 10);
-    setMixedQuestions(shuffled);
-    setSelectedTestId('__mixed__');
-    setCurrentIndex(0);
-    setAnswers({});
-    setSubmitted(false);
+    if (saving.current) return;
+    const shuffled = tests.flatMap((t) => t.questions);
+    const sampleSize = Math.min(shuffled.length, 10);
+    for (let i = 0; i < sampleSize; i++) {
+      const j = i + Math.floor(Math.random() * (shuffled.length - i));
+      [shuffled[i], shuffled[j]] = [shuffled[j], shuffled[i]];
+    }
+    confirmSwitch(() => {
+      setMixedQuestions(shuffled.slice(0, sampleSize));
+      setSelectedTestId('__mixed__');
+      handleResetActive();
+    });
   };
 
   const handlePickOption = (questionId: string, optionIdx: number) => {
-    if (submitted) return;
+    if (submitted || saving.current) return;
     if (feedbackMode === 'instant' && answers[questionId] !== undefined) return;
     setAnswers((prev) => ({ ...prev, [questionId]: optionIdx }));
   };
 
   const handleFinishTest = async () => {
-    setSubmitted(true);
-    setCompletedScores((prev) => ({
-      ...prev,
-      [activePack.id]: { score: correctCount, total: questions.length },
-    }));
-    await onCompleteTest({
-      testTitle: activePack.title,
-      correctCount,
-      totalQuestions: questions.length,
-    });
+    if (submitted || saving.current || !activePack || !questions.length) return;
+    saving.current = true;
+    setIsSaving(true);
+    setSaveError(false);
+    try {
+      await onCompleteTest({
+        testTitle: activePack.title,
+        correctCount,
+        totalQuestions: questions.length,
+      });
+      setCompletedScores((prev) => ({
+        ...prev,
+        [activePack.id]: { score: correctCount, total: questions.length },
+      }));
+      setSubmitted(true);
+    } catch {
+      setSaveError(true);
+    } finally {
+      saving.current = false;
+      setIsSaving(false);
+    }
+  };
+
+  const requestFinish = () => {
+    if (blankCount === 0 || saveError) {
+      void handleFinishTest();
+      return;
+    }
+    setConfirmation({ kind: 'finish', proceed: () => void handleFinishTest() });
   };
 
   const handleResetActive = () => {
     setAnswers({});
     setCurrentIndex(0);
     setSubmitted(false);
+    setSaveError(false);
+    setShowMissedOnly(false);
+    setMarkedQuestions(new Set());
   };
 
-  const chosenForCurrent = currentQuestion ? answers[currentQuestion.id] : undefined;
+  if (!activePack || !currentQuestion) {
+    return <p className="text-sm text-slate-600 dark:text-slate-300">Bu bölümde henüz test bulunmuyor.</p>;
+  }
+
+  const nextPack = tests[tests.findIndex((pack) => pack.id === activePack.id) + 1];
+  const markedForCurrent = markedQuestions.has(currentQuestion.id);
+  const nextMarkedIndex = questions.findIndex((question, index) => index > currentIndex && markedQuestions.has(question.id));
+  const firstMarkedIndex = questions.findIndex((question) => markedQuestions.has(question.id));
+  const chosenForCurrent = answers[currentQuestion.id];
   const revealCurrent = submitted || (feedbackMode === 'instant' && chosenForCurrent !== undefined);
+
+  const confirmingFinish = confirmation?.kind === 'finish';
 
   return (
     <div className="space-y-6">
+      <Modal
+        open={confirmation !== null}
+        onClose={() => setConfirmation(null)}
+        title={confirmingFinish ? 'Test bitirilsin mi?' : 'Başka bir teste geçilsin mi?'}
+        subtitle={confirmingFinish
+          ? `${blankCount} soru boş bırakıldı. Testi bitirirseniz bu yanıtlar boş olarak değerlendirilir.`
+          : 'Bu testteki yanıtlarınız ve soru işaretleriniz silinecek.'}
+        maxWidthClass="max-w-md"
+      >
+        <div className="control-grid ml-auto max-w-sm gap-3">
+          <button type="button" onClick={() => setConfirmation(null)} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700 dark:text-white">
+            Teste dön
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              setConfirmation(null);
+              confirmation?.proceed();
+            }}
+            className="rounded-lg bg-navy-900 px-4 py-2 text-sm font-medium text-white dark:bg-teal-600"
+          >
+            {confirmingFinish ? 'Testi bitir' : 'Testi değiştir'}
+          </button>
+        </div>
+      </Modal>
       {/* Test Pack Selector Grid */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5 space-y-4">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
@@ -145,7 +229,9 @@ export function MultiTestQuizEngine({
               <button
                 type="button"
                 onClick={() => setFeedbackMode('instant')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+                disabled={isSaving || (answeredCount > 0 && !submitted)}
+                aria-pressed={feedbackMode === 'instant'}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer disabled:cursor-default ${
                   feedbackMode === 'instant'
                     ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-400'
@@ -156,7 +242,9 @@ export function MultiTestQuizEngine({
               <button
                 type="button"
                 onClick={() => setFeedbackMode('exam')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+                disabled={isSaving || (answeredCount > 0 && !submitted)}
+                aria-pressed={feedbackMode === 'exam'}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer disabled:cursor-default ${
                   feedbackMode === 'exam'
                     ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
                     : 'text-slate-600 dark:text-slate-400'
@@ -169,6 +257,7 @@ export function MultiTestQuizEngine({
             <button
               type="button"
               onClick={handleStartMixedTest}
+              disabled={isSaving}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-gold-500/60 bg-gold-50/70 dark:bg-gold-950/20 text-navy-900 dark:text-gold-300 hover:bg-gold-100 dark:hover:bg-gold-950/40 cursor-pointer whitespace-nowrap"
             >
               <Shuffle className="w-3.5 h-3.5" />
@@ -179,13 +268,15 @@ export function MultiTestQuizEngine({
 
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
           {tests.map((pack) => {
-            const isSelected = selectedTestId === pack.id;
+            const isSelected = activePack.id === pack.id;
             const prevScore = completedScores[pack.id];
             return (
               <button
                 key={pack.id}
                 type="button"
                 onClick={() => handleSelectPack(pack.id)}
+                disabled={isSaving}
+                aria-pressed={isSelected}
                 className={`text-left p-4 rounded-xl border transition-colors cursor-pointer flex flex-col justify-between gap-2 ${
                   isSelected
                     ? 'border-navy-900 bg-navy-900 text-white dark:border-teal-500 dark:bg-teal-600'
@@ -265,12 +356,47 @@ export function MultiTestQuizEngine({
                     key={q.id}
                     type="button"
                     onClick={() => setCurrentIndex(idx)}
-                    className={`w-8 h-8 rounded-lg border text-xs font-mono font-semibold tabular-nums transition-colors cursor-pointer ${btnStyle}`}
+                    aria-current={isCurrent ? 'step' : undefined}
+                    aria-label={`Soru ${idx + 1}${picked !== undefined ? ', yanıtlandı' : ''}${markedQuestions.has(q.id) ? ', işaretli' : ''}`}
+                    className={`relative size-9 rounded-lg border text-xs font-mono font-semibold tabular-nums transition-colors cursor-pointer ${btnStyle}`}
                   >
                     {idx + 1}
+                    {markedQuestions.has(q.id) && (
+                      <Flag aria-hidden="true" className="absolute -right-1 -top-1 size-3 rounded-sm bg-gold-300 p-px text-navy-950" />
+                    )}
                   </button>
                 );
               })}
+            </div>
+          </div>
+
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <progress aria-label="Yanıtlanan soru sayısı" value={answeredCount} max={questions.length} className="h-2 w-36 max-w-full accent-teal-600" />
+            <div className="control-grid gap-2 sm:max-w-sm">
+              <button
+                type="button"
+                aria-pressed={markedForCurrent}
+                disabled={isSaving}
+                onClick={() => setMarkedQuestions((previous) => {
+                  const next = new Set(previous);
+                  if (next.has(currentQuestion.id)) next.delete(currentQuestion.id);
+                  else next.add(currentQuestion.id);
+                  return next;
+                })}
+                className="inline-flex items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-medium text-slate-700 aria-pressed:border-gold-500 aria-pressed:bg-gold-100 dark:border-slate-700 dark:text-slate-200 dark:aria-pressed:bg-gold-950/50"
+              >
+                <Flag aria-hidden="true" className="size-4" />
+                {markedForCurrent ? 'İşareti kaldır' : 'Sonra dönmek için işaretle'}
+              </button>
+              {firstMarkedIndex !== -1 && (
+                <button
+                  type="button"
+                  onClick={() => setCurrentIndex(nextMarkedIndex === -1 ? firstMarkedIndex : nextMarkedIndex)}
+                  className="rounded-lg px-3 py-2 text-sm font-medium text-teal-700 underline underline-offset-4 dark:text-teal-400"
+                >
+                  İşaretli soruya git ({markedQuestions.size})
+                </button>
+              )}
             </div>
           </div>
 
@@ -306,6 +432,8 @@ export function MultiTestQuizEngine({
                     key={`${currentQuestion.id}-${optIdx}`}
                     type="button"
                     onClick={() => handlePickOption(currentQuestion.id, optIdx)}
+                    aria-pressed={isPicked}
+                    disabled={isSaving || revealCurrent}
                     className={`w-full text-left p-4 rounded-xl border transition-colors flex items-start gap-3 cursor-pointer ${optionClass}`}
                   >
                     <span className="font-mono font-semibold text-xs mt-0.5 shrink-0">
@@ -323,9 +451,21 @@ export function MultiTestQuizEngine({
               })}
             </div>
 
+            {feedbackMode === 'exam' && chosenForCurrent !== undefined && (
+              <button
+                type="button"
+                disabled={isSaving}
+                onClick={() => setAnswers(({ [currentQuestion.id]: _cleared, ...remaining }) => remaining)}
+                className="text-sm font-medium text-teal-700 underline underline-offset-4 dark:text-teal-400 disabled:opacity-60"
+              >
+                Yanıtı temizle
+              </button>
+            )}
+
             {/* Instant Solution Feedback */}
             {revealCurrent && (
               <div
+                role="status"
                 className={`p-4 rounded-xl border text-xs sm:text-sm leading-relaxed ${
                   chosenForCurrent === currentQuestion.correctIndex
                     ? 'border-emerald-200 dark:border-emerald-900 bg-emerald-50/70 dark:bg-emerald-950/30 text-emerald-950 dark:text-emerald-200'
@@ -344,8 +484,14 @@ export function MultiTestQuizEngine({
             )}
           </div>
 
+          {saveError && (
+            <p role="alert" className="text-sm text-red-700 dark:text-red-300">
+              Test sonucu kaydedilemedi. Yanıtlarınız burada duruyor. Tekrar deneyebilirsiniz.
+            </p>
+          )}
+
           {/* Footer Controls */}
-          <div className="pt-4 border-t border-slate-100 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
+          <div className="control-grid gap-2 border-t border-slate-100 pt-4 dark:border-slate-800">
             <button
               type="button"
               disabled={currentIndex === 0}
@@ -356,27 +502,26 @@ export function MultiTestQuizEngine({
               <span>Önceki Soru</span>
             </button>
 
-            <div className="flex items-center gap-2">
-              {currentIndex < questions.length - 1 && (
-                <button
-                  type="button"
-                  onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
-                  className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
-                >
-                  <span>Sonraki Soru</span>
-                  <ChevronRight className="w-4 h-4" />
-                </button>
-              )}
-
+            {currentIndex < questions.length - 1 && (
               <button
                 type="button"
-                onClick={() => void handleFinishTest()}
-                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 cursor-pointer whitespace-nowrap"
+                onClick={() => setCurrentIndex((i) => Math.min(questions.length - 1, i + 1))}
+                className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap"
               >
-                <ClipboardCheck className="w-4 h-4" />
-                <span>Testi Bitir ve Değerlendir</span>
+                <span>Sonraki Soru</span>
+                <ChevronRight className="w-4 h-4" />
               </button>
-            </div>
+            )}
+
+            <button
+              type="button"
+              onClick={requestFinish}
+              disabled={isSaving}
+              className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 cursor-pointer whitespace-nowrap disabled:opacity-50"
+            >
+              <ClipboardCheck className="w-4 h-4" />
+              <span>{isSaving ? 'Kaydediliyor…' : blankCount > 0 ? `Testi Bitir (${blankCount} boş)` : 'Testi Bitir ve Değerlendir'}</span>
+            </button>
           </div>
         </section>
       ) : (
@@ -393,7 +538,7 @@ export function MultiTestQuizEngine({
                 {Math.round((correctCount / questions.length) * 100)})
               </h3>
             </div>
-            <div className="flex flex-wrap items-center gap-2">
+            <div className="control-grid gap-2 sm:max-w-sm">
               <button
                 type="button"
                 onClick={handleResetActive}
@@ -402,10 +547,10 @@ export function MultiTestQuizEngine({
                 <RotateCcw className="w-3.5 h-3.5" />
                 <span>Bu Testi Yeniden Çöz</span>
               </button>
-              {activePack.testNumber > 0 && activePack.testNumber < tests.length && (
+              {activePack.id !== '__mixed__' && nextPack && (
                 <button
                   type="button"
-                  onClick={() => handleSelectPack(tests[activePack.testNumber].id)}
+                  onClick={() => handleSelectPack(nextPack.id)}
                   className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 cursor-pointer whitespace-nowrap"
                 >
                   <span>Sonraki Teste Geç</span>
@@ -415,11 +560,24 @@ export function MultiTestQuizEngine({
             </div>
           </div>
 
+          <label className="inline-flex items-center gap-2 text-sm text-slate-700 dark:text-slate-200">
+            <input
+              type="checkbox"
+              checked={showMissedOnly}
+              onChange={(event) => setShowMissedOnly(event.target.checked)}
+              className="size-4 accent-teal-600"
+            />
+            Yalnızca yanlış ve boş soruları göster
+          </label>
+          {showMissedOnly && correctCount === questions.length && (
+            <p role="status" className="text-sm text-slate-600 dark:text-slate-300">Bütün soruları doğru yanıtladınız.</p>
+          )}
           <div className="space-y-3">
             {questions.map((q, idx) => {
               const picked = answers[q.id];
               const isCorrect = picked === q.correctIndex;
               const isBlank = picked === undefined;
+              if (showMissedOnly && isCorrect) return null;
               return (
                 <div
                   key={q.id}

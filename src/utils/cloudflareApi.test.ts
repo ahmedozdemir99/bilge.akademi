@@ -4,7 +4,7 @@ import { onRequest } from '../../functions/api/[[path]]';
 function createContext(
   url: string,
   init: RequestInit = {},
-  env: { GEMINI_API_KEY?: string } = {}
+  env: { GEMINI_API_KEY?: string; 'Gemini API Key'?: string } = {}
 ) {
   return {
     request: new Request(url, init),
@@ -26,8 +26,8 @@ async function runTests() {
     assert.equal(healthMissingBody.ok, true);
     assert.equal(healthMissingBody.runtime, 'cloudflare-pages');
     assert.equal(healthMissingBody.aiConfigured, false);
-    assert.equal(healthMissingBody.model, 'gemini-4-hydrogen');
-    assert.equal(healthMissingBody.fallbackModel, 'gemini-3.1-flash-lite');
+    assert.equal(healthMissingBody.model, 'gemini-3.8-flash');
+    assert.equal(healthMissingBody.fallbackModel, 'gemini-3.5-flash-lite');
 
     // 2. Health endpoint with API key (must NOT leak key)
     const fakeSecretKey = 'AIzaSyTEST_HEALTH_KEY_DO_NOT_LEAK_0001';
@@ -43,6 +43,15 @@ async function runTests() {
     assert.equal(healthOkText.includes(fakeSecretKey), false);
     const healthOkBody = JSON.parse(healthOkText) as Record<string, unknown>;
     assert.equal(healthOkBody.aiConfigured, true);
+
+    const healthSiteSecret = await onRequest(createContext(
+      'https://bilgeakademi.pages.dev/api/health',
+      { method: 'GET' },
+      { GEMINI_API_KEY: 'MY_GEMINI_API_KEY', 'Gemini API Key': fakeSecretKey },
+    ));
+    const healthSiteSecretText = await healthSiteSecret.text();
+    assert.equal(JSON.parse(healthSiteSecretText).aiConfigured, true);
+    assert.equal(healthSiteSecretText.includes(fakeSecretKey), false);
 
     // 3. Missing GEMINI_API_KEY returns 503 MISSING_API_KEY
     const missingKeyRes = await onRequest(
@@ -60,6 +69,32 @@ async function runTests() {
     const missingKeyBody = (await missingKeyRes.json()) as { code?: string; error?: string };
     assert.equal(missingKeyBody.code, 'MISSING_API_KEY');
     assert.ok(missingKeyBody.error?.includes('GEMINI_API_KEY'));
+
+    const connectionUrl = 'https://bilgeakademi.pages.dev/api/ai/connection';
+    const connectionRequest = { method: 'POST' };
+    const missingConnection = await onRequest(createContext(connectionUrl, connectionRequest));
+    assert.equal(missingConnection.status, 503);
+
+    const connectionContext = () => createContext(connectionUrl, connectionRequest, { GEMINI_API_KEY: fakeSecretKey });
+    globalThis.fetch = async (input, init) => {
+      const url = new URL(String(input));
+      assert.equal(url.hostname, 'generativelanguage.googleapis.com');
+      assert.equal(url.searchParams.has('key'), false);
+      assert.equal(new Headers(init?.headers).get('x-goog-api-key'), fakeSecretKey);
+      return Response.json({ models: [] });
+    };
+    const connectionOk = await onRequest(connectionContext());
+    assert.equal(connectionOk.status, 200);
+    assert.deepEqual(await connectionOk.json(), { ok: true });
+
+    globalThis.fetch = async () => Response.json({
+      error: { status: 'PERMISSION_DENIED', message: fakeSecretKey },
+    }, { status: 403 });
+    const connectionDenied = await onRequest(connectionContext());
+    assert.equal(connectionDenied.status, 403);
+    const connectionDeniedBody = await connectionDenied.text();
+    assert.ok(connectionDeniedBody.includes('AUTH_ERROR'));
+    assert.ok(!connectionDeniedBody.includes(fakeSecretKey));
 
     // 4. Primary Flash model succeeds directly
     const calledUrlsPrimary: string[] = [];
@@ -89,14 +124,14 @@ async function runTests() {
     const primaryBody = (await primaryRes.json()) as { reply?: string };
     assert.equal(primaryBody.reply, 'Merhaba öğrenci!');
     assert.equal(calledUrlsPrimary.length, 1);
-    assert.ok(calledUrlsPrimary[0].includes('/models/gemini-4-hydrogen:generateContent'));
+    assert.ok(calledUrlsPrimary[0].includes('/models/gemini-3.8-flash:generateContent'));
 
     // 5. Fallback to Flash-Lite when Primary hits 429 quota
     const calledUrlsFallback: string[] = [];
     globalThis.fetch = (async (input: string | URL | Request) => {
       const url = typeof input === 'string' ? input : input instanceof URL ? input.toString() : input.url;
       calledUrlsFallback.push(url);
-      if (url.includes('gemini-4-hydrogen')) {
+      if (url.includes('gemini-3.8-flash')) {
         return new Response(
           JSON.stringify({ error: { status: 'RESOURCE_EXHAUSTED', message: 'Quota exceeded' } }),
           { status: 429, headers: { 'Content-Type': 'application/json' } }
@@ -125,7 +160,7 @@ async function runTests() {
     const fallbackBody = (await fallbackRes.json()) as { reply?: string };
     assert.equal(fallbackBody.reply, 'Yedek Flash-Lite yanıtı');
     assert.equal(calledUrlsFallback.length, 2);
-    assert.ok(calledUrlsFallback[1].includes('/models/gemini-3.1-flash-lite:generateContent'));
+    assert.ok(calledUrlsFallback[1].includes('/models/gemini-3.5-flash-lite:generateContent'));
 
     // 6. Dynamic discovery when static IDs return 404 on external API key
     const calledUrlsDiscovery: string[] = [];

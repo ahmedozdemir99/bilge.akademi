@@ -202,7 +202,7 @@ export function ClassFormModal({
           </div>
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -407,7 +407,7 @@ export function StudentFormModal({
           </p>
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -685,7 +685,7 @@ export function GradeFormModal({
           />
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -851,7 +851,7 @@ export function AttendanceFormModal({
           />
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}

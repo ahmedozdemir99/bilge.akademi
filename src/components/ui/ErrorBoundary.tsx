@@ -53,7 +53,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
             <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">
               {this.state.errorMessage}
             </p>
-            <div className="flex items-center gap-3">
+            <div className="control-grid max-w-md gap-3">
               <button
                 type="button"
                 onClick={this.handleReset}

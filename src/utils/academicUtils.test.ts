@@ -11,6 +11,7 @@ import {
   normalizeScore,
 } from './exportUtils';
 import type { AttendanceRecord, Grade, PracticeExamRecord, Student } from '../types/academy';
+import { calculateTrialHistory } from './trialHistory';
 
 const sampleStudent: Student = {
   id: 'stu_test_9912',
@@ -194,4 +195,18 @@ assert.equal(robotSummary.subjectAverages.length, 6);
 assert.equal(robotSummary.subjectAverages[1].key, 'matematik');
 assert.equal(robotSummary.subjectAverages[1].avgNet, 12.5);
 
-console.log('BİLGE AKADEMİ birim testleri başarıyla geçti (7/7).');
+const current = { ...robotRecords[0], updatedAt: '2026-10-04T12:00:00Z' };
+const history = calculateTrialHistory([
+  { ...robotRecords[1], matematikD: 0, matematikY: 3 },
+  { ...current, id: 'old-copy', updatedAt: '2026-10-04T10:00:00Z', matematikD: 1 },
+  { ...current, id: 'peer-result', studentId: 'another-student', examTitle: ' lgs   DENEME 1 ', wrongPenalty: 4, matematikD: 19, matematikY: 1 },
+  current,
+]);
+assert.equal(history.length, 6);
+assert.deepEqual(history[1].points.map(({ date, net, count, change }) => ({ date, net, count, change })), [
+  { date: '2026-10-01', net: 16.38, count: 2, change: null },
+  { date: '2026-11-01', net: -1, count: 1, change: -17.38 },
+]);
+assert.ok(calculateTrialHistory([]).every(({ points }) => points.length === 0));
+
+console.log('BİLGE AKADEMİ birim testleri başarıyla geçti (8/8).');

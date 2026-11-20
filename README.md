@@ -93,19 +93,29 @@ npx tsx src/utils/modules.test.ts
 
 ---
 
+## ChatGPT Sites’ta Gemini’yi etkinleştirme
+
+1. [Google AI Studio](https://aistudio.google.com/apikey) üzerinden bir Gemini API anahtarı oluşturun.
+2. Bilge Akademi’nin Sites ayarlarında **Environment variables** bölümüne `GEMINI_API_KEY` adlı bir **Secret** ekleyin.
+3. Siteyi yeniden yayınlayın. Bilge Akademi’de **Ayarlar → Gemini bağlantısı → Bağlantıyı test et** yolunu izleyin.
+
 ## Cloudflare Pages Yayınlama Rehberi
 
 Bu proje hem Node.js/Express (`server.ts`) hem de **Cloudflare Pages Functions (`functions/api/[[path]].ts`)** ile tam uyumludur.
 
-1. **Derleme Ayarları (Cloudflare Pages):**
-   - Build command: `npm run build`
-   - Build output directory: `dist`
-2. **Yapay Zekâ ve Seslendirme (`GEMINI_API_KEY`):**
-   - Cloudflare Pages panelinde **Settings → Environment variables** bölümüne gidin.
-   - Hem **Production** hem **Preview** ortamı için `GEMINI_API_KEY` değişkenini (Secret olarak) ekleyip yeniden yayınlayın (**Retry deployment**).
-3. **Google ile Giriş (Firebase Authentication):**
-   - Firebase Console → **Authentication → Settings → Authorized domains** listesine Cloudflare alan adlarınızı ekleyin (`bilge-akademi.pages.dev` ve `main.bilge-akademi.pages.dev`).
-   - Not: Giriş yapılmasa bile tüm dersler, testler, deneyler ve ibadet rehberi **Demo Modu** ile eksiksiz çalışır.
+| Ayar | Değer |
+| --- | --- |
+| GitHub deposu | `ahmedozdemir99/bilge.akademi` |
+| Production branch | `cloudflare-pages` |
+| Framework preset | `None` |
+| Build command | `bun install --frozen-lockfile && npm run build:pages` |
+| Build output directory | `dist` |
+| Root directory | Boş bırakın (depo kökü) |
+| Build değişkenleri | `NODE_VERSION=24`, `BUN_VERSION=1.4.5`, `SKIP_DEPENDENCY_INSTALL=true` |
+
+- **Yapay zekâ ve seslendirme:** Pages projesinin **Settings → Variables and Secrets** bölümünde `GEMINI_API_KEY` değerini şifreli bir gizli değişken olarak ekleyin. Önizlemede de kullanacaksanız Preview ortamında ayrıca tanımlayın. Değişkeni kaydettikten sonra dağıtımı yeniden başlatın.
+- **Google ile giriş:** Firebase Console → **Authentication → Settings → Authorized domains** listesine yayının alan adını ekleyin. Önizlemede giriş yapacaksanız kullandığınız önizleme alan adını da ekleyin.
+- **Telefona kurulum:** Yayın adresini Android’de Chrome ile açıp menüden **Uygulamayı yükle** veya **Ana ekrana ekle** seçeneğini kullanın. iPhone’da Safari’nin **Paylaş → Ana Ekrana Ekle** seçeneğini kullanın.
 
 ---
 

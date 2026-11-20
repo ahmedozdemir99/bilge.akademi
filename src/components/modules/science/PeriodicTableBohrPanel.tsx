@@ -61,7 +61,7 @@ export function PeriodicTableBohrPanel() {
             </h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
+          <div className="control-grid gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
             {CATEGORY_FILTERS.map((cat) => (
               <button
                 key={cat}

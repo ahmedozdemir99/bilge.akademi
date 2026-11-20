@@ -90,12 +90,16 @@ export function AIAssistantModule() {
           message: trimmed,
           moduleContext: selectedContext,
           roleView: workspaceView,
-          history: nextHistory.slice(-8).map((m) => ({ role: m.role, text: m.text })),
+          history: messages.filter((message) => message.id !== 'welcome').slice(-8).map((m) => ({ role: m.role, text: m.text })),
         }),
       });
-      const data = (await response.json().catch(() => ({}))) as { error?: string; reply?: string };
-      if (!response.ok) {
-        if (data.error) {
+      const data = (await response.json().catch(() => ({}))) as { error?: string; code?: string; reply?: string };
+      if (!response.ok || !data.reply?.trim()) {
+        setMessages((prev) => prev.filter((message) => message.id !== userMsg.id));
+        setInput((current) => current || trimmed);
+        if (data.code === 'MISSING_API_KEY') {
+          setError('Yapay zekâ asistanı şu anda kullanılamıyor.');
+        } else if (data.error) {
           setError(data.error);
         } else if (response.status === 404) {
           setError('İstenen yapay zekâ modeli bulunamadı veya şu anda erişilemiyor.');
@@ -111,7 +115,7 @@ export function AIAssistantModule() {
         return;
       }
 
-      const replyText = String(data.reply || 'Yanıt oluşturulamadı.');
+      const replyText = data.reply.trim();
       const assistantMsg: AIChatMessage = {
         id: `a_${Date.now()}`,
         role: 'assistant',
@@ -127,6 +131,8 @@ export function AIAssistantModule() {
         replyText
       );
     } catch {
+      setMessages((prev) => prev.filter((message) => message.id !== userMsg.id));
+      setInput((current) => current || trimmed);
       setError('Sunucuya bağlanılamadı. Lütfen tekrar deneyin.');
     } finally {
       setLoading(false);
@@ -141,7 +147,7 @@ export function AIAssistantModule() {
   const handleClearChat = () => {
     setMessages([
       {
-        id: `welcome_${Date.now()}`,
+        id: 'welcome',
         role: 'assistant',
         text: 'Yeni bir sohbet başlatıldı. Hangi konu veya ders materyali üzerinde çalışmak istersiniz?',
         timestamp: new Date().toLocaleTimeString('tr-TR', { hour: '2-digit', minute: '2-digit' }),
@@ -236,7 +242,7 @@ export function AIAssistantModule() {
             )}
 
             {error && (
-              <div className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-300">
+              <div role="alert" className="flex items-start gap-2.5 p-3.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-xs text-red-700 dark:text-red-300">
                 <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
                 <span>{error}</span>
               </div>

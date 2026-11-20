@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useId, useRef } from 'react';
 import { X } from 'lucide-react';
 
 interface ModalProps {
@@ -18,36 +18,43 @@ export function Modal({
   children,
   maxWidthClass = 'max-w-lg',
 }: ModalProps) {
+  const dialogRef = useRef<HTMLDialogElement>(null);
+  const titleId = useId();
+  const subtitleId = useId();
+
   useEffect(() => {
     if (!open) return;
-    const handleKey = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
-    };
-    window.addEventListener('keydown', handleKey);
-    return () => window.removeEventListener('keydown', handleKey);
-  }, [open, onClose]);
+    const dialog = dialogRef.current;
+    dialog?.showModal();
+    return () => dialog?.close();
+  }, [open]);
 
   if (!open) return null;
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-slate-950/60 backdrop-blur-[2px]"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="modal-title"
-      onClick={onClose}
+    <dialog
+      ref={dialogRef}
+      className={`fixed inset-0 m-auto w-[calc(100%-2rem)] ${maxWidthClass} bg-transparent p-0 backdrop:bg-slate-950/60 backdrop:backdrop-blur-[2px]`}
+      aria-labelledby={titleId}
+      aria-describedby={subtitle ? subtitleId : undefined}
+      onCancel={(event) => {
+        event.preventDefault();
+        onClose();
+      }}
+      onClick={(event) => {
+        if (event.target === event.currentTarget) onClose();
+      }}
     >
       <div
-        className={`w-full ${maxWidthClass} bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[90vh] flex flex-col`}
-        onClick={(e) => e.stopPropagation()}
+        className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[90dvh] flex flex-col"
       >
         <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-200 dark:border-slate-800">
           <div className="min-w-0">
-            <h2 id="modal-title" className="text-lg font-semibold text-slate-900 dark:text-slate-100">
+            <h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {title}
             </h2>
             {subtitle && (
-              <p className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
+              <p id={subtitleId} className="mt-1 text-sm text-slate-500 dark:text-slate-400">{subtitle}</p>
             )}
           </div>
           <button
@@ -61,7 +68,7 @@ export function Modal({
         </div>
         <div className="px-6 py-5 overflow-y-auto">{children}</div>
       </div>
-    </div>
+    </dialog>
   );
 }
 
@@ -87,7 +94,7 @@ export function ConfirmDialog({
   return (
     <Modal open={open} onClose={onClose} title={title} maxWidthClass="max-w-md">
       <p className="text-sm text-slate-600 dark:text-slate-300 leading-relaxed mb-6">{message}</p>
-      <div className="flex items-center justify-end gap-3">
+      <div className="control-grid ml-auto max-w-sm gap-3">
         <button
           type="button"
           onClick={onClose}

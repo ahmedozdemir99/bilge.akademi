@@ -47,6 +47,7 @@ import {
   GradeFormModal,
   StudentFormModal,
 } from './student-tracking/StudentForms';
+import { normalizeSearchText } from '../../utils/searchText';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
 type TrackingTab = 'students' | 'grades' | 'trials' | 'analytics';
@@ -116,15 +117,15 @@ export function StudentTrackingModule() {
 
   // Derived lists
   const filteredStudents = useMemo(() => {
-    const q = searchQuery.trim().toLocaleLowerCase('tr');
+    const q = normalizeSearchText(searchQuery);
     return students.filter((s) => {
       if (classFilter !== 'all' && s.classId !== classFilter) return false;
       if (statusFilter !== 'all' && s.status !== statusFilter) return false;
       if (q) {
-        const clsName = classMap.get(s.classId)?.name.toLocaleLowerCase('tr') ?? '';
+        const clsName = normalizeSearchText(classMap.get(s.classId)?.name ?? '');
         const match =
-          s.fullName.toLocaleLowerCase('tr').includes(q) ||
-          s.studentNumber.toLocaleLowerCase('tr').includes(q) ||
+          normalizeSearchText(s.fullName).includes(q) ||
+          normalizeSearchText(s.studentNumber).includes(q) ||
           clsName.includes(q);
         if (!match) return false;
       }
@@ -391,7 +392,7 @@ export function StudentTrackingModule() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div className="flex flex-col gap-4">
         <div>
           <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
             Modül 01 · {isDemoMode ? 'Demo Modu (Örnek Veri)' : 'Firebase Bulut Kayıtları'}
@@ -405,7 +406,7 @@ export function StudentTrackingModule() {
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 no-print">
+        <div role="group" aria-label="Öğrenci takip işlemleri" className="control-grid gap-2 no-print">
           <button
             type="button"
             onClick={() => {
@@ -487,7 +488,7 @@ export function StudentTrackingModule() {
       {/* Segmented Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <div
-          className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+          className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
           role="tablist"
           aria-label="Öğrenci Takip Sekmeleri"
         >
@@ -652,7 +653,7 @@ export function StudentTrackingModule() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="control-grid gap-2 sm:max-w-80">
                 <button
                   type="button"
                   onClick={handleExportStudentsCsv}
@@ -994,7 +995,7 @@ export function StudentTrackingModule() {
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="control-grid gap-2 sm:max-w-sm">
               <button
                 type="button"
                 onClick={() => void handleRunClassAI()}

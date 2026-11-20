@@ -85,7 +85,7 @@ export function LiteratureTreasuryPanel({ onLoadPoemToEditor }: LiteratureTreasu
       {/* Sub-navigation & Search */}
       <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
         <div
-          className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+          className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
           role="tablist"
         >
           {(
@@ -172,7 +172,7 @@ export function LiteratureTreasuryPanel({ onLoadPoemToEditor }: LiteratureTreasu
           </section>
 
           {/* Category Filter */}
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="control-grid gap-2">
             <button
               type="button"
               onClick={() => setCategoryFilter('all')}

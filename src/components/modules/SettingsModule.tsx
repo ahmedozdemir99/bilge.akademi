@@ -272,7 +272,7 @@ export function SettingsModule() {
           otomatik olarak çıkarılır.
         </p>
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
+        <div className="control-grid gap-3 pt-2">
           {!isDemoMode ? (
             <button
               type="button"

@@ -157,7 +157,7 @@ export function StudentProfileView({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="control-grid gap-2 sm:max-w-lg">
           {!readOnly && onEditStudent && (
             <button
               type="button"

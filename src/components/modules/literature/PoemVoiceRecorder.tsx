@@ -332,7 +332,7 @@ export function PoemVoiceRecorder({
       {/* Live Microphone Controls + Real-Time Level Meter */}
       <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/70 border border-slate-200 dark:border-slate-800 space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-2">
+          <div className="control-grid gap-2">
             {status === 'idle' ? (
               <button
                 type="button"

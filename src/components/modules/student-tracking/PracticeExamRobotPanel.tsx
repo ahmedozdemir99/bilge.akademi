@@ -449,7 +449,7 @@ export function PracticeExamRobotPanel({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="control-grid gap-2 sm:max-w-80">
             <button
               type="button"
               onClick={handleExportCsv}

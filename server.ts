@@ -3,6 +3,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import { onRequest as handlePagesApi } from './functions/api/[[path]].ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,11 +12,11 @@ const app = express();
 app.use(express.json({ limit: '1.5mb' }));
 
 const PORT = Number(process.env.PORT) || 3000;
-const MODEL_NAME = 'gemini-4-hydrogen';
-const FALLBACK_MODEL_NAME = 'gemini-3.1-flash-lite';
+const MODEL_NAME = 'gemini-3.8-flash';
+const FALLBACK_MODEL_NAME = 'gemini-3.5-flash-lite';
 
 function getGenAIClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     return null;
   }
@@ -30,7 +31,7 @@ function getGenAIClient(): GoogleGenAI | null {
 }
 
 function getGenAITtsClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     return null;
   }
@@ -198,7 +199,9 @@ function ensureClient(res: express.Response): GoogleGenAI | null {
 }
 
 app.get('/api/health', (_req, res) => {
-  const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY');
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const hasKey = Boolean(apiKey && apiKey !== 'MY_GEMINI_API_KEY');
+  res.set('Cache-Control', 'no-store');
   res.json({
     ok: true,
     runtime: 'node-express',
@@ -207,6 +210,15 @@ app.get('/api/health', (_req, res) => {
     fallbackModel: FALLBACK_MODEL_NAME,
     ttsModel: 'gemini-3.8-flash-lite-tts',
   });
+});
+
+app.post('/api/ai/connection', async (_req, res) => {
+  const result = await handlePagesApi({
+    request: new Request('http://localhost/api/ai/connection', { method: 'POST' }),
+    env: { GEMINI_API_KEY: process.env.GEMINI_API_KEY },
+    params: {},
+  });
+  res.set('Cache-Control', 'no-store').status(result.status).json(await result.json());
 });
 
 /* ---------------- MODULE 1: STUDENT & CLASS AI ANALYSIS ---------------- */

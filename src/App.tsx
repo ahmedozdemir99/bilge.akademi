@@ -1,26 +1,32 @@
+import { lazy, Suspense } from 'react';
 import { AcademyProvider, useAcademy } from './context/AcademyContext';
 import { AppShell } from './components/layout/AppShell';
 import { AIAssistantModule } from './components/modules/AIAssistantModule';
-import { EnglishModule } from './components/modules/EnglishModule';
-import { HistoryAtlasModule } from './components/modules/HistoryAtlasModule';
 import { HomeDashboard } from './components/modules/HomeDashboard';
-import { LiteratureModule } from './components/modules/LiteratureModule';
-import { MathTutorModule } from './components/modules/MathTutorModule';
-import { PhilosophyModule } from './components/modules/PhilosophyModule';
-import { ReligionModule } from './components/modules/ReligionModule';
-import { ReportsModule } from './components/modules/ReportsModule';
-import { ScienceLabModule } from './components/modules/ScienceLabModule';
-import { SettingsModule } from './components/modules/SettingsModule';
-import { StudentTrackingModule } from './components/modules/StudentTrackingModule';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
+import { GoogleSignInDialog } from './components/ui/GoogleSignInDialog';
 import { ToastContainer } from './components/ui/ToastContainer';
 
+const ActivityWorkshop = lazy(() => import('./components/modules/ActivityWorkshop').then(({ ActivityWorkshop }) => ({ default: ActivityWorkshop })));
+const EnglishModule = lazy(() => import('./components/modules/EnglishModule').then(({ EnglishModule }) => ({ default: EnglishModule })));
+const HistoryAtlasModule = lazy(() => import('./components/modules/HistoryAtlasModule').then(({ HistoryAtlasModule }) => ({ default: HistoryAtlasModule })));
+const LiteratureModule = lazy(() => import('./components/modules/LiteratureModule').then(({ LiteratureModule }) => ({ default: LiteratureModule })));
+const MathTutorModule = lazy(() => import('./components/modules/MathTutorModule').then(({ MathTutorModule }) => ({ default: MathTutorModule })));
+const PhilosophyModule = lazy(() => import('./components/modules/PhilosophyModule').then(({ PhilosophyModule }) => ({ default: PhilosophyModule })));
+const ReligionModule = lazy(() => import('./components/modules/ReligionModule').then(({ ReligionModule }) => ({ default: ReligionModule })));
+const ReportsModule = lazy(() => import('./components/modules/ReportsModule').then(({ ReportsModule }) => ({ default: ReportsModule })));
+const ScienceLabModule = lazy(() => import('./components/modules/ScienceLabModule').then(({ ScienceLabModule }) => ({ default: ScienceLabModule })));
+const SettingsModule = lazy(() => import('./components/modules/SettingsModule').then(({ SettingsModule }) => ({ default: SettingsModule })));
+const StudentTrackingModule = lazy(() => import('./components/modules/StudentTrackingModule').then(({ StudentTrackingModule }) => ({ default: StudentTrackingModule })));
+
 function BilgeAkademiRouter() {
-  const { activeModule } = useAcademy();
+  const { activeModule, workshopActivityId } = useAcademy();
 
   switch (activeModule) {
     case 'home':
       return <HomeDashboard />;
+    case 'activity-workshop':
+      return <ActivityWorkshop key={workshopActivityId ?? 'workshop'} initialActivityId={workshopActivityId} />;
     case 'student-tracking':
       return <StudentTrackingModule />;
     case 'literature':
@@ -53,8 +59,13 @@ export default function App() {
     <ErrorBoundary>
       <AcademyProvider>
         <AppShell>
-          <BilgeAkademiRouter />
+          <Suspense
+            fallback={<p role="status" className="text-sm text-slate-600 dark:text-slate-300">Bölüm yükleniyor…</p>}
+          >
+            <BilgeAkademiRouter />
+          </Suspense>
         </AppShell>
+        <GoogleSignInDialog />
         <ToastContainer />
       </AcademyProvider>
     </ErrorBoundary>

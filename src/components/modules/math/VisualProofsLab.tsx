@@ -43,7 +43,7 @@ export function VisualProofsLab() {
   return (
     <div className="space-y-5">
       {/* Proof Selector */}
-      <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div role="group" aria-label="Görsel ispat seçimi" className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         {(
           [
             { id: 'pythagoras', label: 'Pisagor (a² + b² = c²)' },
@@ -56,6 +56,7 @@ export function VisualProofsLab() {
           <button
             key={item.id}
             type="button"
+            aria-pressed={activeProof === item.id}
             onClick={() => setActiveProof(item.id)}
             className={`px-3 py-1.5 text-xs font-medium rounded-md cursor-pointer whitespace-nowrap transition-colors ${
               activeProof === item.id

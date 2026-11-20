@@ -1,4 +1,5 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { ActivityId } from '../components/modules/workshop/activityTitles';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
   collection,
@@ -181,10 +182,14 @@ export interface MathAttemptInput {
   hintsUsed: number;
 }
 
+type GoogleSignInHelp = 'browser' | 'connection' | 'popup' | 'storage';
+
 interface AcademyContextValue {
   // Navigation
   activeModule: ModuleId;
   setActiveModule: (module: ModuleId) => void;
+  workshopActivityId: ActivityId | null;
+  openWorkshopActivity: (id: ActivityId) => void;
   assistantInitialContext: string;
   openAssistantForModule: (moduleLabel: string) => void;
 
@@ -194,6 +199,8 @@ interface AcademyContextValue {
   authLoading: boolean;
   isDemoMode: boolean;
   signInWithGoogle: () => Promise<void>;
+  googleSignInHelp: GoogleSignInHelp | null;
+  dismissGoogleSignInHelp: () => void;
   signOutUser: () => Promise<void>;
   updateProfileInfo: (schoolName: string, branch: string, displayName: string) => Promise<void>;
 
@@ -259,12 +266,23 @@ interface AcademyContextValue {
 const AcademyContext = createContext<AcademyContextValue | null>(null);
 
 export function AcademyProvider({ children }: { children: React.ReactNode }) {
-  const [activeModule, setActiveModule] = useState<ModuleId>('home');
+  const [activeModule, setModule] = useState<ModuleId>('home');
+  const [workshopActivityId, setWorkshopActivityId] = useState<ActivityId | null>(null);
+  const setActiveModule = useCallback((module: ModuleId) => {
+    setWorkshopActivityId(null);
+    setModule(module);
+  }, []);
+  const openWorkshopActivity = useCallback((id: ActivityId) => {
+    setWorkshopActivityId(id);
+    setModule('activity-workshop');
+  }, []);
   const [assistantInitialContext, setAssistantInitialContext] = useState<string>('Genel Platform');
 
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [googleSignInHelp, setGoogleSignInHelp] = useState<GoogleSignInHelp | null>(null);
+  const googleSignInPending = useRef(false);
   const [dataLoading, setDataLoading] = useState(false);
 
   const [theme, setThemeState] = useState<ThemeMode>(() => {
@@ -599,47 +617,56 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user]);
 
+  const dismissGoogleSignInHelp = useCallback(() => setGoogleSignInHelp(null), []);
+
   const signInWithGoogle = useCallback(async () => {
+    if (googleSignInPending.current || auth.currentUser) return;
+
+    const userAgent = navigator.userAgent;
+    const isAndroidWebView = /Android.*(?:; wv\)|Version\/4\.0.*Chrome\/)/i.test(userAgent);
+    const isAppleWebView = /(?:iPhone|iPad|iPod).*AppleWebKit/i.test(userAgent)
+      && !/(?:Safari|CriOS|FxiOS|EdgiOS|OPiOS)\//i.test(userAgent);
+    if (window.self !== window.top || isAndroidWebView || isAppleWebView) {
+      setGoogleSignInHelp('browser');
+      return;
+    }
+    if (!navigator.onLine) {
+      setGoogleSignInHelp('connection');
+      return;
+    }
+
+    googleSignInPending.current = true;
+    setGoogleSignInHelp(null);
     try {
       await signInWithPopup(auth, googleProvider);
-      notify('success', 'Oturum açıldı', 'Verileriniz artık Firebase Firestore üzerinde güvenle saklanır.');
+      notify('success', 'Oturum açıldı', 'Bulut hesabınız etkin.');
     } catch (error) {
-      const errObj = error as { code?: string; message?: string };
-      const code = errObj?.code ?? '';
-      const msg = errObj?.message ?? '';
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || msg.includes('popup-closed-by-user')) {
-        return;
+      const code = (error as { code?: string } | null)?.code ?? '';
+      switch (code) {
+        case 'auth/popup-closed-by-user':
+        case 'auth/cancelled-popup-request':
+          return;
+        case 'auth/network-request-failed':
+          setGoogleSignInHelp('connection');
+          return;
+        case 'auth/popup-blocked':
+          setGoogleSignInHelp('popup');
+          return;
+        case 'auth/web-storage-unsupported':
+        case 'auth/operation-not-supported-in-this-environment':
+          setGoogleSignInHelp('storage');
+          return;
+        case 'auth/unauthorized-domain':
+          notify('error', 'Bu adres Google girişi için yetkili değil', 'Google ile giriş yapmak için Bilge Akademi’nin yayın adresini açın.');
+          return;
+        case 'auth/operation-not-allowed':
+          notify('error', 'Google girişi devre dışı', 'Site yöneticisinin Firebase Authentication’da Google girişini etkinleştirmesi gerekiyor.');
+          return;
+        default:
+          notify('error', 'Google ile giriş tamamlanamadı', 'Tekrar deneyebilir veya Demo Modunda devam edebilirsiniz.');
       }
-      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
-        const host = typeof window !== 'undefined' ? window.location.hostname : '';
-        notify(
-          'error',
-          'Alan adı Firebase’de yetkilendirilmemiş',
-          `Google girişi için "${host}" alan adını Firebase Console > Authentication > Settings > Authorized domains listesine ekleyin. Tüm dersleri Demo Modunda giriş yapmadan kullanabilirsiniz.`
-        );
-        return;
-      }
-      if (code === 'auth/popup-blocked' || msg.includes('popup-blocked')) {
-        notify(
-          'error',
-          'Açılır pencere engellendi',
-          'Tarayıcı ayarlarından bu site için açılır pencerelere (pop-up) izin verip tekrar deneyin.'
-        );
-        return;
-      }
-      if (code.includes('api-key') || msg.includes('API key')) {
-        notify(
-          'error',
-          'Firebase API anahtarı kısıtlı',
-          'Google Cloud Console > Credentials bölümünde bu alan adının Firebase API anahtarına izinli olduğunu kontrol edin.'
-        );
-        return;
-      }
-      notify(
-        'error',
-        'Giriş başarısız',
-        `Google ile oturum açılırken bir hata oluştu${code ? ` (${code})` : ''}. Demo Moduyla tüm özellikler kullanılabilir.`
-      );
+    } finally {
+      googleSignInPending.current = false;
     }
   }, [notify]);
 
@@ -1563,12 +1590,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const openAssistantForModule = useCallback((moduleLabel: string) => {
     setAssistantInitialContext(moduleLabel);
     setActiveModule('ai-assistant');
-  }, []);
+  }, [setActiveModule]);
 
   const value = useMemo<AcademyContextValue>(
     () => ({
       activeModule,
       setActiveModule,
+      workshopActivityId,
+      openWorkshopActivity,
       assistantInitialContext,
       openAssistantForModule,
       user,
@@ -1576,6 +1605,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       authLoading,
       isDemoMode,
       signInWithGoogle,
+      googleSignInHelp,
+      dismissGoogleSignInHelp,
       signOutUser,
       updateProfileInfo,
       theme,
@@ -1649,15 +1680,19 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       deleteStudent,
       demoStore,
       dismissToast,
+      dismissGoogleSignInHelp,
+      googleSignInHelp,
       isDemoMode,
       notify,
       openAssistantForModule,
+      openWorkshopActivity,
       profile,
       recordMathAttempt,
       recordQuizAttempt,
       resetDemoData,
       saveAIConversationSummary,
       seedDemoToFirestore,
+      setActiveModule,
       setCompactMode,
       setTheme,
       setWorkspaceView,
@@ -1672,6 +1707,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       updateProfileInfo,
       updateStudent,
       user,
+      workshopActivityId,
       workspaceView,
     ]
   );

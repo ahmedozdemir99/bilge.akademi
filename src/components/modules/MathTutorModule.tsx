@@ -1,3 +1,4 @@
+import { WorkshopLinks } from './workshop/WorkshopLinks';
 import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -283,7 +284,7 @@ export function MathTutorModule() {
         </div>
 
         <div
-          className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 self-start"
+          className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 self-start"
           role="tablist"
         >
           {(
@@ -552,7 +553,7 @@ export function MathTutorModule() {
       {/* TAB 2: MIDDLE-SCHOOL INTERACTIVE GRAPHS, COORDINATE SYSTEM & GEOMETRY */}
       {activeTab === 'graphs' && (
         <div className="space-y-5">
-          <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+          <div className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
             {(
               [
                 { id: 'geometry', label: 'Prizma, Piramit & Açınım Animasyonları' },
@@ -1150,6 +1151,8 @@ export function MathTutorModule() {
           </section>
         </div>
       )}
+
+      <WorkshopLinks activities={activeTab === 'graphs' ? ['line', 'area'] : ['fractions', 'line', 'area']} />
     </div>
   );
 }
