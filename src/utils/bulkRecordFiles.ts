@@ -1,5 +1,6 @@
 import { normalizeSearchText } from './searchText';
 import { LGS_SUBJECT_CONFIG } from './exportUtils';
+import { extractTableRows } from './bulkTableLayout';
 
 export interface ImportSheet {
   name: string;
@@ -21,106 +22,118 @@ function checkedRows(rows: string[][]): string[][] {
   return rows;
 }
 
-type PdfTextItem = { str: string; width: number; height: number; transform: number[] };
+const MAX_FILE_BYTES = 10 * 1024 * 1024;
+const MAX_PDF_PAGES_PER_SCAN = 60;
 
-export function extractPdfPageRows(items: (PdfTextItem | { type: string })[]): string[][] {
-  const pieces = items.flatMap((item) => {
-    if (!('str' in item) || !item.str.trim()) return [];
-    const value = item.str.trim();
-    const widthPerCharacter = item.width / value.length;
-    return [...value.matchAll(/\S(?:.*?\S)?(?=\s{2,}|$)/g)].map((part) => ({
-      x: item.transform[4] + part.index * widthPerCharacter,
-      y: item.transform[5],
-      width: part[0].length * widthPerCharacter,
-      height: item.height,
-      value: part[0],
-    }));
-  }).sort((a, b) => b.y - a.y || a.x - b.x);
-  const lines: { y: number; pieces: typeof pieces }[] = [];
-  for (const piece of pieces) {
-    const line = lines.at(-1);
-    if (line && Math.abs(line.y - piece.y) <= 2.5) line.pieces.push(piece);
-    else lines.push({ y: piece.y, pieces: [piece] });
-  }
-  const pageRows = lines.map(({ pieces: line }) => {
-    const cells: { x: number; end: number; value: string }[] = [];
-    for (const piece of line.sort((a, b) => a.x - b.x)) {
-      const previous = cells.at(-1);
-      const end = piece.x + piece.width;
-      if (previous && piece.x - previous.end < Math.max(2.5, piece.height * 0.37)) {
-        previous.value += ' ' + piece.value;
-        previous.end = Math.max(previous.end, end);
-      } else {
-        cells.push({ x: piece.x, end, value: piece.value });
-      }
-    }
-    return cells;
-  });
-  const frequencies = new Map<number, number>();
-  for (const row of pageRows) {
-    if (row.length >= 2 && row.some(({ value }) => /^\d+$/.test(value))) {
-      frequencies.set(row.length, (frequencies.get(row.length) ?? 0) + 1);
-    }
-  }
-  const commonWidth = [...frequencies.entries()].sort(([a, n], [b, m]) => m - n || b - a)[0]?.[0];
-  const reference = pageRows.find((row) => row.length === commonWidth);
-  const result: string[][] = [];
-  for (const row of pageRows) {
-    if (!reference || row.length >= reference.length || row.length < 2) {
-      result.push(row.map(({ value }) => value));
-      continue;
-    }
-    // Empty published score cells have no text object. Align the remaining cells by position.
-    const aligned = Array<string>(reference.length).fill('');
-    for (const cell of row) {
-      let column = 0;
-      let distance = Infinity;
-      for (const [index, anchor] of reference.entries()) {
-        const delta = Math.min(Math.abs(cell.x - anchor.x), Math.abs(cell.end - anchor.end));
-        if (delta < distance) { distance = delta; column = index; }
-      }
-      aligned[column] += (aligned[column] ? ' ' : '') + cell.value;
-    }
-    result.push(aligned);
-  }
-  return result;
+function checkFileSize(file: File) {
+  if (file.size > MAX_FILE_BYTES) throw new Error('PDF, Excel veya görüntü dosyası en fazla 10 MB olabilir.');
 }
 
-async function readPdf(file: File): Promise<ImportSheet[]> {
+async function loadPdf(file: File) {
+  checkFileSize(file);
   const [{ getDocument, GlobalWorkerOptions }, { default: workerUrl }] = await Promise.all([
     import('pdfjs-dist'),
     import('pdfjs-dist/build/pdf.worker.min.mjs?url'),
   ]);
   GlobalWorkerOptions.workerSrc = workerUrl;
-  const task = getDocument({
+  return getDocument({
     data: new Uint8Array(await file.arrayBuffer()),
     useWasm: false,
     stopAtErrors: true,
   });
+}
+
+export function parsePdfPages(selection: string, pageCount: number): { first: number; last: number } {
+  const match = /^(\d+)(?:\s*[-–]\s*(\d+))?$/.exec(selection.trim());
+  if (!match) throw new Error('Bir sayfa numarası veya aralığı girin (ör. 3 veya 3-5).');
+  const first = Number(match[1]);
+  const last = Number(match[2] ?? match[1]);
+  if (!Number.isSafeInteger(first) || !Number.isSafeInteger(last) || first < 1 || last < first || last > pageCount) {
+    throw new Error(`Bu PDF için 1–${pageCount} arasında bir sayfa veya aralık seçin.`);
+  }
+  if (last - first + 1 > MAX_PDF_PAGES_PER_SCAN) throw new Error('Bir seferde en fazla 60 PDF sayfası okunabilir.');
+  return { first, last };
+}
+
+export async function readPdfPageCount(file: File): Promise<number> {
+  const task = await loadPdf(file);
   try {
-    const pdf = await task.promise;
-    if (pdf.numPages > 60) throw new Error('PDF en fazla 60 sayfa olabilir. İlgili sınıfın sayfalarını ayrı dosyaya alın.');
-    const rows: string[][] = [];
-    let readableLines = 0;
-    for (let pageNumber = 1; pageNumber <= pdf.numPages; pageNumber++) {
-      const page = await pdf.getPage(pageNumber);
-      const content = await page.getTextContent();
-      const pageRows = extractPdfPageRows(content.items);
-      rows.push(...pageRows);
-      readableLines += pageRows.filter((row) => row.filter(Boolean).length >= 2).length;
-      page.cleanup();
-      checkedRows(rows);
-    }
-    if (!readableLines) throw new Error('PDF’de okunabilir tablo bulunamadı. Taranmış belgeler için Excel, CSV veya metin katmanı bulunan bir PDF kullanın.');
-    return [{ name: 'PDF', rows }];
+    return (await task.promise).numPages;
   } finally {
     await task.destroy();
   }
 }
 
-export async function readImportWorkbook(file: File): Promise<ImportSheet[]> {
-  if (file.size > 10 * 1024 * 1024) throw new Error('Excel veya PDF dosyası en fazla 10 MB olabilir.');
-  if (/\.pdf$/i.test(file.name)) return readPdf(file);
+export async function readPdfImport(
+  file: File,
+  selection: string,
+  imageScan: boolean,
+  onProgress: (message: string) => void
+): Promise<ImportSheet[]> {
+  const task = await loadPdf(file);
+  let reader: Awaited<ReturnType<typeof import('./bulkOcr').createBulkOcr>> | undefined;
+  try {
+    const pdf = await task.promise;
+    const { first, last } = parsePdfPages(selection, pdf.numPages);
+    const rows: string[][] = [];
+    for (let pageNumber = first; pageNumber <= last; pageNumber += 1) {
+      onProgress(`${pageNumber}. sayfa okunuyor…`);
+      const page = await pdf.getPage(pageNumber);
+      try {
+        const content = imageScan ? null : await page.getTextContent();
+        const textRows = content ? extractTableRows(content.items) : [];
+        const isTable = textRows.some((row) => row.filter(Boolean).length >= 2 && row.some((cell) => /^\d+(?:[.,]\d+)?$/.test(cell)));
+        if (isTable) {
+          rows.push(...textRows);
+        } else {
+          const { createBulkOcr, createOcrCanvas } = await import('./bulkOcr');
+          onProgress(`${pageNumber}. sayfa görüntüden okunuyor…`);
+          reader ??= await createBulkOcr();
+          const base = page.getViewport({ scale: 1 });
+          const scale = Math.min(3, 2800 / Math.max(base.width, base.height));
+          const viewport = page.getViewport({ scale });
+          const canvas = createOcrCanvas(viewport.width, viewport.height);
+          try {
+            await page.render({ canvas, viewport, background: '#ffffff' }).promise;
+            rows.push(...await reader.read(canvas));
+          } finally {
+            canvas.width = canvas.height = 0;
+          }
+        }
+        checkedRows(rows);
+      } finally {
+        page.cleanup();
+      }
+    }
+    if (!rows.some((row) => row.filter(Boolean).length >= 2)) {
+      throw new Error('Seçilen PDF sayfalarında okunabilir tablo bulunamadı. Daha net bir sayfa görüntüsü veya Excel dosyası kullanın.');
+    }
+    const pageLabel = first === last ? String(first) : `${first}–${last}`;
+    return [{ name: `PDF · Sayfa ${pageLabel}`, rows }];
+  } finally {
+    try {
+      await reader?.close();
+    } finally {
+      await task.destroy();
+    }
+  }
+}
+
+export function isScreenshot(file: File): boolean {
+  return /\.(png|jpe?g|webp)$/i.test(file.name) || /^(image\/(png|jpeg|webp))$/.test(file.type);
+}
+
+export async function readImportWorkbook(file: File, onProgress: (message: string) => void = () => {}): Promise<ImportSheet[]> {
+  checkFileSize(file);
+  if (isScreenshot(file)) {
+    const { readScreenshotRows } = await import('./bulkOcr');
+    onProgress('Görüntüdeki satırlar okunuyor…');
+    const rows = checkedRows(await readScreenshotRows(file));
+    if (!rows.some((row) => row.filter(Boolean).length >= 2)) {
+      throw new Error('Görüntüde okunabilir tablo bulunamadı. Yazıları ve sütunları net gösteren bir ekran görüntüsü kullanın.');
+    }
+    return [{ name: 'Ekran görüntüsü', rows }];
+  }
   if (/\.xlsx$/i.test(file.name)) {
     const { default: readXlsxFile } = await import('read-excel-file/universal');
     const sheets = await readXlsxFile(file);
@@ -134,7 +147,7 @@ export async function readImportWorkbook(file: File): Promise<ImportSheet[]> {
     if (!result.length) throw new Error('Excel dosyasında okunabilir tablo bulunamadı.');
     return result;
   }
-  throw new Error('Excel’i .xlsx veya .csv biçiminde kaydedin ya da metin içeren bir PDF seçin.');
+  throw new Error('Excel (.xlsx), CSV, PDF veya PNG, JPEG, WebP biçiminde bir görüntü seçin.');
 }
 
 export function suggestFileColumns(rows: string[][], fields: string[]) {

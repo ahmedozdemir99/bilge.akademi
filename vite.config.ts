@@ -45,6 +45,15 @@ export default defineConfig(() => {
         },
       },
     ],
+    build: {
+      rolldownOptions: {
+        output: {
+          assetFileNames: ({ names }) => names.includes('tur.traineddata.gz')
+            ? 'assets/ocr/v1/tur.traineddata.gz'
+            : 'assets/[name]-[hash][extname]',
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

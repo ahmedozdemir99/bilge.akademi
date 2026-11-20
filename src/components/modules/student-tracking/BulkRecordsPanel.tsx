@@ -4,7 +4,7 @@ import { useAcademy } from '../../../context/AcademyContext';
 import { DEFAULT_SUBJECT_NAMES, DEMO_TEACHER_ID } from '../../../data/demoData';
 import type { ExamType } from '../../../types/academy';
 import { buildBulkPlan, bulkHeaders, BULK_EXAM_TYPES, type BulkInput, type BulkMode, type BulkPlan } from '../../../utils/bulkStudentRecords';
-import { readImportWorkbook, type ImportSheet } from '../../../utils/bulkRecordFiles';
+import { isScreenshot, readImportWorkbook, readPdfImport, readPdfPageCount, type ImportSheet } from '../../../utils/bulkRecordFiles';
 import { BulkFileMapper } from './BulkFileMapper';
 import { exportToCsv } from '../../../utils/exportUtils';
 
@@ -43,6 +43,10 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
   const [text, setText] = useState('');
   const [workbook, setWorkbook] = useState<{ filename: string; sheets: ImportSheet[] } | null>(null);
   const [mappingOpen, setMappingOpen] = useState(false);
+  const [pdfSource, setPdfSource] = useState<{ file: File; pageCount: number } | null>(null);
+  const [pdfPages, setPdfPages] = useState('1');
+  const [forceOcr, setForceOcr] = useState(false);
+  const [fileProgress, setFileProgress] = useState('');
   const [preview, setPreview] = useState<{ input: BulkInput; plan: BulkPlan } | null>(null);
   const [result, setResult] = useState<Awaited<ReturnType<typeof saveBulkRecords>> | null>(null);
   const [error, setError] = useState('');
@@ -119,16 +123,23 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
   async function openFile(file: File) {
     if (locked.current) return;
     invalidate();
+    setWorkbook(null);
+    setMappingOpen(false);
+    setPdfSource(null);
     locked.current = true;
     setBusy(true);
+    setFileProgress(isScreenshot(file) ? 'Görüntü okuma hazırlanıyor…' : 'Dosya açılıyor…');
     try {
       if (/\.(csv|tsv|txt)$/i.test(file.name)) {
         if (file.size > 400000) throw new Error('CSV çok büyük. Bir sınıf ve bir değerlendirme içeren daha küçük bir dosya seçin.');
         setText(await file.text());
-        setWorkbook(null);
-        setMappingOpen(false);
+      } else if (/\.pdf$/i.test(file.name) || file.type === 'application/pdf') {
+        const pageCount = await readPdfPageCount(file);
+        setPdfSource({ file, pageCount });
+        setPdfPages('1');
+        setForceOcr(false);
       } else {
-        setWorkbook({ filename: file.name, sheets: await readImportWorkbook(file) });
+        setWorkbook({ filename: file.name, sheets: await readImportWorkbook(file, setFileProgress) });
         setMappingOpen(true);
       }
     } catch (issue) {
@@ -136,6 +147,28 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
     } finally {
       locked.current = false;
       setBusy(false);
+      setFileProgress('');
+    }
+  }
+
+  async function readSelectedPdf() {
+    if (!pdfSource || locked.current) return;
+    invalidate();
+    setWorkbook(null);
+    setMappingOpen(false);
+    locked.current = true;
+    setBusy(true);
+    setFileProgress('PDF açılıyor…');
+    try {
+      const sheets = await readPdfImport(pdfSource.file, pdfPages, forceOcr, setFileProgress);
+      setWorkbook({ filename: pdfSource.file.name + ' · ' + sheets[0].name, sheets });
+      setMappingOpen(true);
+    } catch (issue) {
+      setError(issue instanceof Error ? issue.message : 'PDF sayfaları okunamadı.');
+    } finally {
+      locked.current = false;
+      setBusy(false);
+      setFileProgress('');
     }
   }
 
@@ -216,7 +249,7 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
           <div className="space-y-2">
             <label className="block text-sm font-medium" htmlFor="bulk-rows">Kayıt listesi</label>
             <p id="bulk-columns" className="text-xs leading-relaxed text-slate-600 dark:text-slate-300">
-              Excel’den sütunları kopyalayın ya da Excel (.xlsx), metin içeren PDF veya CSV dosyası açın.
+              Excel’den sütunları kopyalayın ya da Excel (.xlsx), PDF, CSV veya ekran görüntüsü açın.
               <span className="block font-medium">{headers.join(' · ')}</span>
               {mode !== 'roster' && 'Katılmayan öğrencinin puan veya sonuç hücrelerini boş bırakın. Sıfır sonuç için 0 yazın.'}
             </p>
@@ -229,8 +262,8 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
                 <Download className="size-4" /> Şablonu İndir
               </button>
               <label className={secondary + ' cursor-pointer focus-within:outline-2'}>
-                <Upload className="size-4" /> Excel, PDF veya CSV Aç
-                <input className="sr-only" type="file" accept=".xlsx,.pdf,.csv,.tsv,.txt"
+                <Upload className="size-4" /> Dosya veya Ekran Görüntüsü Aç
+                <input className="sr-only" type="file" accept=".xlsx,.pdf,.csv,.tsv,.txt,.png,.jpg,.jpeg,.webp"
                   onChange={(event) => {
                     const file = event.target.files?.[0];
                     if (file) void openFile(file);
@@ -242,6 +275,22 @@ export function BulkRecordsPanel({ initialMode, onClassAnalysis, onStudents }: {
               )}
             </div>
           </div>
+          {pdfSource && (
+            <div className="space-y-2 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
+              <p className="break-all text-sm">{pdfSource.file.name} · {pdfSource.pageCount} sayfa</p>
+              <label className="block space-y-1 text-sm font-medium">
+                <span>PDF sayfası veya aralığı</span>
+                <input className={controls + ' max-w-48'} type="text" value={pdfPages} placeholder="Örn. 3 veya 3-5"
+                  onChange={(event) => setPdfPages(event.target.value)} />
+              </label>
+              <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={forceOcr} onChange={(event) => setForceOcr(event.target.checked)} />
+                Görüntü olarak tara (OCR)
+              </label>
+              <button type="button" className={secondary} onClick={() => void readSelectedPdf()}>Seçilen Sayfaları Oku</button>
+            </div>
+          )}
+          {fileProgress && <p role="status" className="text-sm text-teal-700 dark:text-teal-300">{fileProgress}</p>}
           {workbook && mappingOpen && <BulkFileMapper key={mode + workbook.filename} filename={workbook.filename} sheets={workbook.sheets}
             fields={headers} onClose={() => setMappingOpen(false)} onApply={(rows) => {
               invalidate();
