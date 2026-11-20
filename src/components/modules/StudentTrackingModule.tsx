@@ -53,12 +53,15 @@ import { normalizeSearchText } from '../../utils/searchText';
 import { classChartColors, getSubjectColor } from '../../utils/subjectColors';
 import { summarizePracticeForAnalysis } from '../../utils/practiceAnalysis';
 import { BulkRecordsPanel } from './student-tracking/BulkRecordsPanel';
+import { ClassTrialArchive, ClassTrialDistribution } from './student-tracking/ClassTrialArchive';
 import { ExamNetTrend } from './student-tracking/ExamNetTrend';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
-type TrackingTab = 'students' | 'grades' | 'trials' | 'analytics' | 'bulk';
+type TrackingTab = 'students' | 'grades' | 'trials' | 'archive' | 'analytics' | 'bulk';
 
-export function StudentTrackingModule({ initialAnalysis = false }: { initialAnalysis?: boolean }) {
+export function StudentTrackingModule({ initialAnalysis = false, initialArchive = false, initialClass = '' }: {
+  initialAnalysis?: boolean; initialArchive?: boolean; initialClass?: string;
+}) {
   const {
     classes,
     students,
@@ -83,7 +86,7 @@ export function StudentTrackingModule({ initialAnalysis = false }: { initialAnal
     seedDemoToFirestore,
   } = useAcademy();
 
-  const [activeTab, setActiveTab] = useState<TrackingTab>(initialAnalysis ? 'analytics' : 'students');
+  const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive ? 'archive' : initialAnalysis ? 'analytics' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // Filters
@@ -93,6 +96,7 @@ export function StudentTrackingModule({ initialAnalysis = false }: { initialAnal
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [examTypeFilter, setExamTypeFilter] = useState<'all' | ExamType>('all');
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('all');
+  const [archiveClassId, setArchiveClassId] = useState(initialClass);
 
   // Modals
   const [classModalOpen, setClassModalOpen] = useState(false);
@@ -508,6 +512,7 @@ export function StudentTrackingModule({ initialAnalysis = false }: { initialAnal
             [
               { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
               { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
+              { id: 'archive', label: 'Deneme Arşivi' },
               { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
               { id: 'bulk', label: 'Toplu Giriş' },
@@ -987,6 +992,14 @@ export function StudentTrackingModule({ initialAnalysis = false }: { initialAnal
         </div>
       )}
 
+      {activeTab === 'archive' && <ClassTrialArchive classes={classes} students={students} exams={practiceExams} classId={archiveClassId}
+        onClassChange={setArchiveClassId} onReports={(id) => {
+          setAnalyticsClassId(id);
+          setClassAI(null);
+          setClassAIError('');
+          setActiveTab('analytics');
+        }} />}
+
       {activeTab === 'bulk' && <BulkRecordsPanel />}
 
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
@@ -1115,6 +1128,7 @@ export function StudentTrackingModule({ initialAnalysis = false }: { initialAnal
           )}
 
           <ExamNetTrend exams={analyticsPracticeExams} group />
+          <ClassTrialDistribution exams={analyticsPracticeExams} />
 
           {/* Class AI Result */}
           {classAIError && (

@@ -246,7 +246,7 @@ interface AcademyContextValue {
 
   addPracticeExam: (input: PracticeExamInput) => Promise<void>;
   deletePracticeExam: (id: string) => Promise<void>;
-  saveBulkRecords: (input: BulkInput) => Promise<{ classId: string; saved: number; skipped: number; error?: string }>;
+  saveBulkRecords: (input: BulkInput) => Promise<{ classId: string; saved: number; skipped: number; studentsSaved?: number; trialsSaved?: number; error?: string }>;
 
   addPoem: (input: PoemInput) => Promise<string>;
   updatePoem: (id: string, input: PoemInput) => Promise<void>;
@@ -785,7 +785,11 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           practiceExams: merge(current.practiceExams, practiceExams),
         };
       });
-      return { classId: plan.classId, saved: records.length, skipped };
+      return {
+        classId: plan.classId, saved: records.length, skipped,
+        studentsSaved: records.filter(({ collection }) => collection === 'students').length,
+        trialsSaved: records.filter(({ collection }) => collection === 'practiceExams').length,
+      };
     }
 
     const writeRecords = async (entries: { collection: string; id: string; data: object }[]) => {
@@ -814,18 +818,24 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     };
 
     let saved = 0;
+    let studentsSaved = 0;
+    let trialsSaved = 0;
     try {
       if (plan.newClass) await writeRecords([{ collection: 'classes', id: plan.classId, data: plan.newClass }]);
-      // Current rules look up the owning class and student for every score write.
-      // Five writes per commit stay within Firestore's twenty rule document accesses.
-      for (let offset = 0; offset < records.length; offset += 5) {
-        const chunk = records.slice(offset, offset + 5);
-        await writeRecords(chunk);
-        saved += chunk.length;
+      // Firestore rules require the parent class and student to exist before a result is written.
+      for (const collection of ['students', 'grades', 'practiceExams'] as const) {
+        const phase = records.filter((row) => row.collection === collection);
+        for (let offset = 0; offset < phase.length; offset += 5) {
+          const chunk = phase.slice(offset, offset + 5);
+          await writeRecords(chunk);
+          saved += chunk.length;
+          if (collection === 'students') studentsSaved += chunk.length;
+          if (collection === 'practiceExams') trialsSaved += chunk.length;
+        }
       }
-      return { classId: plan.classId, saved, skipped };
+      return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved };
     } catch {
-      return { classId: plan.classId, saved, skipped, error: 'Bulut kaydı tamamlanamadı. Bağlantınızı kontrol edip aynı listeyi tekrar kaydedebilirsiniz.' };
+      return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved, error: 'Bulut kaydı tamamlanamadı. Bağlantınızı kontrol edip aynı listeyi tekrar kaydedebilirsiniz.' };
     }
   }, [authLoading, cloudClasses, cloudGrades, cloudPracticeExams, cloudStudents, dataLoading, demoStore, user, workspaceView]);
 

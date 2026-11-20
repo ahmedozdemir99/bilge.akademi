@@ -13,7 +13,7 @@ export const hasPublishedTrialScore = (id: string) => id.startsWith('bulk_pdf_')
 export type BulkInput =
   | { mode: 'roster'; classId: string; newClass?: ClassInput; text: string }
   | { mode: 'grades'; classId: string; text: string; assessment: Pick<GradeInput, 'subjectName' | 'examTitle' | 'examType' | 'examDate' | 'maxScore'> }
-  | { mode: 'trials'; classId: string; text: string; assessment: Pick<PracticeExamInput, 'examTitle' | 'examDate' | 'wrongPenalty'>; publishedResults?: ReadonlyMap<string, PublishedBulkTrial> };
+  | { mode: 'trials'; classId: string; text: string; assessment: Pick<PracticeExamInput, 'examTitle' | 'examDate' | 'wrongPenalty'>; publishedResults?: ReadonlyMap<string, PublishedBulkTrial>; roster?: { text: string; newClass?: ClassInput } };
 
 interface BulkSnapshot {
   classes: SchoolClass[];
@@ -86,6 +86,29 @@ const trialKey = (record: Pick<PracticeExamInput, 'classId' | 'studentId' | 'exa
   JSON.stringify([record.classId, record.studentId, normalizeSearchText(record.examTitle), record.examDate]);
 
 export async function buildBulkPlan(input: BulkInput, snapshot: BulkSnapshot, teacherId: string): Promise<BulkPlan> {
+  if (input.mode === 'trials' && input.roster) {
+    const roster = await buildBulkPlan({
+      mode: 'roster', classId: input.classId, text: input.roster.text, newClass: input.roster.newClass,
+    }, snapshot, teacherId);
+    const pending = roster.rows.filter((row) => row.collection === 'students').filter((row) => !row.skip);
+    const newStudents: Student[] = await Promise.all(pending.map(async (row) => ({
+      ...row.data, id: await bulkRecordId(teacherId, 'students', row.key), teacherId,
+    })));
+    const projected = {
+      ...snapshot,
+      classes: roster.newClass ? [...snapshot.classes, { ...roster.newClass, id: roster.classId, teacherId }] : snapshot.classes,
+      students: [...snapshot.students, ...newStudents],
+    };
+    const publishedResults = input.publishedResults ? new Map(input.publishedResults) : undefined;
+    for (const number of input.text.split(/\r?\n/).map((line) => readBulkColumns(line)[0])) {
+      const result = publishedResults?.get(publishedTrialKey(input.classId, number));
+      if (result) publishedResults?.set(publishedTrialKey(roster.classId, number), result);
+    }
+    const trials = await buildBulkPlan({
+      ...input, roster: undefined, classId: roster.classId, publishedResults,
+    }, projected, teacherId);
+    return { ...trials, newClass: roster.newClass, rows: [...pending, ...trials.rows] };
+  }
   const belongs = <T extends { teacherId: string }>(record: T) => record.teacherId === teacherId;
   const classes = snapshot.classes.filter(belongs);
   let selected = classes.find((value) => value.id === input.classId);

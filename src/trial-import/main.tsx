@@ -8,6 +8,7 @@ import { ToastContainer } from '../components/ui/ToastContainer';
 import { DEMO_TEACHER_ID } from '../data/demoData';
 import { buildBulkPlan, bulkHeaders, publishedTrialKey, type BulkInput, type BulkPlan } from '../utils/bulkStudentRecords';
 import { importSheetWidth, inspectTrialPdf, readPdfImport, readTrialPdfResults, type ImportSheet } from '../utils/bulkRecordFiles';
+import { trialRosterDrafts } from '../utils/trialRosterImport';
 import { calculateNet, computePracticeExamTotals, LGS_SUBJECT_CONFIG } from '../utils/exportUtils';
 import '../index.css';
 
@@ -15,7 +16,7 @@ const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2
 const primary = 'inline-flex min-h-11 items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white hover:bg-teal-800 disabled:opacity-50';
 const numberFormat = new Intl.NumberFormat('tr-TR', { maximumFractionDigits: 2 });
 const trialFields = bulkHeaders('trials');
-const statisticsLink = '/?denemeAnalizi=1';
+const archiveLink = '/?denemeArsivi=1';
 const requestedPage = new URLSearchParams(window.location.search).get('sayfa') ?? '';
 type TrialInput = Extract<BulkInput, { mode: 'trials' }>;
 
@@ -32,7 +33,8 @@ function TrialImporter() {
   const [progress, setProgress] = useState('');
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState('');
-  const [savedCount, setSavedCount] = useState<number>();
+  const [savedCount, setSavedCount] = useState<{ trials: number; students: number; classes: string[] }>();
+  const [addMissing, setAddMissing] = useState(false);
   const locked = useRef(false);
   const authorized = Boolean(user && workspaceView === 'teacher' && !authLoading && !dataLoading);
   const publishedReport = sheets.some((sheet) => Boolean(sheet.published));
@@ -40,18 +42,24 @@ function TrialImporter() {
   const detection = useMemo(() => {
     if (!sheets.length || authLoading || dataLoading) return null;
     try {
-      const schoolYear = date ? Number(date.slice(0, 4)) - (Number(date.slice(5, 7)) < 9 ? 1 : 0) : null;
-      const sections = classId ? classes.filter((item) => item.id === classId) : publishedReport && schoolYear
-        ? classes.filter((item) => item.academicYear.replace(/[^0-9]/g, '') === String(schoolYear) + (schoolYear + 1))
-        : classes;
+      const dateForYear = date || new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Istanbul' }).format(new Date());
+      const schoolYear = Number(dateForYear.slice(0, 4)) - (Number(dateForYear.slice(5, 7)) < 9 ? 1 : 0);
+      const academicYear = schoolYear + '-' + (schoolYear + 1);
+      const academicSections = classes.filter((item) => item.academicYear.replace(/[^0-9]/g, '') === String(schoolYear) + (schoolYear + 1));
+      const sections = classId ? classes.filter((item) => item.id === classId) : publishedReport ? academicSections : classes;
       const ids = new Set(sections.map(({ id }) => id));
-      return readTrialPdfResults(sheets, students.filter((student) => ids.has(student.classId)), trialFields, sections);
+      const existing = readTrialPdfResults(sheets, students.filter((student) => ids.has(student.classId)), trialFields, sections);
+      const sameYearIds = new Set([...academicSections, ...sections].map(({ id }) => id));
+      const proposed = trialRosterDrafts(sheets, sections, students.filter((student) => sameYearIds.has(student.classId)), classId, academicYear);
+      return { ...existing, drafts: proposed.drafts, draftIssues: proposed.issues };
     } catch (issue) {
-      return { groups: new Map<string, string[][]>(), issues: [], publishedResults: new Map<string, { totalNet: number; score: number }>(), error: issue instanceof Error ? issue.message : 'Sonuçlar okunamadı.' };
+      return { groups: new Map<string, string[][]>(), issues: [], drafts: [], draftIssues: [], publishedResults: new Map<string, { totalNet: number; score: number }>(), error: issue instanceof Error ? issue.message : 'Sonuçlar okunamadı.' };
     }
   }, [sheets, students, classes, classId, authLoading, dataLoading, date, publishedReport]);
 
   const matchedCount = [...(detection?.groups.values() ?? [])].reduce((count, group) => count + group.length, 0);
+  const missingCount = detection?.drafts.reduce((count, group) => count + group.rows.length, 0) ?? 0;
+  const totalToReview = matchedCount + (addMissing ? missingCount : 0);
   const names = useMemo(() => {
     const map = new Map<string, string>();
     for (const student of students) map.set(JSON.stringify([student.classId, student.studentNumber]), student.fullName);
@@ -77,6 +85,7 @@ function TrialImporter() {
   async function readPages(file: File, pages: string) {
     setSheets([]);
     setSavedCount(undefined);
+    setAddMissing(false);
     setSheets(await readPdfImport(file, pages, false, setProgress, true));
     setReadSelection(pages);
   }
@@ -112,17 +121,38 @@ function TrialImporter() {
           batches.push({ input, plan: await buildBulkPlan(input, { classes, students, grades, practiceExams }, user.uid) });
         }
       }
-      let count = 0;
-      setProgress('Firebase’e kaydediliyor…');
-      for (const { input, plan } of batches) {
-        if (plan.rows.every((row) => row.skip)) continue;
-        const result = await saveBulkRecords(input);
-        count += result.saved;
-        if (result.error) {
-          throw new Error(`${count} sonuç bu işlemde kaydedildi. ${result.error}`);
+      if (addMissing) {
+        for (const draft of detection.drafts) {
+          for (let start = 0; start < draft.rows.length; start += 250) {
+            const rows = draft.rows.slice(start, start + 250);
+            const input: TrialInput = {
+              mode: 'trials', classId: draft.classId, assessment: { examTitle: title, examDate: date, wrongPenalty: penalty },
+              text: rows.map(({ number, scores }) => [number, ...scores].join('\t')).join('\n'),
+              roster: {
+                newClass: draft.newClass,
+                text: rows.map(({ number, name }) => number + '\t' + name.replace(/[\t\r\n]+/g, ' ')).join('\n'),
+              },
+              publishedResults: new Map(rows.map((row) => [publishedTrialKey(draft.classId, row.number), row])),
+            };
+            batches.push({ input, plan: await buildBulkPlan(input, { classes, students, grades, practiceExams }, user.uid) });
+          }
         }
       }
-      setSavedCount(count);
+      let trials = 0;
+      let studentsAdded = 0;
+      const savedClasses = new Set<string>();
+      setProgress('Firebase’e kaydediliyor…');
+      for (const { input, plan } of batches) {
+        savedClasses.add(plan.classId);
+        if (plan.rows.every((row) => row.skip)) continue;
+        const result = await saveBulkRecords(input);
+        trials += result.trialsSaved ?? 0;
+        studentsAdded += result.studentsSaved ?? 0;
+        if (result.error) {
+          throw new Error(`${studentsAdded} öğrenci ve ${trials} sonuç kaydedildi. ${result.error}`);
+        }
+      }
+      setSavedCount({ trials, students: studentsAdded, classes: [...savedClasses] });
     });
   }
 
@@ -183,9 +213,27 @@ function TrialImporter() {
       {progress && <p role="status">{progress}</p>}
       {error && <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-4 text-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
       {detection && <section className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-        <h2 className="text-lg font-bold">Kayıt önizlemesi · {matchedCount} eşleşen sonuç</h2>
+        <h2 className="text-lg font-bold">Kayıt önizlemesi · {totalToReview} sonuç</h2>
         {'error' in detection && <p role="alert">{detection.error}</p>}
-        {detection.issues.length > 0 && <details className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100" open={matchedCount === 0}>
+        {missingCount > 0 && savedCount === undefined && <div className="space-y-3 rounded-lg border border-teal-200 bg-teal-50 p-4 dark:border-teal-900 dark:bg-teal-950">
+          <label className="flex items-start gap-3 font-semibold">
+            <input type="checkbox" className="mt-1 size-5 shrink-0" checked={addMissing} disabled={busy}
+              onChange={(event) => { setAddMissing(event.target.checked); setError(''); }} />
+            Eksik sınıf ve öğrencileri PDF’den ekle
+          </label>
+          <ul className="space-y-2 text-sm">
+            {detection.drafts.map((draft) => <li key={draft.label}>
+              <strong>{draft.label}</strong> · {draft.rows.length} yeni öğrenci{draft.newClass && ' · Yeni sınıf · ' + draft.newClass.academicYear}
+              {addMissing && <ul className="mt-1 max-h-36 space-y-1 overflow-auto pl-3">
+                {draft.rows.map((row) => <li key={row.number}>{row.number} · {row.name}</li>)}
+              </ul>}
+            </li>)}
+          </ul>
+        </div>}
+        {detection.draftIssues.length > 0 && <ul className="space-y-1 rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100">
+          {detection.draftIssues.map((issue) => <li key={issue}>{issue}</li>)}
+        </ul>}
+        {detection.issues.length > 0 && <details className="rounded-lg bg-amber-50 p-3 text-sm text-amber-900 dark:bg-amber-950 dark:text-amber-100" open={matchedCount === 0 && missingCount === 0}>
           <summary className="cursor-pointer font-semibold">{detection.issues.length} uyarı · İnceleyin</summary>
           <ul className="mt-2 max-h-56 space-y-1 overflow-auto">{detection.issues.map((issue) => <li key={issue}>{issue}</li>)}</ul>
         </details>}
@@ -218,15 +266,15 @@ function TrialImporter() {
             </table>
           </div>
         </div>)}
-        {matchedCount > 0 && savedCount === undefined && <>
+        {totalToReview > 0 && savedCount === undefined && <>
           <button type="button" className={primary} disabled={!authorized || !date || !title.trim() || busy}
-            onClick={() => void save()}>{matchedCount} Eşleşen Sonucu Firebase’e Kaydet</button>
+            onClick={() => void save()}>{addMissing && missingCount ? 'Sınıfı, Öğrencileri ve Sonuçları Kaydet' : `${matchedCount} Sonucu Firebase’e Kaydet`}</button>
           {authorized && !date && <p className="text-sm">Kayıt için deneme tarihini girin.</p>}
         </>}
-        {!matchedCount && !detection.issues.length && <p className="text-sm">Seçilen sayfalarda eşleşen sonuç bulunamadı.</p>}
+        {!matchedCount && !missingCount && !detection.issues.length && <p className="text-sm">Seçilen sayfalarda eşleşen sonuç bulunamadı.</p>}
         {savedCount !== undefined && <div role="status" className="space-y-2">
-          <p>{savedCount ? `${savedCount} sonuç Firebase’e kaydedildi.` : 'Bu sonuçlar zaten kayıtlı.'}</p>
-          <a href={statisticsLink} className={primary}><BarChart3 size={18} /> Bilge Akademi’de Analizi Aç</a>
+          <p>{savedCount.trials || savedCount.students ? `${savedCount.students} öğrenci ve ${savedCount.trials} sonuç Firebase’e kaydedildi.` : 'Bu sonuçlar zaten kayıtlı.'}</p>
+          <a href={archiveLink + (savedCount.classes.length === 1 ? '&sinif=' + encodeURIComponent(savedCount.classes[0]) : '')} className={primary}><BarChart3 size={18} /> Sınıfın Deneme Arşivini Aç</a>
         </div>}
       </section>}
       {sheets.length > 0 && <details className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
