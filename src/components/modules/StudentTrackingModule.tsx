@@ -37,7 +37,6 @@ import {
   calculateAttendanceSummary,
   calculateAverageScore,
   calculateSubjectAverages,
-  calculateTrialRobotSummary,
   exportToCsv,
   formatTurkishDate,
   triggerPrintReport,
@@ -53,6 +52,7 @@ import { normalizeSearchText } from '../../utils/searchText';
 import { classChartColors, getSubjectColor } from '../../utils/subjectColors';
 import { summarizePracticeForAnalysis } from '../../utils/practiceAnalysis';
 import { BulkRecordsPanel } from './student-tracking/BulkRecordsPanel';
+import { orderStudentsByNet, STUDENT_NET_ORDERS, summarizeStudentNets, type StudentNetOrder } from '../../utils/studentNetOrder';
 import { ClassTrialArchive, ClassTrialDistribution } from './student-tracking/ClassTrialArchive';
 import { ExamNetTrend } from './student-tracking/ExamNetTrend';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
@@ -92,6 +92,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
+  const [netOrder, setNetOrder] = useState<StudentNetOrder>('default');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [examTypeFilter, setExamTypeFilter] = useState<'all' | ExamType>('all');
@@ -127,9 +128,10 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   const selectedStudent = selectedStudentId ? studentMap.get(selectedStudentId) ?? null : null;
 
   // Derived lists
+  const studentNets = useMemo(() => summarizeStudentNets(practiceExams), [practiceExams]);
   const filteredStudents = useMemo(() => {
     const q = normalizeSearchText(searchQuery);
-    return students.filter((s) => {
+    const visible = students.filter((s) => {
       if (classFilter !== 'all' && s.classId !== classFilter) return false;
       if (statusFilter !== 'all' && s.status !== statusFilter) return false;
       if (q) {
@@ -142,7 +144,8 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       }
       return true;
     });
-  }, [classFilter, classMap, searchQuery, statusFilter, students]);
+    return orderStudentsByNet(visible, studentNets, netOrder);
+  }, [classFilter, classMap, searchQuery, statusFilter, students, studentNets, netOrder]);
 
   const uniqueSubjects = useMemo(() => {
     const set = new Set(grades.map((g) => g.subjectName));
@@ -365,17 +368,15 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       ['Okul No', 'Ad Soyad', 'Sınıf', 'Seviye', 'Not Ort.', 'Deneme Sayısı', 'Deneme Ort. Net', 'Durum'],
       filteredStudents.map((stu) => {
         const sGrades = grades.filter((g) => g.studentId === stu.id);
-        const sTrials = calculateTrialRobotSummary(
-          practiceExams.filter((p) => p.studentId === stu.id)
-        );
+        const sTrials = studentNets.get(stu.id);
         return [
           stu.studentNumber,
           stu.fullName,
           classMap.get(stu.classId)?.name ?? '-',
           `${stu.gradeLevel}. Sınıf`,
           sGrades.length > 0 ? calculateAverageScore(sGrades) : '-',
-          sTrials.examCount,
-          sTrials.examCount > 0 ? sTrials.avgTotalNet : '-',
+          sTrials?.count ?? 0,
+          sTrials?.average ?? '-',
           stu.status === 'active' ? 'Aktif' : 'Pasif',
         ];
       })
@@ -659,6 +660,17 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                   ))}
                 </select>
 
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Net sırası
+                  <select
+                    value={netOrder}
+                    onChange={(event) => setNetOrder(event.target.value as StudentNetOrder)}
+                    className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                  >
+                    {STUDENT_NET_ORDERS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+
                 <select
                   aria-label="Duruma göre filtrele"
                   value={statusFilter}
@@ -710,7 +722,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                       <th className="py-3 px-4 font-medium">Öğrenci</th>
                       <th className="py-3 px-4 font-medium">Sınıf</th>
                       <th className="py-3 px-4 font-medium text-right">Not Ort.</th>
-                      <th className="py-3 px-4 font-medium text-right">Deneme Ort. Net</th>
+                      <th scope="col" aria-sort={netOrder === 'default' ? 'none' : netOrder} className="py-3 px-4 font-medium text-right">Deneme Ort. Net</th>
                       <th className="py-3 px-4 font-medium">Durum</th>
                       <th className="py-3 px-4 font-medium text-right no-print">İşlemler</th>
                     </tr>
@@ -719,9 +731,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                     {filteredStudents.map((stu) => {
                       const sGrades = grades.filter((g) => g.studentId === stu.id);
                       const sAvg = calculateAverageScore(sGrades);
-                      const sTrial = calculateTrialRobotSummary(
-                        practiceExams.filter((p) => p.studentId === stu.id)
-                      );
+                      const sTrial = studentNets.get(stu.id);
                       const cls = classMap.get(stu.classId);
 
                       return (
@@ -748,7 +758,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                             {sGrades.length > 0 ? sAvg.toFixed(1) : '—'}
                           </td>
                           <td className={`${rowPad} px-4 text-right font-mono text-xs tabular-nums text-teal-700 dark:text-teal-400 font-semibold`}>
-                            {sTrial.examCount > 0 ? `${sTrial.avgTotalNet.toFixed(2)} net` : '—'}
+                            {sTrial ? `${sTrial.average.toFixed(2)} net` : '—'}
                           </td>
                           <td className={`${rowPad} px-4 text-xs whitespace-nowrap`}>
                             <span
@@ -974,6 +984,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
         <div className="space-y-4">
           <a href="/deneme-aktarim/" className="inline-flex rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">Deneme PDF’si Aktar</a>
           <PracticeExamRobotPanel
+          initialClassId={classFilter}
           students={students}
           classes={classes}
           practiceExams={practiceExams}

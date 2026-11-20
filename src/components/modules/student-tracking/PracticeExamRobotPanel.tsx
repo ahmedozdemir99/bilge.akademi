@@ -29,6 +29,7 @@ import {
   LGS_SUBJECT_CONFIG,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { orderStudentsByNet, STUDENT_NET_ORDERS, summarizeStudentNets, type StudentNetOrder } from '../../../utils/studentNetOrder';
 import { trialSubjectColors } from '../../../utils/subjectColors';
 
 interface PracticeExamRobotPanelProps {
@@ -38,6 +39,7 @@ interface PracticeExamRobotPanelProps {
   onAddPracticeExam: (input: PracticeExamInput) => Promise<void>;
   onDeletePracticeExam: (exam: PracticeExamRecord) => void;
   lockedStudentId?: string;
+  initialClassId?: string;
 }
 
 type SubjectInputs = Record<MiddleSchoolTrialSubjectKey, { d: number; y: number }>;
@@ -58,11 +60,12 @@ export function PracticeExamRobotPanel({
   onAddPracticeExam,
   onDeletePracticeExam,
   lockedStudentId,
+  initialClassId = 'all',
 }: PracticeExamRobotPanelProps) {
   const today = new Date().toISOString().slice(0, 10);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(
-    lockedStudentId || students[0]?.id || ''
-  );
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [entryClassId, setEntryClassId] = useState(initialClassId);
+  const [entryNetOrder, setEntryNetOrder] = useState<StudentNetOrder>('default');
   const [filterStudentId, setFilterStudentId] = useState<string>(lockedStudentId || 'all');
   const [filterClassId, setFilterClassId] = useState<string>('all');
 
@@ -75,6 +78,17 @@ export function PracticeExamRobotPanel({
 
   const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
+
+  const studentNets = useMemo(() => summarizeStudentNets(practiceExams), [practiceExams]);
+  const entryClass = classes.some(({ id }) => id === entryClassId) ? entryClassId : 'all';
+  const entryStudents = useMemo(() => orderStudentsByNet(
+    students.filter((student) => entryClass === 'all' || student.classId === entryClass),
+    studentNets,
+    entryNetOrder
+  ), [students, entryClass, studentNets, entryNetOrder]);
+  const targetStudent = lockedStudentId
+    ? studentMap.get(lockedStudentId)
+    : entryStudents.find(({ id }) => id === selectedStudentId) ?? entryStudents[0];
 
   const liveTotals = useMemo(
     () =>
@@ -161,8 +175,7 @@ export function PracticeExamRobotPanel({
 
   const handleSaveExam = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetId = lockedStudentId || selectedStudentId || students[0]?.id;
-    const stu = students.find((s) => s.id === targetId);
+    const stu = targetStudent;
     if (!stu || examTitle.trim().length < 2) return;
 
     setSaving(true);
@@ -263,24 +276,48 @@ export function PracticeExamRobotPanel({
 
         <form onSubmit={(e) => void handleSaveExam(e)} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {!lockedStudentId && (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                  Öğrenci
-                </label>
-                <select
-                  value={selectedStudentId || students[0]?.id || ''}
-                  onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100"
-                >
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.fullName} ({classMap.get(s.classId)?.name ?? `${s.gradeLevel}. Sınıf`})
-                    </option>
-                  ))}
+            {!lockedStudentId && <>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Sınıf
+                <select value={entryClass} onChange={(event) => {
+                  const nextClass = event.target.value;
+                  const nextStudents = orderStudentsByNet(students.filter((student) => nextClass === 'all' || student.classId === nextClass), studentNets, entryNetOrder);
+                  setEntryClassId(nextClass);
+                  setSelectedStudentId(nextStudents.find(({ id }) => id === targetStudent?.id)?.id ?? nextStudents[0]?.id ?? '');
+                }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                  <option value="all">Tüm Sınıflar</option>
+                  {classes.map((item) => <option value={item.id} key={item.id}>{item.name} · {item.academicYear}</option>)}
                 </select>
-              </div>
-            )}
+              </label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Net sırası
+                <select value={entryNetOrder} onChange={(event) => {
+                  setSelectedStudentId(targetStudent?.id ?? '');
+                  setEntryNetOrder(event.target.value as StudentNetOrder);
+                }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                  {STUDENT_NET_ORDERS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Öğrenci
+                <select
+                  value={targetStudent?.id ?? ''}
+                  onChange={(event) => setSelectedStudentId(event.target.value)}
+                  disabled={!entryStudents.length}
+                  className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                >
+                  {!entryStudents.length && <option value="">Bu sınıfta öğrenci yok</option>}
+                  {entryStudents.map((student) => {
+                    const net = studentNets.get(student.id);
+                    const schoolClass = classMap.get(student.classId);
+                    return <option key={student.id} value={student.id}>
+                      {student.fullName}{entryClass === 'all' ? ' (' + (schoolClass?.name ?? student.gradeLevel + '. Sınıf') + ')' : ''}
+                      {net ? ' · ' + net.average.toFixed(2) + ' net' : ''}
+                    </option>;
+                  })}
+                </select>
+              </label>
+            </>}
 
             <div className={lockedStudentId ? 'md:col-span-2' : ''}>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
@@ -405,7 +442,7 @@ export function PracticeExamRobotPanel({
 
             <button
               type="submit"
-              disabled={saving || students.length === 0}
+              disabled={saving || !targetStudent}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 hover:bg-gold-500 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4" />
