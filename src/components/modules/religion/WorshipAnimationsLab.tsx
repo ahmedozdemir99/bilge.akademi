@@ -482,6 +482,11 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
 
   const handleListenSinglePrayer = () => {
     stopAllGuidedNarration();
+    if (PRAYER_POSTURE_STEPS[prayerIdx].postureKey === 'niyyah') {
+      // Speak the exact intention text locally, avoiding generative audio variations.
+      speakInstant(buildPrayerSpeechText(PRAYER_POSTURE_STEPS[prayerIdx]), { lang: 'tr-TR', rate: 0.94 });
+      return;
+    }
     void speakTurkishStudio(buildPrayerSpeechText(PRAYER_POSTURE_STEPS[prayerIdx]));
   };
 
@@ -541,11 +546,17 @@ export function WorshipAnimationsLab({ onOpenSurahs }: { onOpenSurahs?: () => vo
           TURKISH_WORSHIP_STYLE
         ).catch(() => undefined);
       }
-      void speakTurkishStudio(buildPrayerSpeechText(st), () => {
+      const nextStep = () => {
         if (!prayerNarrateCancelRef.current) {
           window.setTimeout(() => runStep(idx + 1), 500);
         }
-      });
+      };
+      if (st.postureKey === 'niyyah') {
+        // Browser speech reads the exact fixed intention without a generated audio file.
+        speakInstant(buildPrayerSpeechText(st), { lang: 'tr-TR', rate: 0.94, onEnd: nextStep });
+      } else {
+        void speakTurkishStudio(buildPrayerSpeechText(st), nextStep);
+      }
     };
     runStep(0);
   };
