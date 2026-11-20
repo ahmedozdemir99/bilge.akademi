@@ -27,6 +27,23 @@ export default defineConfig(() => {
           }
         },
       },
+      {
+        name: 'share-page',
+        apply: 'build',
+        closeBundle(error?: Error): void {
+          if (error) return;
+
+          const dist = path.resolve(__dirname, 'dist');
+          const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+          const shareHtml = html.replace(
+            /(<meta property="og:url" content="[^"]+\/)(?=")/,
+            '$1paylas/',
+          );
+          const shareDir = path.join(dist, 'paylas');
+          fs.mkdirSync(shareDir, { recursive: true });
+          fs.writeFileSync(path.join(shareDir, 'index.html'), shareHtml);
+        },
+      },
     ],
     resolve: {
       alias: {
