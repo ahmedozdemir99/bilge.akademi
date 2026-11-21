@@ -7,7 +7,9 @@ const roles = [
 ] as const;
 
 export function WorkspaceRoleControl() {
-  const { authLoading, isDemoMode, workspaceView, setWorkspaceView } = useAcademy();
+  const { authLoading, isDemoMode, profile, user, workspaceView, setWorkspaceView } = useAcademy();
+
+  const canSwitch = isDemoMode || (user !== null && profile?.uid === user.uid && (profile.role === 'teacher' || profile.role === 'admin'));
 
   return (
     <div
@@ -25,21 +27,18 @@ export function WorkspaceRoleControl() {
           </>
         );
 
-        return isDemoMode && !authLoading ? (
+        return (
           <button
             key={id}
             type="button"
             aria-pressed={selected}
+            disabled={authLoading}
             onClick={() => setWorkspaceView(id)}
-            className="appearance-option cursor-pointer"
+            title={!canSwitch && id === 'teacher' ? 'Öğretmen yetkisi gerekli' : undefined}
+            className="appearance-option cursor-pointer disabled:cursor-wait"
           >
             {content}
           </button>
-        ) : (
-          <div key={id} data-selected={selected} className="appearance-option">
-            {content}
-            {selected && <span className="sr-only"> (etkin görünüm)</span>}
-          </div>
         );
       })}
     </div>
