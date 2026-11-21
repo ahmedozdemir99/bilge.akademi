@@ -158,9 +158,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
       }
 
       const count = sortedStudentExams.length;
-      const avgLgs = round2(
-        sortedStudentExams.reduce((acc, ex) => acc + ex.lgsPuan, 0) / count
-      );
+      const scoredExams = sortedStudentExams.filter((ex) => Number.isFinite(ex.lgsPuan) && ex.lgsPuan >= 100 && ex.lgsPuan <= 500);
+      const avgLgs = scoredExams.length ? round2(
+        scoredExams.reduce((acc, ex) => acc + ex.lgsPuan, 0) / scoredExams.length
+      ) : 0;
       const avgToplamNet = round2(
         sortedStudentExams.reduce((acc, ex) => acc + ex.toplam.net, 0) / count
       );
@@ -181,7 +182,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         }
       }
 
-      const bestLgs = Math.max(...sortedStudentExams.map((ex) => ex.lgsPuan));
+      const bestLgs = scoredExams.length ? Math.max(...scoredExams.map((ex) => ex.lgsPuan)) : 0;
 
       raw.push({
         student,
@@ -201,6 +202,12 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
     const dir = sortDirection === 'desc' ? 1 : -1;
 
     raw.sort((a, b) => {
+      // Missing LGS scores must always appear below scored students for LGS rankings.
+      if (selectedSubject === 'ALL' && ['avg_lgs', 'latest_lgs', 'best_lgs'].includes(generalMetric)) {
+        const aMissing = getPrimarySortValue(a) < 100;
+        const bMissing = getPrimarySortValue(b) < 100;
+        if (aMissing !== bMissing) return aMissing ? 1 : -1;
+      }
       const aVal = getPrimarySortValue(a);
       const bVal = getPrimarySortValue(b);
       if (Math.abs(bVal - aVal) > 0.0001) {
@@ -241,7 +248,8 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
   const footerAverages = useMemo(() => {
     if (filteredRows.length === 0) return null;
     const count = filteredRows.length;
-    const avgLgs = round2(filteredRows.reduce((acc, r) => acc + r.avgLgs, 0) / count);
+    const scoredRows = filteredRows.filter((r) => r.avgLgs >= 100);
+    const avgLgs = scoredRows.length ? round2(scoredRows.reduce((acc, r) => acc + r.avgLgs, 0) / scoredRows.length) : 0;
     const avgToplamNet = round2(
       filteredRows.reduce((acc, r) => acc + r.avgToplamNet, 0) / count
     );
@@ -281,9 +289,10 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           avgNet: round2(
             participants.reduce((acc, rec) => acc + rec.toplam.net, 0) / participants.length
           ),
-          avgLgs: round2(
-            participants.reduce((acc, rec) => acc + rec.lgsPuan, 0) / participants.length
-          ),
+          avgLgs: (() => {
+            const scored = participants.filter((rec) => Number.isFinite(rec.lgsPuan) && rec.lgsPuan >= 100 && rec.lgsPuan <= 500);
+            return scored.length ? round2(scored.reduce((acc, rec) => acc + rec.lgsPuan, 0) / scored.length) : 0;
+          })(),
           subjectNets,
         });
       }
@@ -414,7 +423,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
                     <strong style={{ color: activeSubjectMeta.color }}>
                       {formatTrNumber(topStudent.avgSubjectNets[activeSubjectMeta.key], 2)}
                     </strong>{' '}
-                    Net · Ort. {formatTrNumber(topStudent.avgLgs, 2)} p
+                    Net · Ort. {topStudent.avgLgs >= 100 ? formatTrNumber(topStudent.avgLgs, 2) : 'Puan yok'} p
                   </>
                 ) : (
                   <>
