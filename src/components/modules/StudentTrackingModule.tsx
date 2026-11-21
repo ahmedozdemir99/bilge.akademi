@@ -544,7 +544,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             type="button"
             onClick={() => setActiveTab('deneme-analysis')}
             aria-pressed={activeTab === 'deneme-analysis'}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
+            className="col-span-full inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Deneme Analizi</span>
