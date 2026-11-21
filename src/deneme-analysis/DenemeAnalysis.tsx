@@ -102,12 +102,13 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
       }
 
       changeArchive(current);
-      return {
-        totalRecords,
-        matchedCount: totalMatched,
-        newStudentsCount: totalNew,
-        examCount: bundles.length,
-      };
+      setSelectedStudentId(null);
+      setActiveTab('students');
+      setBannerMessage({
+        type: 'info',
+        text: `${bundles.length} deneme arşive eklendi. ${totalRecords} sonuç işlendi, ${totalMatched} öğrenci eşleşti ve ${totalNew} yeni kart açıldı.`,
+      });
+      section.current?.scrollIntoView({ block: 'start' });
     },
     [archive, changeArchive]
   );
@@ -276,13 +277,15 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
         )}
       </div>
 
-      <UploadModal
-        isOpen={isUploadOpen}
-        onClose={() => setIsUploadOpen(false)}
-        onBundlesParsed={handleBundlesParsed}
-        nextExamOrder={nextExamOrder}
-        onLoadSample={loadSample}
-      />
+      {isUploadOpen && (
+        <UploadModal
+          isOpen
+          onClose={() => setIsUploadOpen(false)}
+          onBundlesParsed={handleBundlesParsed}
+          nextExamOrder={nextExamOrder}
+          onLoadSample={loadSample}
+        />
+      )}
     </section>
   );
 }

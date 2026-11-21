@@ -1249,21 +1249,41 @@ function parseSonucBelgesiPage(tokens: TextToken[], pageWidth: number): ParsedSo
   };
 }
 
+interface ExamPdfOptions {
+  customExamName?: string;
+  examDate?: string;
+  examOrder?: number;
+  isSample?: boolean;
+  onProgress?: (currentPage: number, totalPages: number) => void;
+  signal?: AbortSignal;
+}
+
 export async function parseExamPdf(
   source: ArrayBuffer | Uint8Array,
   fileName: string,
-  options?: {
-    customExamName?: string;
-    examDate?: string;
-    examOrder?: number;
-    isSample?: boolean;
-    onProgress?: (currentPage: number, totalPages: number) => void;
-  }
+  options?: ExamPdfOptions
 ): Promise<ParsedExamBundle> {
+  const signal = options?.signal;
+  signal?.throwIfAborted();
   const data = source instanceof Uint8Array ? source : new Uint8Array(source);
   const loadingTask = pdfjsLib.getDocument({ data, useSystemFonts: true });
-  const pdfDoc = await loadingTask.promise;
+  let destroying: Promise<void> | undefined;
+  const destroy = () => (destroying ??= loadingTask.destroy().catch(() => {}));
+  const abort = () => { void destroy(); };
+  signal?.addEventListener('abort', abort, { once: true });
+
+  try {
+    const pdfDoc = await loadingTask.promise;
+    return await readExamPdf(pdfDoc, fileName, options);
+  } finally {
+    signal?.removeEventListener('abort', abort);
+    await destroy();
+  }
+}
+
+async function readExamPdf(pdfDoc: pdfjsLib.PDFDocumentProxy, fileName: string, options?: ExamPdfOptions) {
   const totalPages = pdfDoc.numPages;
+  options?.onProgress?.(0, totalPages);
 
   const okulListMeta: OkulListMeta = {
     generalSubjectNets: {},
@@ -1274,11 +1294,14 @@ export async function parseExamPdf(
   let activeTabularLayout: DynamicTableLayout | null = null;
 
   for (let pageNum = 1; pageNum <= totalPages; pageNum++) {
+    options?.signal?.throwIfAborted();
     const page = await pdfDoc.getPage(pageNum);
     const viewport = page.getViewport({ scale: 1 });
     const pageWidth = viewport.width || 595;
 
     const content = await page.getTextContent();
+    page.cleanup();
+    options?.signal?.throwIfAborted();
     const tokens: TextToken[] = [];
     for (const item of content.items) {
       if ('str' in item && item.str.trim() !== '') {

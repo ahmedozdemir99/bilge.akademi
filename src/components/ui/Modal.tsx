@@ -7,6 +7,7 @@ interface ModalProps {
   title: string;
   subtitle?: string;
   children: React.ReactNode;
+  footer?: React.ReactNode;
   maxWidthClass?: string;
 }
 
@@ -16,6 +17,7 @@ export function Modal({
   title,
   subtitle,
   children,
+  footer,
   maxWidthClass = 'max-w-lg',
 }: ModalProps) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -48,7 +50,7 @@ export function Modal({
       <div
         className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden max-h-[90dvh] flex flex-col"
       >
-        <div className="flex items-start justify-between gap-4 px-6 py-5 border-b border-slate-200 dark:border-slate-800">
+        <div className="flex shrink-0 items-start justify-between gap-3 border-b border-slate-200 px-4 py-3 dark:border-slate-800 sm:gap-4 sm:px-6 sm:py-5">
           <div className="min-w-0">
             <h2 id={titleId} className="text-lg font-semibold text-slate-900 dark:text-slate-100">
               {title}
@@ -66,7 +68,8 @@ export function Modal({
             <X className="w-5 h-5" />
           </button>
         </div>
-        <div className="px-6 py-5 overflow-y-auto">{children}</div>
+        <div className="min-h-0 overflow-y-auto overscroll-contain px-4 py-3 sm:px-6 sm:py-5">{children}</div>
+        {footer && <footer className="shrink-0 border-t border-slate-200 bg-white px-4 py-3 dark:border-slate-800 dark:bg-slate-900 sm:px-6">{footer}</footer>}
       </div>
     </dialog>
   );

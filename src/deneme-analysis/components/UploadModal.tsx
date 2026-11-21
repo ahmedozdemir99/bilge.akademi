@@ -1,10 +1,9 @@
-import React, { useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   FileUp,
   FileText,
   FileSpreadsheet,
   X,
-  CheckCircle2,
   AlertCircle,
   Loader2,
   RefreshCw,
@@ -13,26 +12,14 @@ import {
 import { ParsedExamBundle } from '../types/exam';
 import { parseExamPdf } from '../utils/pdfParser';
 import { downloadExcelTemplate, parseExamExcel } from '../utils/excelHandler';
+import { Modal } from '../../components/ui/Modal';
 
 interface UploadModalProps {
   isOpen: boolean;
   onClose: () => void;
-  onBundlesParsed: (bundles: ParsedExamBundle[]) => {
-    totalRecords: number;
-    matchedCount: number;
-    newStudentsCount: number;
-    examCount: number;
-  };
+  onBundlesParsed: (bundles: ParsedExamBundle[]) => void;
   nextExamOrder: number;
   onLoadSample: () => void;
-}
-
-interface UploadResultSummary {
-  examCount: number;
-  totalRecords: number;
-  matchedCount: number;
-  newStudentsCount: number;
-  fileNames: string[];
 }
 
 function isExcelFile(file: File): boolean {
@@ -59,6 +46,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   onLoadSample,
 }) => {
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const currentUpload = useRef<AbortController | null>(null);
   const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
   const [customExamName, setCustomExamName] = useState('');
   const [examDate, setExamDate] = useState(() => new Date().toISOString().slice(0, 10));
@@ -67,19 +55,16 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   const [progressText, setProgressText] = useState('');
   const [progressPct, setProgressPct] = useState(0);
   const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [resultSummary, setResultSummary] = useState<UploadResultSummary | null>(null);
-
-  if (!isOpen) return null;
+  useEffect(() => () => currentUpload.current?.abort(), []);
 
   const handleFilesAdded = (files: FileList | null) => {
-    if (!files) return;
+    if (!files || currentUpload.current) return;
     const supported = Array.from(files).filter((f) => isPdfFile(f) || isExcelFile(f));
     if (supported.length === 0) {
       setErrorMsg('Lütfen PDF (.pdf) veya Excel (.xlsx, .xls, .csv) formatında deneme sonuç dosyası seçin.');
       return;
     }
     setErrorMsg(null);
-    setResultSummary(null);
     setSelectedFiles((prev) => {
       const existingNames = new Set(prev.map((p) => `${p.name}_${p.size}`));
       const uniqueNew = supported.filter((f) => !existingNames.has(`${f.name}_${f.size}`));
@@ -92,104 +77,93 @@ export const UploadModal: React.FC<UploadModalProps> = ({
   };
 
   const handleParseAll = async () => {
-    if (selectedFiles.length === 0) return;
+    if (selectedFiles.length === 0 || currentUpload.current) return;
+    const controller = new AbortController();
+    currentUpload.current = controller;
+    const { signal } = controller;
     setIsParsing(true);
     setErrorMsg(null);
-    setResultSummary(null);
+    setProgressPct(0);
+    setProgressText('Dosya hazırlanıyor…');
 
     try {
       const bundles: ParsedExamBundle[] = [];
-      for (let i = 0; i < selectedFiles.length; i++) {
-        const file = selectedFiles[i];
+      for (const [index, file] of selectedFiles.entries()) {
+        signal.throwIfAborted();
+        const customName = selectedFiles.length === 1 ? customExamName.trim() || undefined : undefined;
+        const options = { customExamName: customName, examDate, examOrder: nextExamOrder + index };
+        setProgressText(`${index + 1}/${selectedFiles.length} · ${file.name}`);
         const buffer = await file.arrayBuffer();
-        const customName =
-          selectedFiles.length === 1 && customExamName.trim() ? customExamName.trim() : undefined;
+        signal.throwIfAborted();
 
         if (isExcelFile(file)) {
-          setProgressText(`"${file.name}" Excel tablosu okunuyor...`);
-          setProgressPct(Math.round(((i + 0.5) / selectedFiles.length) * 100));
-          const bundle = await parseExamExcel(buffer, file.name, {
-            customExamName: customName,
-            examDate,
-            examOrder: nextExamOrder + i,
-          });
-          bundles.push(bundle);
-          setProgressPct(Math.round(((i + 1) / selectedFiles.length) * 100));
+          bundles.push(await parseExamExcel(buffer, file.name, options));
         } else {
-          setProgressText(`"${file.name}" okunuyor...`);
-          const bundle = await parseExamPdf(buffer, file.name, {
-            customExamName: customName,
-            examDate,
-            examOrder: nextExamOrder + i,
-            onProgress: (cur, total) => {
-              const fileBase = (i / selectedFiles.length) * 100;
-              const fileSpan = (1 / selectedFiles.length) * 100;
-              setProgressPct(Math.round(fileBase + (cur / Math.max(1, total)) * fileSpan));
-              setProgressText(`${file.name} · Sayfa ${cur} / ${total}`);
+          bundles.push(await parseExamPdf(buffer, file.name, {
+            ...options,
+            signal,
+            onProgress: (current, total) => {
+              if (signal.aborted) return;
+              setProgressPct(Math.round((index + current / total) * 100 / selectedFiles.length));
+              setProgressText(`${index + 1}/${selectedFiles.length} · Sayfa ${current} / ${total}`);
             },
-          });
-          bundles.push(bundle);
+          }));
         }
+        setProgressPct(Math.round((index + 1) * 100 / selectedFiles.length));
       }
 
-      const stats = onBundlesParsed(bundles);
-      setResultSummary({
-        ...stats,
-        fileNames: selectedFiles.map((f) => f.name),
-      });
-      setSelectedFiles([]);
-      setCustomExamName('');
-      setProgressPct(100);
-    } catch (err) {
-      setErrorMsg(
-        err instanceof Error
-          ? err.message
-          : 'Dosya ayrıştırılırken beklenmeyen bir hata oluştu.'
-      );
+      signal.throwIfAborted();
+      onBundlesParsed(bundles);
+      onClose();
+    } catch (error) {
+      if (!signal.aborted) setErrorMsg(error instanceof Error ? error.message : 'Dosya okunamadı.');
     } finally {
-      setIsParsing(false);
+      if (currentUpload.current === controller) {
+        currentUpload.current = null;
+        setIsParsing(false);
+      }
     }
   };
 
-  const handleClose = () => {
-    if (isParsing) return;
-    setErrorMsg(null);
-    setResultSummary(null);
-    setSelectedFiles([]);
+  const cancelUpload = () => {
+    currentUpload.current?.abort();
     onClose();
   };
 
   return (
-    <div
-      className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 p-4 backdrop-blur-[2px]"
-      role="dialog"
-      aria-modal="true"
-      aria-labelledby="upload-modal-title"
-    >
-      <div className="w-full max-w-xl rounded-xl border border-slate-200 bg-white shadow-xl">
-        {/* Header */}
-        <div className="flex items-center justify-between border-b border-slate-200 px-6 py-4">
-          <div>
-            <h2 id="upload-modal-title" className="text-lg font-bold text-slate-900">
-              Toplu Deneme Sonuç Dosyası Yükle (PDF / Excel)
-            </h2>
-            <p className="mt-0.5 text-sm text-slate-500">
-              PDF veya Excel (.xlsx, .xls, .csv) dosyalarını yükleyin; öğrenciler otomatik eşleştirilir.
+    <Modal
+      open={isOpen}
+      onClose={cancelUpload}
+      title="Deneme Dosyası Yükle"
+      subtitle="PDF, Excel veya CSV dosyası seçin."
+      maxWidthClass="max-w-xl"
+      footer={
+        <div className="space-y-2">
+          {isParsing && (
+            <div role="status" className="space-y-1 text-sm text-slate-700 dark:text-slate-200">
+              <p className="truncate">{progressText}</p>
+              <progress className="block h-2 w-full accent-teal-700" max={100} value={progressPct} aria-label="Dosya okuma ilerlemesi" />
+            </div>
+          )}
+          {errorMsg && (
+            <p role="alert" className="flex max-h-[18dvh] gap-2 overflow-y-auto text-sm text-red-700 dark:text-rose-300">
+              <AlertCircle className="mt-0.5 size-4 shrink-0" aria-hidden="true" /> {errorMsg}
             </p>
+          )}
+          <div className="grid grid-cols-[minmax(0,1fr)_minmax(0,2fr)] gap-2">
+            <button type="button" onClick={cancelUpload} className="appearance-option">
+              {isParsing ? 'Durdur' : 'Kapat'}
+            </button>
+            <button type="button" onClick={() => void handleParseAll()} disabled={!selectedFiles.length || isParsing}
+              className="inline-flex min-h-11 min-w-0 items-center justify-center gap-2 rounded-lg bg-teal-700 px-2 py-2 text-center text-sm font-semibold text-white hover:bg-teal-800 disabled:opacity-50">
+              {isParsing && <Loader2 className="size-4 shrink-0 animate-spin" aria-hidden="true" />}
+              {isParsing ? 'Okunuyor…' : 'Analiz Et ve Arşive Ekle'}
+            </button>
           </div>
-          <button
-            type="button"
-            onClick={handleClose}
-            disabled={isParsing}
-            className="rounded-lg p-1.5 text-slate-400 transition-colors hover:bg-slate-100 hover:text-slate-700 disabled:opacity-40"
-            aria-label="Kapat"
-          >
-            <X className="h-5 w-5" />
-          </button>
         </div>
-
-        {/* Body */}
-        <div className="space-y-4 px-6 py-5">
+      }
+    >
+      <div className="space-y-3">
           {/* Dropzone */}
           <div
             onDragOver={(e) => {
@@ -202,8 +176,7 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               setIsDragging(false);
               handleFilesAdded(e.dataTransfer.files);
             }}
-            onClick={() => !isParsing && fileInputRef.current?.click()}
-            className={`cursor-pointer rounded-lg border-2 border-dashed px-6 py-7 text-center transition-colors ${
+            className={`cursor-pointer rounded-lg border-2 border-dashed px-3 py-4 text-center sm:px-6 sm:py-6 transition-colors ${
               isDragging
                 ? 'border-blue-600 bg-blue-50/70'
                 : 'border-slate-300 bg-slate-50/60 hover:border-slate-400 hover:bg-slate-50'
@@ -215,16 +188,21 @@ export const UploadModal: React.FC<UploadModalProps> = ({
               accept="application/pdf,.pdf,.xlsx,.xls,.csv,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet,application/vnd.ms-excel,text/csv"
               multiple
               className="hidden"
-              onChange={(e) => handleFilesAdded(e.target.files)}
+              disabled={isParsing}
+              onChange={(event) => {
+                handleFilesAdded(event.target.files);
+                event.target.value = '';
+              }}
             />
             <div className="mx-auto mb-3 flex h-11 w-11 items-center justify-center rounded-lg border border-slate-200 bg-white text-blue-700">
               <FileUp className="h-5 w-5" />
             </div>
-            <p className="text-sm font-semibold text-slate-900">
-              PDF veya Excel dosyasını sürükleyip bırakın veya seçin
-            </p>
+            <button type="button" disabled={isParsing} onClick={() => fileInputRef.current?.click()}
+              className="appearance-option mx-auto">
+              Dosya Seç
+            </button>
             <p className="mt-1 text-xs text-slate-500">
-              Desteklenen formatlar: <strong>PDF</strong> (Toplu Sonuç Belgesi / Okul Net Listesi) ve{' '}
+              Sürükleyip bırakabilirsiniz. <strong>PDF</strong> (Toplu Sonuç Belgesi / Okul Net Listesi) ve{' '}
               <strong>Excel (.xlsx, .xls, .csv)</strong> (tek veya çift satır başlıklı D/Y/B/Net tabloları).
             </p>
           </div>
@@ -333,87 +311,15 @@ export const UploadModal: React.FC<UploadModalProps> = ({
             </div>
           </div>
 
-          {/* Progress */}
-          {isParsing && (
-            <div className="rounded-lg border border-blue-200 bg-blue-50/60 p-3.5">
-              <div className="flex items-center justify-between text-xs font-medium text-blue-900">
-                <span className="flex items-center gap-2">
-                  <Loader2 className="h-4 w-4 animate-spin text-blue-700" />
-                  {progressText || 'Dosya ayrıştırılıyor...'}
-                </span>
-                <span className="font-mono tabular-nums">%{progressPct}</span>
-              </div>
-              <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-blue-200/70">
-                <div
-                  className="h-full bg-blue-700 transition-all duration-150"
-                  style={{ width: `${progressPct}%` }}
-                />
-              </div>
-            </div>
-          )}
-
-          {/* Error */}
-          {errorMsg && (
-            <div className="flex items-start gap-2.5 rounded-lg border border-red-200 bg-red-50 p-3.5 text-sm text-red-800">
-              <AlertCircle className="mt-0.5 h-4 w-4 shrink-0 text-red-600" />
-              <span>{errorMsg}</span>
-            </div>
-          )}
-
-          {/* Success */}
-          {resultSummary && (
-            <div className="rounded-lg border border-emerald-200 bg-emerald-50/70 p-3.5 text-sm text-emerald-900">
-              <div className="flex items-center gap-2 font-semibold">
-                <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-                {resultSummary.examCount} deneme başarıyla arşive eklendi
-              </div>
-              <p className="mt-1 text-xs text-emerald-800 tabular-nums">
-                Toplam {resultSummary.totalRecords} öğrenci kaydı işlendi ·{' '}
-                {resultSummary.matchedCount} mevcut öğrenci eşleştirildi ·{' '}
-                {resultSummary.newStudentsCount} yeni öğrenci kartı oluşturuldu.
-              </p>
-              <p className="mt-1 text-[11px] text-emerald-700">
-                Önceki ve sonraki deneme karşılaştırmaları tüm öğrenci kartlarında ve Genel Bakış ekranında güncellendi.
-              </p>
-            </div>
-          )}
-        </div>
-
-        {/* Footer */}
-        <div className="flex flex-wrap items-center justify-between gap-3 border-t border-slate-200 bg-slate-50/60 px-6 py-3.5 rounded-b-xl">
-          <button
-            type="button"
-            onClick={() => {
-              onLoadSample();
-              onClose();
-            }}
-            disabled={isParsing}
-            className="inline-flex items-center gap-1.5 text-xs font-medium text-slate-600 transition-colors hover:text-blue-700 disabled:opacity-50"
-          >
-            <RefreshCw className="h-3.5 w-3.5" />
-            Örnek Verileri Ekle
-          </button>
-
-          <div className="flex items-center gap-2">
-            <button
-              type="button"
-              onClick={handleClose}
-              disabled={isParsing}
-              className="rounded-lg border border-slate-300 bg-white px-4 py-2 text-sm font-medium text-slate-700 transition-colors hover:bg-slate-50 disabled:opacity-40"
-            >
-              {resultSummary ? 'Tamam' : 'İptal'}
-            </button>
-            <button
-              type="button"
-              onClick={handleParseAll}
-              disabled={selectedFiles.length === 0 || isParsing}
-              className="rounded-lg bg-blue-700 px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-blue-800 disabled:cursor-not-allowed disabled:opacity-40"
-            >
-              {isParsing ? 'Okunuyor...' : 'Analiz Et ve Arşive Ekle'}
-            </button>
-          </div>
-        </div>
+        <button
+          type="button"
+          onClick={() => { onLoadSample(); onClose(); }}
+          disabled={isParsing}
+          className="inline-flex items-center gap-2 text-sm font-medium text-slate-600 underline hover:text-teal-700 disabled:opacity-50"
+        >
+          <RefreshCw className="size-4" aria-hidden="true" /> Örnek Verileri Ekle
+        </button>
       </div>
-    </div>
+    </Modal>
   );
 };
