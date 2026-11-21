@@ -322,6 +322,50 @@ service cloud.firestore {
       }
     }
 
+    // Deneme Analizi backup: isolated from /users profile validation.
+    match /denemeArchives/{userId} {
+      allow get: if isVerifiedUser() && isOwner(userId);
+      allow list, delete: if false;
+      allow create: if isVerifiedUser() && isOwner(userId) &&
+        incoming().keys().hasAll(['ownerId', 'displayName', 'examCount', 'studentCount', 'lastBackupAt', 'createdAt', 'updatedAt']) &&
+        incoming().keys().hasOnly(['ownerId', 'displayName', 'examCount', 'studentCount', 'lastBackupAt', 'createdAt', 'updatedAt']) &&
+        incoming().ownerId == userId && incoming().displayName is string &&
+        incoming().examCount is int && incoming().examCount >= 0 && incoming().examCount <= 500 &&
+        incoming().studentCount is int && incoming().studentCount >= 0 && incoming().studentCount <= 5000 &&
+        incoming().createdAt == request.time && incoming().updatedAt == request.time &&
+        incoming().lastBackupAt == request.time;
+      allow update: if isVerifiedUser() && isOwner(userId) &&
+        existing().ownerId == userId && incoming().ownerId == userId &&
+        incoming().createdAt == existing().createdAt &&
+        incoming().keys().hasOnly(['ownerId', 'displayName', 'examCount', 'studentCount', 'lastBackupAt', 'createdAt', 'updatedAt']) &&
+        incoming().displayName is string &&
+        incoming().examCount is int && incoming().examCount >= 0 && incoming().examCount <= 500 &&
+        incoming().studentCount is int && incoming().studentCount >= 0 && incoming().studentCount <= 5000 &&
+        incoming().lastBackupAt == request.time && incoming().updatedAt == request.time;
+      match /exams/{examId} {
+        allow get, list: if isVerifiedUser() && isOwner(userId);
+        allow create, update: if isVerifiedUser() && isOwner(userId) &&
+          incoming().ownerId == userId && isValidId(examId) &&
+          incoming().keys().hasAll(['id', 'ownerId', 'createdAt', 'updatedAt']) &&
+          incoming().id == examId &&
+          incoming().createdAt is timestamp && incoming().updatedAt == request.time &&
+          (!exists(/databases/$(database)/documents/denemeArchives/$(userId)/exams/$(examId)) ||
+            incoming().createdAt == existing().createdAt);
+        allow delete: if false;
+      }
+      match /students/{studentId} {
+        allow get, list: if isVerifiedUser() && isOwner(userId);
+        allow create, update: if isVerifiedUser() && isOwner(userId) &&
+          incoming().ownerId == userId && isValidId(studentId) &&
+          incoming().keys().hasAll(['id', 'ownerId', 'createdAt', 'updatedAt']) &&
+          incoming().id == studentId &&
+          incoming().createdAt is timestamp && incoming().updatedAt == request.time &&
+          (!exists(/databases/$(database)/documents/denemeArchives/$(userId)/students/$(studentId)) ||
+            incoming().createdAt == existing().createdAt);
+        allow delete: if false;
+      }
+    }
+
     // Private, immutable trial-archive snapshots.
     match /users/{userId}/trialBackups/{backupId} {
       allow get, list: if isVerifiedUser() && isOwner(userId);
