@@ -489,62 +489,64 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           </p>
         </div>
 
-        <div role="group" aria-label="Öğrenci takip işlemleri" className="control-grid gap-2 no-print">
-          <button
-            type="button"
-            onClick={() => {
-              setEditingClass(null);
-              setClassModalOpen(true);
-            }}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <FolderPlus className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
-            <span>Sınıf Ekle</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingStudent(null);
-              setStudentModalOpen(true);
-            }}
-            disabled={classes.length === 0}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <UserPlus className="w-3.5 h-3.5" />
-            <span>Öğrenci Ekle</span>
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              if (activeTab === 'bulk') {
-                bulkPanel.current?.focus();
-              } else {
-                focusBulkOnOpen.current = true;
-                setActiveTab('bulk');
-              }
-            }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-900 transition-colors hover:border-teal-400 hover:bg-teal-100 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-100 dark:hover:bg-teal-900"
-          >
-            <UsersRound className="size-4" aria-hidden="true" />
-            Sınıfı Toplu Ekle
-          </button>
-          <button
-            type="button"
-            onClick={() => {
-              setEditingGrade(null);
-              setGradeModalOpen(true);
-            }}
-            disabled={students.length === 0}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Plus className="w-3.5 h-3.5 text-gold-600 dark:text-gold-400" />
-            <span>Not Gir</span>
-          </button>
+        <div role="group" aria-label="Öğrenci takip işlemleri" className="grid gap-2 no-print">
+          <div className="control-grid gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setEditingClass(null);
+                setClassModalOpen(true);
+              }}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <FolderPlus className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
+              <span>Sınıf Ekle</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingStudent(null);
+                setStudentModalOpen(true);
+              }}
+              disabled={classes.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <UserPlus className="w-3.5 h-3.5" />
+              <span>Öğrenci Ekle</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                if (activeTab === 'bulk') {
+                  bulkPanel.current?.focus();
+                } else {
+                  focusBulkOnOpen.current = true;
+                  setActiveTab('bulk');
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-900 transition-colors hover:border-teal-400 hover:bg-teal-100 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-100 dark:hover:bg-teal-900"
+            >
+              <UsersRound className="size-4" aria-hidden="true" />
+              Sınıfı Toplu Ekle
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setEditingGrade(null);
+                setGradeModalOpen(true);
+              }}
+              disabled={students.length === 0}
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
+            >
+              <Plus className="w-3.5 h-3.5 text-gold-600 dark:text-gold-400" />
+              <span>Not Gir</span>
+            </button>
+          </div>
           <button
             type="button"
             onClick={() => setActiveTab('deneme-analysis')}
             aria-pressed={activeTab === 'deneme-analysis'}
-            className="col-span-full inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
+            className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Deneme Analizi</span>
