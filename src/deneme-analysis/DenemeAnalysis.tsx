@@ -30,6 +30,7 @@ import { useAcademy } from '../context/AcademyContext';
 import { useCloudBackup } from './hooks/useCloudBackup';
 import { mergeArchives } from './utils/cloudBackup';
 import { sampleBundles } from './utils/sampleArchive';
+import { repairMissingLgsScores } from './utils/scoreRepair';
 import './styles.css';
 
 type NavTab = 'students' | 'leaderboard' | 'overview' | 'archive' | 'weaknesses';
@@ -45,6 +46,7 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
   const [activeTab, setActiveTab] = useState<NavTab>('students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   const [isUploadOpen, setIsUploadOpen] = useState(false);
+  const [isRepairing, setIsRepairing] = useState(false);
 
   const [bannerMessage, setBannerMessage] = useState<{
     type: 'info' | 'error';
@@ -113,6 +115,27 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
     },
     [archive, changeArchive]
   );
+
+  const handleScoreRepair = useCallback(async (file: File | undefined) => {
+    if (!file) return;
+    setIsRepairing(true);
+    try {
+      const text = await file.text();
+      const result = repairMissingLgsScores(archive, text);
+      if (!result.repaired) {
+        setBannerMessage({ type: 'info', text: `Eksik puan tamamlanamadı. ${result.alreadyScored} puan zaten kayıtlı, ${result.skipped} kayıt güvenli eşleşmedi.` });
+        return;
+      }
+      const confirmed = window.confirm(`${result.repaired} eksik LGS puanı PDF sonuçlarıyla tamamlanacak. ${result.alreadyScored} mevcut geçerli puan korunacak. ${result.skipped} belirsiz kayıt atlanacak. Devam edilsin mi?`);
+      if (!confirmed) return;
+      changeArchive(result.next);
+      setBannerMessage({ type: 'info', text: `${result.repaired} eksik LGS puanı tamamlandı; ortalamalar ve sıralama güncellendi. ${result.skipped} belirsiz kayıt değiştirilmedi. Bulut yedeği için Deneme Arşivi bölümünden Firebase'e Yedekle'yi kullanın.` });
+    } catch (error) {
+      setBannerMessage({ type: 'error', text: error instanceof Error ? error.message : 'Puan dosyası okunamadı.' });
+    } finally {
+      setIsRepairing(false);
+    }
+  }, [archive, changeArchive]);
 
   const handleDeleteExam = useCallback(
     (examId: string) => {
@@ -192,6 +215,13 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
             </button>
           ))}
         </nav>
+        <div className="rounded-lg border border-teal-200 bg-teal-50 p-3 text-sm text-slate-800">
+          <label htmlFor="lgs-score-repair-file" className="mb-2 block font-semibold">PDF'lerden eksik LGS puanlarını tamamla</label>
+          <p className="mb-2 text-xs">İki denemelik arşivde yalnızca öğrenci numarası, soyadı ve sınıfı doğrulanan eksik puanlar güncellenir. Mevcut puanlar korunur; işlemden önce onay istenir.</p>
+          <input id="lgs-score-repair-file" type="file" accept=".csv,text/csv" disabled={isRepairing}
+            className="block w-full min-w-0 text-sm file:mr-3 file:rounded-md file:border-0 file:bg-teal-700 file:px-3 file:py-2 file:text-white"
+            onChange={(event) => { void handleScoreRepair(event.target.files?.[0]); event.target.value = ''; }} />
+        </div>
         <p className="text-sm text-slate-600">Deneme kayıtları bu tarayıcıda saklanır. Firebase ve JSON yedeklerine Deneme Arşivi’nden ulaşabilirsiniz.</p>
       </div>
 
