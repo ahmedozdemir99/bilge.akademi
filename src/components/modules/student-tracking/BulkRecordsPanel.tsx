@@ -178,7 +178,7 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
         </div>}
         {mode === 'grades' && !classStudents.length && <p className="text-sm text-amber-800 dark:text-amber-200">Not girmek için öğrencileri olan bir sınıf seçin.</p>}
         {mode === 'roster' && <div role="group" aria-label="Listenin kaynağı" className="grid gap-2 sm:grid-cols-2">
-          <button type="button" className={sourceButton} aria-pressed={source === 'file'} onClick={() => { changeSource('file'); fileInputRef.current?.click(); }}>
+          <button type="button" className={sourceButton} aria-pressed={source === 'file'} onClick={() => { changeSource('file'); window.setTimeout(() => fileInputRef.current?.click(), 0); }}>
             <FileUp className="size-4 shrink-0" aria-hidden="true" /> Excel veya PDF
           </button>
           <button type="button" className={sourceButton} aria-pressed={source === 'paste'} onClick={() => changeSource('paste')}>

@@ -487,7 +487,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           const data = snap.data();
           setProfile({
             uid: firebaseUser.uid,
-            displayName: String(data.displayName || safeName),
+            displayName: typeof data.displayName === 'string' && data.displayName.trim().length >= 2 && data.displayName !== 'Bilge Kullanıcı' ? data.displayName : safeName,
             role: isBootstrappedAdmin ? 'admin' : (data.role as UserProfile['role']) || 'student',
             schoolName: typeof data.schoolName === 'string' ? data.schoolName : undefined,
             branch: typeof data.branch === 'string' ? data.branch : undefined,
