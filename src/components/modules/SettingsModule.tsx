@@ -34,6 +34,7 @@ export function SettingsModule() {
   const [schoolName, setSchoolName] = useState(profile?.schoolName ?? 'Bilge Akademi');
   const [branch, setBranch] = useState(profile?.branch ?? 'Genel Eğitim');
   const [savingProfile, setSavingProfile] = useState(false);
+  const [profileSaveMessage, setProfileSaveMessage] = useState('');
   const [seeding, setSeeding] = useState(false);
   const [syncing, setSyncing] = useState(false);
   const [syncMessage, setSyncMessage] = useState('');
@@ -67,8 +68,16 @@ export function SettingsModule() {
   const handleProfileSave = async (e: React.FormEvent) => {
     e.preventDefault();
     setSavingProfile(true);
+    setProfileSaveMessage('');
     try {
-      await updateProfileInfo(schoolName, branch, displayName);
+      if (!navigator.onLine) throw new Error('İnternet bağlantısı yok.');
+      await Promise.race([
+        updateProfileInfo(schoolName, branch, displayName),
+        new Promise<never>((_, reject) => setTimeout(() => reject(new Error('Firebase yanıt vermedi. Bağlantınızı kontrol edip yeniden deneyin.')), 12000)),
+      ]);
+      setProfileSaveMessage('Profil bilgileri kaydedildi.');
+    } catch (error) {
+      setProfileSaveMessage(error instanceof Error ? error.message : 'Profil kaydedilemedi.');
     } finally {
       setSavingProfile(false);
     }
@@ -163,6 +172,7 @@ export function SettingsModule() {
                 className="w-full px-3 py-2 text-sm rounded-lg border border-slate-300 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-900 dark:text-slate-100"
               />
             </div>
+            {profileSaveMessage && <p role="status" className="sm:col-span-3 text-sm text-slate-700 dark:text-slate-200">{profileSaveMessage}</p>}
             <div className="sm:col-span-3 flex justify-end">
               <button
                 type="submit"

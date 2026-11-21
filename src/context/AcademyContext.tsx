@@ -731,12 +731,13 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       }
       const path = `users/${user.uid}`;
       try {
-        await updateDoc(doc(db, 'users', user.uid), {
+        await setDoc(doc(db, 'users', user.uid), {
+          uid: user.uid,
           displayName: safeDisplay,
           schoolName: schoolName.trim().slice(0, 120),
           branch: branch.trim().slice(0, 80),
           updatedAt: serverTimestamp(),
-        });
+        }, { merge: true });
         setProfile((prev) =>
           prev
             ? {
@@ -749,7 +750,9 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         );
         notify('success', 'Profil güncellendi', 'Kurum ve branş bilgileriniz kaydedildi.');
       } catch (error) {
-        handleFirestoreError(error, OperationType.UPDATE, path);
+        console.error('Profil kaydedilemedi:', error);
+        notify('error', 'Profil kaydedilemedi', error instanceof Error ? error.message : 'Bağlantıyı kontrol edip yeniden deneyin.');
+        throw error;
       }
     },
     [notify, user]
