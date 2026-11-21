@@ -538,11 +538,9 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             [
               { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
               { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
-              { id: 'archive', label: 'Sınıf Deneme Arşivi' },
               { id: 'deneme-analysis', label: 'Deneme Analiz' },
               { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
-              { id: 'bulk', label: 'Toplu Giriş' },
             ] as { id: TrackingTab; label: string }[]
           ).map((tab) => (
             <button
@@ -551,7 +549,6 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={() => {
-                if (tab.id === 'archive') setTrialView('archive');
                 setActiveTab(tab.id);
               }}
               className={`px-3.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
@@ -1110,6 +1107,61 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               </button>
             </div>
           </div>
+
+          <section aria-label="Sınıf başarı göstergeleri" className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+            {[
+              { label: 'Öğrenci Sayısı', value: analyticsStudents.length.toLocaleString('tr-TR'), detail: 'Seçili kapsamda kayıtlı öğrenci' },
+              { label: 'Yazılı Notu', value: analyticsGrades.length.toLocaleString('tr-TR'), detail: analyticsGrades.length ? `Ortalama ${calculateAverageScore(analyticsGrades).toFixed(1)} / 100` : 'Henüz not girilmedi' },
+              { label: 'Deneme Sonucu', value: analyticsPracticeExams.length.toLocaleString('tr-TR'), detail: 'Kaydedilmiş deneme sonucu' },
+              { label: 'Ortalama Deneme Neti', value: classPracticeAnalysis.examCount ? classPracticeAnalysis.avgTotalNet.toFixed(2) : '—', detail: classPracticeAnalysis.examCount ? 'Seçili kapsamın net ortalaması' : 'Henüz deneme kaydı yok' },
+            ].map((metric) => (
+              <div key={metric.label} className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900">
+                <p className="text-xs font-medium text-slate-600 dark:text-slate-300">{metric.label}</p>
+                <p className="mt-2 text-2xl font-semibold tabular-nums text-navy-900 dark:text-white">{metric.value}</p>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">{metric.detail}</p>
+              </div>
+            ))}
+          </section>
+          <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h3 className="font-semibold text-navy-900 dark:text-white">Sınıf Başarı Tablosu</h3>
+                <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">Kayıtlı yazılı notları ve deneme sonuçlarına göre otomatik güncellenir.</p>
+              </div>
+              <button type="button" onClick={() => exportToCsv('sinif_basari_raporu',
+                ['Sınıf', 'Öğrenci', 'Yazılı Kaydı', 'Yazılı Ortalaması', 'Deneme Sonucu', 'Deneme Ortalama Net'],
+                classes.filter((cls) => analyticsClassId === 'all' || cls.id === analyticsClassId).map((cls) => {
+                  const cg = grades.filter((g) => g.classId === cls.id);
+                  const cp = practiceExams.filter((p) => p.classId === cls.id);
+                  return [cls.name, students.filter((stu) => stu.classId === cls.id).length, cg.length,
+                    cg.length ? calculateAverageScore(cg).toFixed(2) : '', cp.length,
+                    cp.length ? (cp.reduce((sum, exam) => sum + exam.totalNet, 0) / cp.length).toFixed(2) : ''];
+                }))} className="inline-flex min-h-10 items-center gap-2 rounded-lg border border-slate-300 px-3 text-xs font-medium dark:border-slate-700">
+                <Download className="size-4" /> Excel / CSV İndir
+              </button>
+            </div>
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[560px] text-left text-sm">
+                <thead><tr className="border-b border-slate-200 text-xs text-slate-600 dark:border-slate-700 dark:text-slate-300">
+                  <th className="py-2 pr-3">Sınıf</th><th className="py-2 pr-3">Öğrenci</th><th className="py-2 pr-3">Yazılı Ort.</th><th className="py-2 pr-3">Deneme</th><th className="py-2">Ort. Net</th>
+                </tr></thead>
+                <tbody>
+                  {classes.filter((cls) => analyticsClassId === 'all' || cls.id === analyticsClassId).map((cls) => {
+                    const cg = grades.filter((g) => g.classId === cls.id);
+                    const cp = practiceExams.filter((p) => p.classId === cls.id);
+                    return <tr key={cls.id} className="border-b border-slate-100 dark:border-slate-800">
+                      <td className="py-3 pr-3 font-medium">{cls.name}</td>
+                      <td className="py-3 pr-3">{students.filter((stu) => stu.classId === cls.id).length}</td>
+                      <td className="py-3 pr-3">{cg.length ? calculateAverageScore(cg).toFixed(1) : '—'}</td>
+                      <td className="py-3 pr-3">{cp.length}</td>
+                      <td className="py-3">{cp.length ? (cp.reduce((sum, exam) => sum + exam.totalNet, 0) / cp.length).toFixed(2) : '—'}</td>
+                    </tr>;
+                  })}
+                </tbody>
+              </table>
+              {classes.length === 0 && <p className="py-4 text-sm text-slate-500">Rapor oluşturmak için önce sınıf ekleyin.</p>}
+            </div>
+          </section>
 
           {/* Charts */}
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
