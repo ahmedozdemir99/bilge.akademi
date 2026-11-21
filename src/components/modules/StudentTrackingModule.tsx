@@ -495,7 +495,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             setTrialView('archive');
             setActiveTab('archive');
           }}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 px-3.5 py-2 text-xs font-semibold text-teal-800 transition-colors hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200 dark:hover:bg-teal-950"
+            className="col-span-full inline-flex items-center gap-1.5 rounded-lg border border-teal-300 px-3.5 py-2 text-xs font-semibold text-teal-800 transition-colors hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200 dark:hover:bg-teal-950"
           >
             <BarChart3 className="size-3.5" aria-hidden="true" />
             Deneme Analiz
