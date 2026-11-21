@@ -6,8 +6,8 @@
 
 ## Modüller ve Özellikler
 
-1. **Öğrenci Takip ve LGS Deneme Net Robotu**
-   - Sınıf/şube yönetimi, öğrenci profilleri, ders bazlı yazılı notları ve LGS Deneme Net Robotu (Türkçe, Matematik, Fen Bilimleri, T.C. İnkılap Tarihi, Din Kültürü, İngilizce için Doğru/Yanlış/Boş ve Net hesabı, otomatik ortalamalar ve gelişim grafikleri).
+1. **Öğrenci Takip ve LGS Deneme Analizi**
+   - Sınıf/şube yönetimi, öğrenci profilleri, ders bazlı yazılı notları ve LGS deneme sonuçlarını içe aktarma, ortalamalar ve gelişim grafikleri.
    - Kişisel bilgiler anonimleştirilerek çalışan Yapay Zekâ öğrenci/sınıf gelişim analizi, PDF yazdırma ve Excel/CSV dışa aktarma.
 
 2. **Ortaokul Matematik Dünyası (5–8. Sınıf & LGS)**

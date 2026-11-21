@@ -1,22 +1,26 @@
 import { useRef, useState } from 'react';
-import { FileUp } from 'lucide-react';
+import { ClipboardPaste, FileUp } from 'lucide-react';
 import { useAcademy } from '../../../context/AcademyContext';
 import { DEFAULT_SUBJECT_NAMES, DEMO_TEACHER_ID } from '../../../data/demoData';
 import type { ExamType } from '../../../types/academy';
 import { buildBulkPlan, BULK_EXAM_TYPES, type BulkInput, type BulkPlan } from '../../../utils/bulkStudentRecords';
-import { extractMappedRows, importSheetWidth, readImportWorkbook, readPdfImport, readPdfPageCount, type ImportSheet } from '../../../utils/bulkRecordFiles';
+import { extractMappedRows, importSheetWidth, readImportWorkbook, readPdfImport, readPdfPageCount, readRosterPaste, type ImportSheet } from '../../../utils/bulkRecordFiles';
 import { encodeClassFocus, type ClassKind } from '../../../utils/classKinds';
 import { BulkFileMapper } from './BulkFileMapper';
 
 const field = 'w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950';
 const primary = 'inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-700';
+const sourceButton = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 aria-pressed:border-teal-300 aria-pressed:bg-teal-50 aria-pressed:text-teal-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:aria-pressed:border-teal-700 dark:aria-pressed:bg-teal-950 dark:aria-pressed:text-teal-100';
+const rosterFields = ['Okul No', 'Ad Soyad'];
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Istanbul' }).format(new Date());
 
-export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void }) {
+export function BulkRecordsPanel({ initialClassId, onTrialImport }: { initialClassId?: string; onTrialImport: () => void }) {
   const { classes, students, grades, practiceExams, dataLoading, saveBulkRecords, user } = useAcademy();
   const [mode, setMode] = useState<'roster' | 'grades'>('roster');
-  const [choice, setChoice] = useState<string>();
-  const classId = choice ?? classes[0]?.id ?? '';
+  const [choice, setChoice] = useState(initialClassId);
+  const classId = choice ?? (mode === 'grades' ? classes[0]?.id ?? '' : '');
+  const [source, setSource] = useState<'file' | 'paste'>('file');
+  const [paste, setPaste] = useState('');
   const classStudents = students.filter((student) => student.classId === classId);
   const [kind, setKind] = useState<ClassKind>('school');
   const [name, setName] = useState('');
@@ -73,6 +77,21 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
     setFileVersion((value) => value + 1);
   }
 
+  function changeSource(next: 'file' | 'paste') {
+    if (next === source) return;
+    setSource(next);
+    setPdf(undefined);
+    setFilename('');
+    setSheets([]);
+    clearPreview();
+  }
+
+  function openPastedList() {
+    clearPreview();
+    setSheets([]);
+    void run(async () => showSheets([readRosterPaste(paste)]));
+  }
+
   async function openFile(file: File) {
     clearPreview();
     setPdf(undefined);
@@ -83,7 +102,7 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
       if (file.type === 'application/pdf' || /\.pdf$/i.test(file.name)) {
         const pageCount = await readPdfPageCount(file);
         setPdf({ file, pageCount });
-        setPages('1');
+        setPages(pageCount > 1 && pageCount <= 60 ? `1-${pageCount}` : '1');
         if (pageCount === 1) showSheets(await readPdfImport(file, '1', false, setProgress));
       } else {
         showSheets(await readImportWorkbook(file, setProgress));
@@ -99,7 +118,7 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
       const selected = excluded.size ? sheet.rows.map((row, index) => excluded.has(index) ? [] : row) : sheet.rows;
       const text = extractMappedRows(selected, columns, {
         firstRow: first + 1, lastRow: last + 1, firstColumn: 1, lastColumn: importSheetWidth(sheet.rows),
-      }, mode === 'grades' ? classStudents : undefined, false);
+      }, mode === 'grades' ? classStudents : undefined, mode === 'roster');
       const input: BulkInput = mode === 'roster'
         ? { mode, classId, text, newClass: classId ? undefined : { name, gradeLevel: Number(gradeLevel), section, academicYear, subjectFocus: encodeClassFocus(kind) } }
         : { mode, classId, text, assessment: { examTitle: title, examDate: date, examType, subjectName, maxScore: Number(maxScore) } };
@@ -112,7 +131,9 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
     if (!preview) return;
     await run(async () => {
       const result = await saveBulkRecords(preview.input);
-      setStatus(`${result.saved} kayıt kaydedildi.`);
+      const count = preview.input.mode === 'roster' ? 'öğrenci' : 'not';
+      const skipped = result.skipped ? ` ${result.skipped} kayıt zaten vardı.` : '';
+      setStatus(`${preview.plan.className} · ${result.saved} ${count} kaydedildi.${skipped}`);
       if (result.error) throw new Error(result.error);
       setPreview(undefined);
       setChoice(result.classId);
@@ -123,13 +144,17 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
   return (
     <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 className="text-lg font-semibold">PDF veya Excel’den Toplu Giriş</h2>
+        <h2 id="bulk-records-heading" className="text-lg font-semibold">Toplu Giriş</h2>
         <button type="button" onClick={onTrialImport} className="text-sm font-semibold text-teal-700 underline dark:text-teal-300">Deneme Sonuçlarını Yükle</button>
       </header>
       <fieldset className="min-w-0 space-y-4" disabled={busy || dataLoading} onChange={clearPreview}>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-sm font-medium">Kayıt türü
-            <select className={field} value={mode} onChange={(event) => setMode(event.target.value === 'grades' ? 'grades' : 'roster')}>
+            <select className={field} value={mode} onChange={(event) => {
+              const next = event.target.value === 'grades' ? 'grades' : 'roster';
+              if (next === 'grades') changeSource('file');
+              setMode(next);
+            }}>
               <option value="roster">Sınıf ve öğrenciler</option><option value="grades">Notlar</option>
             </select>
           </label>
@@ -152,14 +177,36 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
           <label className="space-y-1 text-sm font-medium">Öğretim yılı<input className={field} value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} maxLength={9} /></label>
         </div>}
         {mode === 'grades' && !classStudents.length && <p className="text-sm text-amber-800 dark:text-amber-200">Not girmek için öğrencileri olan bir sınıf seçin.</p>}
-        <div className="space-y-2">
-          <label className={primary + ' cursor-pointer focus-within:outline-2'}>
-            <FileUp className="size-4" /> PDF veya Excel Aç
-            <input type="file" className="sr-only" accept=".pdf,.xlsx,.csv,.tsv"
+        {mode === 'roster' && <div role="group" aria-label="Listenin kaynağı" className="flex flex-wrap gap-2">
+          <button type="button" className={sourceButton} aria-pressed={source === 'file'} onClick={() => changeSource('file')}>
+            <FileUp className="size-4" aria-hidden="true" /> Excel veya PDF
+          </button>
+          <button type="button" className={sourceButton} aria-pressed={source === 'paste'} onClick={() => changeSource('paste')}>
+            <ClipboardPaste className="size-4" aria-hidden="true" /> Kopyala ve Yapıştır
+          </button>
+        </div>}
+        {source === 'paste' ? <div className="space-y-2">
+          <label htmlFor="bulk-roster-paste" className="block text-sm font-medium">Öğrenci listesi</label>
+          <p id="bulk-roster-paste-help" className="text-sm text-slate-600 dark:text-slate-300">
+            Excel’den Okul No ve Ad Soyad sütunlarını kopyalayın veya her satıra bir öğrenci yazın.
+          </p>
+          <textarea id="bulk-roster-paste" aria-describedby="bulk-roster-paste-help" className={field + ' resize-y'}
+            value={paste} rows={5} spellCheck={false} placeholder={'101 Ayşe Yılmaz\n102 Mehmet Demir'}
+            onChange={(event) => {
+              setPaste(event.target.value);
+              setSheets([]);
+            }} />
+          <button type="button" className={primary} disabled={!paste.trim()} onClick={openPastedList}>Listeyi Aç</button>
+        </div> : <div className="space-y-2">
+          <label className={primary + ' min-h-11 cursor-pointer focus-within:outline-2'}>
+            <FileUp className="size-4" aria-hidden="true" /> Dosya Seç
+            <input type="file" className="sr-only" accept=".pdf,.xlsx,.csv,.tsv,application/pdf"
+              aria-describedby="bulk-file-formats"
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void openFile(file); }} />
           </label>
-          {filename && <p className="break-all text-sm text-slate-600 dark:text-slate-300">{filename}</p>}
-        </div>
+          <p id="bulk-file-formats" className="text-sm text-slate-600 dark:text-slate-300">Excel (.xlsx), PDF, CSV veya TSV · En fazla 10 MB</p>
+          {filename && <p className="break-all text-sm font-medium text-slate-700 dark:text-slate-200">{filename}</p>}
+        </div>}
         {pdf && pdf.pageCount > 1 && <div className="flex flex-wrap items-end gap-2">
           <label className="space-y-1 text-sm font-medium">PDF sayfası veya aralığı (1–{pdf.pageCount})
             <input className={field} value={pages} onChange={(event) => setPages(event.target.value)} placeholder="Ör. 2 veya 2-4" />
@@ -168,7 +215,7 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
             setSheets([]);
             clearPreview();
             void run(async () => showSheets(await readPdfImport(pdf.file, pages, false, setProgress)));
-          }}>Sayfayı Aç</button>
+          }}>Sayfaları Aç</button>
         </div>}
         {sheets.length > 1 && <label className="block space-y-1 text-sm font-medium">Excel sayfası
           <select className={field} value={sheetIndex} onChange={(event) => setSheetIndex(Number(event.target.value))}>
@@ -190,7 +237,7 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
             <label className="space-y-1 text-sm font-medium">Tam puan<input className={field} type="number" min="1" max="100" value={maxScore} onChange={(event) => setMaxScore(event.target.value)} /></label>
           </div>}
           <BulkFileMapper key={fileVersion + '-' + sheetIndex + '-' + mode} sheet={sheet}
-            fields={mode === 'roster' ? ['Okul No', 'Ad Soyad'] : ['Okul no veya ad soyad', 'Puan']}
+            fields={mode === 'roster' ? rosterFields : ['Okul no veya ad soyad', 'Puan']} suggestRoster={mode === 'roster'}
             onChange={clearPreview} onApply={(first, last, columns, excluded) => void preparePreview(first, last, columns, excluded)} />
         </>}
       </fieldset>
@@ -198,10 +245,11 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
       {error && <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-sm text-red-800 dark:bg-red-950 dark:text-red-200">{error}</p>}
       {preview && <section aria-label="Kayıt önizlemesi" className="space-y-3 rounded-lg border border-slate-200 p-3 dark:border-slate-800">
         <h3 className="font-semibold">{preview.plan.className} · {preview.plan.rows.filter((row) => !row.skip).length} yeni kayıt</h3>
+        {preview.plan.newClass && <p className="text-sm text-slate-600 dark:text-slate-300">Kaydettiğinizde yeni sınıf da oluşturulacak.</p>}
         <ul className="max-h-64 divide-y divide-slate-200 overflow-auto text-sm dark:divide-slate-800">
           {preview.plan.rows.map((row) => <li key={row.key} className="flex justify-between gap-3 py-2"><span>{row.student}</span><span>{row.detail}{row.skip && ' · Kayıtlı'}</span></li>)}
         </ul>
-        <button type="button" className={primary} disabled={busy || preview.plan.rows.every((row) => row.skip)} onClick={() => void save()}>Toplu Kaydet</button>
+        <button type="button" className={primary} disabled={busy || dataLoading || preview.plan.rows.every((row) => row.skip)} onClick={() => void save()}>Toplu Kaydet</button>
       </section>}
       {status && <p role="status" className="text-sm font-medium text-teal-700 dark:text-teal-300">{status}</p>}
     </section>

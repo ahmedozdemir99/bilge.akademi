@@ -1,10 +1,9 @@
-import { lazy, Suspense, useMemo, useState } from 'react';
+import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
 import { loadArchiveState } from '../../deneme-analysis/utils/storage';
 import { SUBJECT_LIST } from '../../deneme-analysis/types/exam';
 import {
   AlertCircle,
   Bot,
-  Calculator,
   Database,
   Download,
   Edit3,
@@ -15,6 +14,7 @@ import {
   Search,
   Trash2,
   UserPlus,
+  UsersRound,
   Users,
   BarChart3,
   FileUp,
@@ -53,7 +53,6 @@ import {
   triggerPrintReport,
 } from '../../utils/exportUtils';
 import { ConfirmDialog } from '../ui/Modal';
-import { PracticeExamRobotPanel } from './student-tracking/PracticeExamRobotPanel';
 import {
   ClassFormModal,
   GradeFormModal,
@@ -72,7 +71,7 @@ import { StudentProfileView } from './student-tracking/StudentProfileView';
 
 const DenemeAnalysis = lazy(() => import('../../deneme-analysis/DenemeAnalysis'));
 
-type TrackingTab = 'students' | 'grades' | 'trials' | 'archive' | 'analytics' | 'bulk' | 'deneme-analysis';
+type TrackingTab = 'students' | 'grades' | 'archive' | 'analytics' | 'bulk' | 'deneme-analysis';
 
 export function StudentTrackingModule({ initialAnalysis = false, initialArchive = false, initialImport = false, initialClass = '' }: {
   initialAnalysis?: boolean; initialArchive?: boolean; initialImport?: boolean; initialClass?: string;
@@ -97,7 +96,6 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
     addGrade,
     updateGrade,
     deleteGrade,
-    addPracticeExam,
     deletePracticeExam,
     seedDemoToFirestore,
   } = useAcademy();
@@ -108,6 +106,14 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
+  const bulkPanel = useRef<HTMLDivElement>(null);
+  const focusBulkOnOpen = useRef(false);
+  useEffect(() => {
+    if (activeTab === 'bulk' && focusBulkOnOpen.current) {
+      focusBulkOnOpen.current = false;
+      bulkPanel.current?.focus();
+    }
+  }, [activeTab]);
   const [netOrder, setNetOrder] = useState<StudentNetOrder>('default');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
@@ -479,8 +485,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             Öğrenci Takip ve Analiz Sistemi
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Ortaokul (5–8. Sınıf &amp; LGS) sınıflarını, öğrenci notlarını, ders ders deneme doğru-yanlış-net
-            hesaplama robotunu ve yapay zekâ analizlerini yönetin.
+            Ortaokul sınıflarını ve öğrenci notlarını yönetin, LGS deneme sonuçlarını inceleyin.
           </p>
         </div>
 
@@ -507,6 +512,21 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           >
             <UserPlus className="w-3.5 h-3.5" />
             <span>Öğrenci Ekle</span>
+          </button>
+          <button
+            type="button"
+            onClick={() => {
+              if (activeTab === 'bulk') {
+                bulkPanel.current?.focus();
+              } else {
+                focusBulkOnOpen.current = true;
+                setActiveTab('bulk');
+              }
+            }}
+            className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-teal-50 px-3.5 py-2 text-xs font-semibold text-teal-900 transition-colors hover:border-teal-400 hover:bg-teal-100 dark:border-teal-700 dark:bg-teal-950 dark:text-teal-100 dark:hover:bg-teal-900"
+          >
+            <UsersRound className="size-4" aria-hidden="true" />
+            Sınıfı Toplu Ekle
           </button>
           <button
             type="button"
@@ -1038,30 +1058,6 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
         </section>
       )}
 
-      {/* TAB 3: PRACTICE EXAMS & NET ROBOT */}
-      {activeTab === 'trials' && (
-        <div className="space-y-4">
-          <PracticeExamRobotPanel
-          onTrialImport={openTrialImport}
-          initialClassId={classFilter}
-          students={students}
-          classes={classes}
-          practiceExams={practiceExams}
-          onAddPracticeExam={addPracticeExam}
-          onDeletePracticeExam={(exam) =>
-            setConfirmState({
-              open: true,
-              title: 'Deneme Kaydını Sil',
-              message: `${studentMap.get(exam.studentId)?.fullName ?? ''} — ${exam.examTitle} (${exam.totalNet.toFixed(2)} net) kaydını silmek istiyor musunuz?`,
-              action: async () => {
-                await deletePracticeExam(exam.id);
-              },
-            })
-          }
-        />
-        </div>
-      )}
-
       {activeTab === 'deneme-analysis' && (
         <Suspense fallback={<p role="status" className="text-sm">Deneme Analiz açılıyor…</p>}>
           <DenemeAnalysis key={user?.uid ?? 'demo'} owner={user?.uid ?? 'demo'} demo={isDemoMode} />
@@ -1093,7 +1089,11 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
         </div>
       )}
 
-      {activeTab === 'bulk' && <BulkRecordsPanel onTrialImport={openTrialImport} />}
+      {activeTab === 'bulk' && (
+        <div ref={bulkPanel} tabIndex={-1} role="tabpanel" aria-labelledby="bulk-records-heading">
+          <BulkRecordsPanel initialClassId={classFilter === 'all' ? undefined : classFilter} onTrialImport={openTrialImport} />
+        </div>
+      )}
 
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
       {activeTab === 'analytics' && (

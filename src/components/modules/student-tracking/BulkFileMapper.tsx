@@ -1,18 +1,27 @@
 import { useState } from 'react';
-import { importSheetWidth, type ImportSheet } from '../../../utils/bulkRecordFiles';
+import { importSheetWidth, inferImportColumns, suggestImportRange, type ImportSheet } from '../../../utils/bulkRecordFiles';
 
 const PAGE_ROWS = 20;
 
-export function BulkFileMapper({ sheet, fields, onApply, onChange }: {
+export function BulkFileMapper({ sheet, fields, suggestRoster = false, onApply, onChange }: {
   sheet: ImportSheet;
   fields: string[];
+  suggestRoster?: boolean;
   onApply: (firstRow: number, lastRow: number, columns: number[], excluded: Set<number>) => void;
   onChange: () => void;
 }) {
-  const [first, setFirst] = useState<number>();
-  const [last, setLast] = useState<number>();
+  const [suggestion] = useState(() => {
+    if (!suggestRoster) return;
+    const range = suggestImportRange(sheet.rows);
+    const columns = inferImportColumns(sheet.rows, fields, range, []);
+    if (columns.every((column) => column >= 0) && new Set(columns).size === fields.length) {
+      return { first: range.firstRow - 1, last: range.lastRow - 1, columns };
+    }
+  });
+  const [first, setFirst] = useState(suggestion?.first);
+  const [last, setLast] = useState(suggestion?.last);
   const [excluded, setExcluded] = useState<Set<number>>(new Set());
-  const [columns, setColumns] = useState<number[]>([]);
+  const [columns, setColumns] = useState<number[]>(suggestion?.columns ?? []);
   const [page, setPage] = useState(0);
   const width = importSheetWidth(sheet.rows);
   const start = first === undefined ? undefined : Math.min(first, last ?? first);

@@ -186,6 +186,23 @@ function readDelimitedRows(text: string): string[][] {
   throw new Error('CSV tablosunda okunabilir sütun bulunamadı.');
 }
 
+export function readRosterPaste(text: string): ImportSheet {
+  if (text.length > 100000) throw new Error('Liste çok uzun. En fazla 100.000 karakter yapıştırabilirsiniz.');
+  const lines = text.replace(/^\uFEFF/, '').split(/\r\n|\n|\r/);
+  const rows = lines.some((line) => /[\t;,]/.test(line))
+    ? readDelimitedRows(text)
+    : checkedRows(lines.map((line) => {
+      const trimmed = line.trim();
+      const match = /^(\S+) +(.+)$/u.exec(trimmed);
+      return match && ROSTER_NUMBER_VALUE.test(match[1]) ? [match[1], match[2]] : [trimmed];
+    }));
+  const nonempty = rows.filter((row) => row.some(Boolean));
+  if (!nonempty.some((row) => row.filter(Boolean).length >= 2)) {
+    throw new Error('Her satıra okul numarasını ve öğrencinin ad soyadını yazın.');
+  }
+  return { name: 'Yapıştırılan liste', rows: nonempty };
+}
+
 export async function readImportWorkbook(file: File, onProgress: (message: string) => void = () => {}): Promise<ImportSheet[]> {
   checkFileSize(file);
   if (isScreenshot(file)) {

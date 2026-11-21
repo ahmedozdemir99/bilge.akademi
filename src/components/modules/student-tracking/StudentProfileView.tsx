@@ -334,7 +334,7 @@ export function StudentProfileView({
           </p>
           {trialSummary.examCount === 0 ? (
             <p className="text-sm text-slate-500 dark:text-slate-400 py-10 text-center">
-              Grafik için Deneme & Net Robotundan deneme sonucu ekleyin.
+              Grafiği görmek için Deneme Analizi bölümüne deneme sonucu ekleyin.
             </p>
           ) : (
             <div className="h-64 w-full">
