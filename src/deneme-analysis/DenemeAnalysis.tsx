@@ -1,4 +1,4 @@
-// Embedded from ahmedozdemir99/Deneme.analiz at 946a3e408eda48fc5e6b030e856a8beb531487ef.
+// Embedded from ahmedozdemir99/Deneme.analiz at a61a90651c5e5f8b3274580eeadda2e65d8edc39.
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FileUp,
@@ -170,7 +170,7 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
   ];
 
   return (
-    <section ref={section} aria-labelledby="embedded-deneme-title" className="deneme-analysis min-w-0 scroll-mt-24 space-y-5">
+    <section ref={section} aria-labelledby="embedded-deneme-title" className="deneme-analysis flex w-full min-w-0 scroll-mt-24 flex-col gap-5">
       <div className="no-print space-y-3 rounded-xl border border-slate-200 bg-white p-4 sm:p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center gap-3">
@@ -193,7 +193,7 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
         <p className="text-sm text-slate-600">Deneme kayıtları bu tarayıcıda saklanır. Firebase ve JSON yedeklerine Deneme Arşivi’nden ulaşabilirsiniz.</p>
       </div>
 
-      <div className="min-w-0">
+      <div className="w-full min-w-0 flex-1">
         {/* Optional Feedback Banner */}
         {bannerMessage && (
           <div
@@ -290,6 +290,10 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
           <SchoolWeaknessView state={archive} onSelectStudent={handleSelectStudent} />
         )}
       </div>
+
+      <footer className="mt-auto border-t border-slate-200 py-4 text-center text-xs font-medium text-slate-600 dark:border-slate-700 dark:text-slate-300">
+        by_ahmedozdemir
+      </footer>
 
       {isUploadOpen && (
         <UploadModal
