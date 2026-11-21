@@ -8,7 +8,7 @@ type Entry = { section: string; number: string; name: string };
 type Pending = { label: string; input: BulkInput; add: number; skip: number };
 
 export function MultiClassRosterImport() {
-  const { classes, students, grades, practiceExams, saveBulkRecords, user, dataLoading, workspaceView } = useAcademy();
+  const { classes, students, grades, practiceExams, saveBulkRecords, user, dataLoading, rosterLoadError, workspaceView } = useAcademy();
   const [year, setYear] = useState('2026-2027');
   const [entries, setEntries] = useState<Entry[]>([]);
   const [plans, setPlans] = useState<Pending[]>([]);
@@ -49,6 +49,7 @@ export function MultiClassRosterImport() {
     setError(''); setStatus(''); setPlans([]); setBusy(true);
     try {
       if (!user || workspaceView !== 'teacher') throw new Error('Buluta kaydetmek için öğretmen hesabınızla giriş yapın.');
+      if (rosterLoadError) throw new Error(rosterLoadError);
       if (dataLoading) throw new Error('Öğrenci verilerinin yüklenmesini bekleyin.');
       if (!/^\d{4}-\d{4}$/.test(year)) throw new Error('Öğretim yılını kontrol edin.');
       const snapshot = { classes, students, grades, practiceExams };
@@ -101,10 +102,13 @@ export function MultiClassRosterImport() {
       <input type="file" accept=".csv,text/csv" className="sr-only" disabled={busy} onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void load(file); }} />
     </label>
     {entries.length > 0 && <p className="text-sm">{entries.length} öğrenci · {[...new Set(entries.map((item) => item.section))].sort().join(', ')}</p>}
-    {entries.length > 0 && <button type="button" disabled={busy || dataLoading || !user} onClick={() => void prepare()} className="min-h-11 rounded-lg bg-navy-900 px-4 py-2 font-semibold text-white disabled:opacity-50">Önizlemeyi Hazırla</button>}
+    {rosterLoadError && <p role="alert" className="rounded-lg bg-red-50 p-3 text-sm text-red-700">{rosterLoadError}</p>}
+    {dataLoading && <p role="status" className="text-sm text-amber-700">Sınıf ve öğrenci kayıtları Firebase'den bekleniyor. Bağlantı sürerse sayfayı yenileyin.</p>}
+    {!user && <p role="alert" className="text-sm text-amber-700">Önizleme için Google hesabınızla giriş yapmanız gerekiyor.</p>}
+    {entries.length > 0 && <button type="button" disabled={busy || dataLoading || !user || !!rosterLoadError} onClick={() => void prepare()} className="min-h-11 rounded-lg bg-navy-900 px-4 py-2 font-semibold text-white disabled:opacity-50">Önizlemeyi Hazırla</button>}
     {plans.length > 0 && <div className="space-y-2">
       <p className="text-sm font-semibold">{plans.map((plan) => `${plan.label}: ${plan.add} yeni, ${plan.skip} kayıtlı`).join(' · ')}</p>
-      <button type="button" disabled={busy || dataLoading} onClick={() => void saveAll()} className="min-h-11 rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white disabled:opacity-50">Tüm Sınıfları Kaydet</button>
+      <button type="button" disabled={busy || dataLoading || !!rosterLoadError} onClick={() => void saveAll()} className="min-h-11 rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white disabled:opacity-50">Tüm Sınıfları Kaydet</button>
     </div>}
     {status && <p role="status" className="text-sm">{status}</p>}
     {error && <p role="alert" className="whitespace-pre-line rounded-lg bg-red-50 p-3 text-sm text-red-700">{error}</p>}
