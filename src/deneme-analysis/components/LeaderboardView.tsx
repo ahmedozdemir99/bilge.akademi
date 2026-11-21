@@ -370,26 +370,22 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="grid grid-cols-2 gap-2 sm:shrink-0">
           <button
             type="button"
+            aria-pressed={showChart}
             onClick={() => setShowChart((prev) => !prev)}
-            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-2 text-xs font-semibold transition-colors ${
-              showChart
-                ? 'border-blue-700 bg-blue-700 text-white'
-                : 'border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
-            }`}
+            className="appearance-option"
           >
-            <BarChart2 className="h-3.5 w-3.5" />
+            <BarChart2 className="size-4 shrink-0" aria-hidden="true" />
             İlk 15 Grafiği
           </button>
-
           <button
             type="button"
             onClick={() => exportLeaderboardToExcel(sortedExams, filteredRows)}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50 px-3 py-2 text-xs font-semibold text-emerald-800 transition-colors hover:bg-emerald-100"
+            className="appearance-option"
           >
-            <FileSpreadsheet className="h-3.5 w-3.5" />
+            <FileSpreadsheet className="size-4 shrink-0" aria-hidden="true" />
             Excel İndir (.xlsx)
           </button>
         </div>
@@ -507,166 +503,121 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
         </div>
       </div>
 
-      {/* Multifunctional Ranking Controls Card */}
-      <section className="space-y-3.5 rounded-xl border border-slate-200 bg-white p-4">
-        {/* Row 1: General Ranking Metric Pills + Direction Toggle */}
-        <div className="flex flex-col gap-2.5 lg:flex-row lg:items-center lg:justify-between">
-          <div className="flex flex-wrap items-center gap-1.5">
-            <span className="mr-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-              Genel Sıralama:
-            </span>
-            {GENERAL_METRICS.map((m) => {
-              const active = selectedSubject === 'ALL' && generalMetric === m.id;
-              return (
-                <button
-                  key={m.id}
-                  type="button"
-                  onClick={() => {
-                    setSelectedSubject('ALL');
-                    setGeneralMetric(m.id);
-                  }}
-                  className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                    active
-                      ? 'border-blue-700 bg-blue-700 text-white shadow-xs'
-                      : 'border-slate-200 bg-slate-50 text-slate-700 hover:border-blue-300 hover:bg-blue-50/50 hover:text-blue-800'
-                  }`}
-                >
-                  {m.shortLabel}
-                </button>
-              );
-            })}
-          </div>
-
-          {/* Sort Direction + View Mode */}
-          <div className="flex flex-wrap items-center gap-2">
-            <button
-              type="button"
-              onClick={() => setSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
-              className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs font-semibold text-slate-700 transition-colors hover:bg-slate-50"
-              title="Sıralama yönünü değiştir"
-            >
-              {sortDirection === 'desc' ? (
-                <>
-                  <ArrowDownWideNarrow className="h-3.5 w-3.5 text-blue-700" />
-                  Çok → Az
-                </>
-              ) : (
-                <>
-                  <ArrowUpNarrowWide className="h-3.5 w-3.5 text-amber-600" />
-                  Az → Çok
-                </>
-              )}
-            </button>
-
-            <div className="inline-flex rounded-lg border border-slate-200 bg-slate-100 p-0.5">
+      <section aria-label="Sıralama filtreleri" className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4">
+        <div className="space-y-2">
+          <h2 id="leaderboard-metric-heading" className="text-sm font-semibold text-slate-700">Genel Sıralama</h2>
+          <div role="group" aria-labelledby="leaderboard-metric-heading" className="grid auto-rows-fr grid-cols-2 gap-2 md:grid-cols-3">
+            {GENERAL_METRICS.map((metric) => (
               <button
+                key={metric.id}
                 type="button"
-                onClick={() => setViewMode('summary')}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  viewMode === 'summary'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
+                aria-pressed={selectedSubject === 'ALL' && generalMetric === metric.id}
+                onClick={() => {
+                  setSelectedSubject('ALL');
+                  setGeneralMetric(metric.id);
+                }}
+                className="appearance-option"
               >
-                <LayoutList className="h-3.5 w-3.5" />
-                Özet + Denemeler
+                {metric.shortLabel}
               </button>
-              <button
-                type="button"
-                onClick={() => setViewMode('full_matrix')}
-                className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-semibold transition-colors ${
-                  viewMode === 'full_matrix'
-                    ? 'bg-white text-slate-900 shadow-xs'
-                    : 'text-slate-600 hover:text-slate-900'
-                }`}
-              >
-                <Table2 className="h-3.5 w-3.5" />
-                Tüm Dersler Matrisi
-              </button>
-            </div>
+            ))}
           </div>
         </div>
 
-        {/* Row 2: Subject-Specific Average Net Ranking Bar */}
-        <div className="flex flex-wrap items-center gap-1.5 border-t border-slate-100 pt-3">
-          <span className="mr-1 inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-slate-500">
-            <BookOpen className="h-3.5 w-3.5 text-slate-400" />
-            Derse Göre Sırala:
-          </span>
+        <div className="grid gap-2 lg:grid-cols-3">
           <button
             type="button"
-            onClick={() => setSelectedSubject('ALL')}
-            className={`rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-              selectedSubject === 'ALL'
-                ? 'border-slate-900 bg-slate-900 text-white'
-                : 'border-slate-200 bg-white text-slate-600 hover:bg-slate-50'
-            }`}
+            onClick={() => setSortDirection((prev) => (prev === 'desc' ? 'asc' : 'desc'))}
+            className="appearance-option"
+            title="Sıralama yönünü değiştir"
           >
-            Tüm Dersler
+            {sortDirection === 'desc'
+              ? <><ArrowDownWideNarrow className="size-4 shrink-0 text-blue-700" aria-hidden="true" /> Çoktan Aza</>
+              : <><ArrowUpNarrowWide className="size-4 shrink-0 text-amber-600" aria-hidden="true" /> Azdan Çoğa</>}
           </button>
-          {SUBJECT_LIST.map((s) => {
-            const isSelected = selectedSubject === s.key;
-            return (
-              <button
-                key={s.key}
-                type="button"
-                onClick={() => setSelectedSubject(s.key)}
-                className={`inline-flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-xs font-semibold transition-colors ${
-                  isSelected
-                    ? 'border-transparent text-white shadow-xs'
-                    : 'border-slate-200 bg-white text-slate-700 hover:border-slate-300 hover:bg-slate-50'
-                }`}
-                style={isSelected ? { backgroundColor: s.color } : undefined}
-              >
-                <span
-                  className="inline-block h-2 w-2 rounded-full"
-                  style={{ backgroundColor: isSelected ? '#FFFFFF' : s.color }}
-                />
-                {s.label}
-              </button>
-            );
-          })}
+          <div role="group" aria-label="Tablo görünümü" className="grid auto-rows-fr grid-cols-2 gap-2 lg:col-span-2">
+            <button
+              type="button"
+              aria-pressed={viewMode === 'summary'}
+              onClick={() => setViewMode('summary')}
+              className="appearance-option"
+            >
+              <LayoutList className="size-4 shrink-0" aria-hidden="true" />
+              Özet + Denemeler
+            </button>
+            <button
+              type="button"
+              aria-pressed={viewMode === 'full_matrix'}
+              onClick={() => setViewMode('full_matrix')}
+              className="appearance-option"
+            >
+              <Table2 className="size-4 shrink-0" aria-hidden="true" />
+              Tüm Dersler Matrisi
+            </button>
+          </div>
         </div>
 
-        {/* Row 3: Search + Class Filter */}
-        <div className="flex flex-col gap-3 border-t border-slate-100 pt-3 lg:flex-row lg:items-center lg:justify-between">
-          <div className="relative flex-1 lg:max-w-xs">
-            <Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-slate-400" />
+        <div className="space-y-2 border-t border-slate-100 pt-4">
+          <h2 id="leaderboard-subject-heading" className="flex items-center gap-2 text-sm font-semibold text-slate-700">
+            <BookOpen className="size-4" aria-hidden="true" /> Derse Göre Sırala
+          </h2>
+          <div role="group" aria-labelledby="leaderboard-subject-heading" className="grid auto-rows-fr grid-cols-2 gap-2 md:grid-cols-3">
+            <button
+              type="button"
+              aria-pressed={selectedSubject === 'ALL'}
+              onClick={() => setSelectedSubject('ALL')}
+              className="appearance-option col-span-full"
+            >
+              Tüm Dersler
+            </button>
+            {SUBJECT_LIST.map((subject) => (
+              <button
+                key={subject.key}
+                type="button"
+                aria-pressed={selectedSubject === subject.key}
+                onClick={() => setSelectedSubject(subject.key)}
+                className="appearance-option"
+              >
+                <span className="size-2 shrink-0 rounded-full ring-1 ring-white/80" style={{ backgroundColor: subject.color }} aria-hidden="true" />
+                {subject.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="space-y-3 border-t border-slate-100 pt-4">
+          <div className="relative">
+            <Search className="pointer-events-none absolute left-3 top-1/2 size-4 -translate-y-1/2 text-slate-400" aria-hidden="true" />
             <input
-              type="text"
+              type="search"
+              aria-label="Öğrenci adı veya okul numarası ara"
               value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Öğrenci adı veya okul numarası ara..."
-              className="w-full rounded-lg border border-slate-300 bg-white py-1.5 pl-9 pr-3 text-xs text-slate-900 placeholder:text-slate-400 focus:border-blue-600 focus:outline-none"
+              onChange={(event) => setSearchQuery(event.target.value)}
+              placeholder="Öğrenci adı veya okul numarası ara…"
+              className="w-full rounded-lg border border-slate-300 bg-white py-2 pl-9 pr-3 text-slate-900 placeholder:text-slate-500"
             />
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div role="group" aria-label="Sınıfa göre filtrele" className="grid auto-rows-fr grid-cols-3 gap-2 sm:grid-cols-4 lg:grid-cols-5">
             <button
               type="button"
+              aria-pressed={selectedClass === 'ALL'}
               onClick={() => setSelectedClass('ALL')}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors tabular-nums ${
-                selectedClass === 'ALL'
-                  ? 'bg-slate-900 text-white'
-                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-              }`}
+              className="appearance-option tabular-nums"
             >
               Tümü ({allRows.length})
             </button>
-            {classes.map((cls) => {
-              const cnt = allRows.filter((r) => r.student.sinif === cls).length;
+            {classes.map((className) => {
+              const count = allRows.filter((row) => row.student.sinif === className).length;
               return (
                 <button
-                  key={cls}
+                  key={className}
                   type="button"
-                  onClick={() => setSelectedClass(cls)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors tabular-nums ${
-                    selectedClass === cls
-                      ? 'bg-slate-900 text-white'
-                      : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
-                  }`}
+                  aria-pressed={selectedClass === className}
+                  onClick={() => setSelectedClass(className)}
+                  className="appearance-option tabular-nums"
                 >
-                  {cls} ({cnt})
+                  {className} ({count})
                 </button>
               );
             })}
