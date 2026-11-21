@@ -39,11 +39,11 @@ interface ModuleCardConfig {
 const CORE_MODULES: ModuleCardConfig[] = [
   {
     id: 'student-tracking',
-    title: 'Öğrenci Takip ve Deneme Net Robotu',
-    subtitle: 'Ortaokul Sınıfları, Ders Ders D/Y/Net Robotu ve Yapay Zekâ Analizi',
+    title: 'Deneme Analizi',
+    subtitle: 'LGS ve Ortaokul Deneme Sonuçları, Netler ve Gelişim Analizi',
     description:
-      '5–8. sınıf öğrenci kayıtlarını, öğrenci notlarını ve 6 derslik LGS/Ortaokul deneme doğru-yanlış-net hesaplama robotunu yönetin; ortalama grafikler ve Excel/PDF raporları alın.',
-    stageLabel: 'Ortaokul & LGS · Deneme Robotu',
+      'Deneme sonuçlarını ders bazında inceleyin, doğru-yanlış-net dağılımlarını ve öğrenci gelişimini analiz edin.',
+    stageLabel: 'Ortaokul & LGS · Deneme Analizi',
     icon: Users,
   },
   {
@@ -175,7 +175,7 @@ export function HomeDashboard() {
               Ortaokul ve LGS İçin Zengin, Etkileşimli ve Yapay Zekâ Destekli Akademi
             </h1>
             <p className="mt-4 text-base text-slate-600 dark:text-slate-300 leading-relaxed max-w-2xl">
-              Ders ders deneme net robotundan etkileşimli Fen Bilimleri deney laboratuvarına,
+              Deneme analizinden etkileşimli Fen Bilimleri deney laboratuvarına,
               sesli İngilizce dinleme stüdyosundan abdest–namaz–hac ibadet animasyonlarına,
               görsel matematik ispatlarından animasyonlu tarih seferlerine kadar dopdolu eğitim platformu.
             </p>
@@ -404,7 +404,15 @@ export function HomeDashboard() {
                 <div className="mt-6 pt-4 border-t border-slate-100 dark:border-slate-800 flex items-center justify-between">
                   <button
                     type="button"
-                    onClick={() => setActiveModule(mod.id)}
+                    onClick={() => {
+                      if (mod.id === 'student-tracking') {
+                        const url = new URL(window.location.href);
+                        url.searchParams.set('denemeAnalizi', '1');
+                        window.location.assign(url.toString());
+                      } else {
+                        setActiveModule(mod.id);
+                      }
+                    }}
                     aria-label={`${mod.title} modülünü aç`}
                     className="inline-flex min-h-11 w-full cursor-pointer items-center justify-center rounded-lg bg-navy-900 px-4 py-2 text-sm font-medium text-white transition-colors hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500"
                   >
