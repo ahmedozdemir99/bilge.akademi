@@ -1,0 +1,64 @@
+name: Sync Deneme Analizi
+
+on:
+  schedule:
+    - cron: '17 * * * *'
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/sync-deneme-analysis.yml'
+      - 'scripts/sync-deneme-analysis.mjs'
+
+permissions:
+  contents: write
+
+concurrency:
+  group: sync-deneme-analysis
+  cancel-in-progress: false
+
+jobs:
+  sync:
+    if: github.repository == 'ahmedozdemir99/bilge.akademi' && github.ref == 'refs/heads/main'
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          ref: main
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+
+      - name: Import shared Deneme Analizi changes
+        id: sync
+        run: |
+          git clone --quiet --no-tags --single-branch --branch main https://github.com/ahmedozdemir99/Deneme.analiz.git "$RUNNER_TEMP/deneme-source"
+          node scripts/sync-deneme-analysis.mjs "$RUNNER_TEMP/deneme-source"
+          if git diff --quiet -- src/deneme-analysis; then
+            echo 'changed=false' >> "$GITHUB_OUTPUT"
+          else
+            echo 'changed=true' >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Check types and build Cloudflare Pages
+        if: steps.sync.outputs.changed == 'true' || github.event_name != 'schedule'
+        run: |
+          npx --yes bun@1.4.5 install --frozen-lockfile
+          npm run lint
+          npm run build:pages
+
+      - name: Push validated updates
+        if: steps.sync.outputs.changed == 'true'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git add -- src/deneme-analysis
+          revision=$(cut -c1-12 src/deneme-analysis/upstream-revision.txt)
+          git commit -m "Sync Deneme Analizi from $revision"
+          export DENEME_GIT_AUTH="AUTHORIZATION: basic $(printf 'x-access-token:%s' "$GH_TOKEN" | base64 -w0)"
+          git --config-env=http.https://github.com/.extraheader=DENEME_GIT_AUTH push origin HEAD:refs/heads/main

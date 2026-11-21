@@ -784,3 +784,91 @@ export function exportSchoolArchiveToExcel(
 
   XLSX.writeFile(wb, `LGS_Okul_Deneme_Arsivi_${new Date().toISOString().slice(0, 10)}.xlsx`);
 }
+
+export interface LeaderboardExportRow {
+  student: StudentProfile;
+  schoolRank: number;
+  examMap: Map<string, StudentExamRecord>;
+  attendedCount: number;
+  avgLgs: number;
+  avgToplamNet: number;
+  avgSubjectNets: Record<SubjectKey, number>;
+}
+
+/**
+ * Exports the multi-exam leaderboard (ranked highest to lowest with 1., 2., 3. exam subject nets & averages) to .xlsx.
+ */
+export function exportLeaderboardToExcel(
+  sortedExams: ExamMeta[],
+  rows: LeaderboardExportRow[]
+): void {
+  const wb = XLSX.utils.book_new();
+
+  // Sheet 1: Genel Sıralama ve Ortalamalar
+  const summaryHeaders = [
+    'Sıra',
+    'Adı Soyadı',
+    'Şube',
+    'Öğrenci No',
+    'Katıldığı Deneme',
+    'Ortalama LGS',
+    'Ortalama Toplam Net',
+    ...SUBJECT_LIST.map((s) => `Ort. ${s.label} Net`),
+    ...sortedExams.flatMap((ex, idx) => [
+      `${idx + 1}. Deneme Net (${ex.name})`,
+      `${idx + 1}. Deneme LGS`,
+    ]),
+  ];
+
+  const summaryData: Array<Array<string | number>> = rows.map((row, idx) => [
+    idx + 1,
+    row.student.name,
+    row.student.sinif,
+    row.student.numara,
+    `${row.attendedCount}/${sortedExams.length}`,
+    row.avgLgs,
+    row.avgToplamNet,
+    ...SUBJECT_LIST.map((s) => row.avgSubjectNets[s.key]),
+    ...sortedExams.flatMap<string | number>((ex) => {
+      const rec = row.examMap.get(ex.id);
+      return rec ? [rec.toplam.net, rec.lgsPuan] : ['', ''];
+    }),
+  ]);
+
+  const wsSummary = XLSX.utils.aoa_to_sheet([summaryHeaders, ...summaryData]);
+  XLSX.utils.book_append_sheet(wb, wsSummary, 'Genel Sıralama');
+
+  // Sheet 2: Tüm Denemeler Ders Bazlı Matris
+  const matrixHeaders = [
+    'Sıra',
+    'Adı Soyadı',
+    'Şube',
+    ...SUBJECT_LIST.map((s) => `Ort. ${s.shortLabel}`),
+    'Ort. Net',
+    'Ort. LGS',
+    ...sortedExams.flatMap((_, idx) => [
+      ...SUBJECT_LIST.map((s) => `${idx + 1}.D ${s.shortLabel}`),
+      `${idx + 1}.D Net`,
+      `${idx + 1}.D LGS`,
+    ]),
+  ];
+
+  const matrixData: Array<Array<string | number>> = rows.map((row, idx) => [
+    idx + 1,
+    row.student.name,
+    row.student.sinif,
+    ...SUBJECT_LIST.map((s) => row.avgSubjectNets[s.key]),
+    row.avgToplamNet,
+    row.avgLgs,
+    ...sortedExams.flatMap<string | number>((ex) => {
+      const rec = row.examMap.get(ex.id);
+      if (!rec) return [...SUBJECT_LIST.map(() => ''), '', ''];
+      return [...SUBJECT_LIST.map((s) => rec.subjects[s.key].net), rec.toplam.net, rec.lgsPuan];
+    }),
+  ]);
+
+  const wsMatrix = XLSX.utils.aoa_to_sheet([matrixHeaders, ...matrixData]);
+  XLSX.utils.book_append_sheet(wb, wsMatrix, 'Tüm Dersler Matrisi');
+
+  XLSX.writeFile(wb, `LGS_Basari_Siralamasi_${new Date().toISOString().slice(0, 10)}.xlsx`);
+}

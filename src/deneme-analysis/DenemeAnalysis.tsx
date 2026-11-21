@@ -1,4 +1,3 @@
-// Embedded from ahmedozdemir99/Deneme.analiz at a61a90651c5e5f8b3274580eeadda2e65d8edc39.
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FileUp,
@@ -6,6 +5,7 @@ import {
   Users,
   BarChart3,
   FolderArchive,
+  Trophy,
   AlertCircle,
   X,
 } from 'lucide-react';
@@ -19,6 +19,7 @@ import {
   renameExamInState,
   saveArchiveState,
 } from './utils/storage';
+import { LeaderboardView } from './components/LeaderboardView';
 import { StudentCardsView } from './components/StudentCardsView';
 import { StudentDetailView } from './components/StudentDetailView';
 import { OverviewView } from './components/OverviewView';
@@ -31,7 +32,7 @@ import { mergeArchives } from './utils/cloudBackup';
 import { sampleBundles } from './utils/sampleArchive';
 import './styles.css';
 
-type NavTab = 'students' | 'overview' | 'archive' | 'weaknesses';
+type NavTab = 'students' | 'leaderboard' | 'overview' | 'archive' | 'weaknesses';
 
 export default function DenemeAnalysis({ owner, demo = false }: { owner: string; demo?: boolean }) {
   const section = useRef<HTMLElement>(null);
@@ -164,6 +165,7 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
 
   const navItems: Array<{ id: NavTab; label: string; icon: React.ReactNode }> = [
     { id: 'students', label: 'Öğrenci Kartları', icon: <Users className="h-4 w-4" /> },
+    { id: 'leaderboard', label: 'Sıralama', icon: <Trophy className="h-4 w-4" /> },
     { id: 'overview', label: 'Genel Bakış', icon: <BarChart3 className="h-4 w-4" /> },
     { id: 'archive', label: 'Deneme Arşivi', icon: <FolderArchive className="h-4 w-4" /> },
     { id: 'weaknesses', label: 'Eksik Analizi', icon: <AlertCircle className="h-4 w-4" /> },
@@ -241,6 +243,12 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
               onOpenUpload={() => setIsUploadOpen(true)}
             />
           </div>
+        ) : activeTab === 'leaderboard' ? (
+          <LeaderboardView
+            state={archive}
+            onSelectStudent={handleSelectStudent}
+            onOpenUpload={() => setIsUploadOpen(true)}
+          />
         ) : activeTab === 'overview' ? (
           <OverviewView
             state={archive}

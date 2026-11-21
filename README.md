@@ -99,6 +99,12 @@ npx tsx src/utils/modules.test.ts
 2. Bilge Akademi’nin Sites ayarlarında **Environment variables** bölümüne `GEMINI_API_KEY` adlı bir **Secret** ekleyin.
 3. Siteyi yeniden yayınlayın. Bilge Akademi’de **Ayarlar → Gemini bağlantısı → Bağlantıyı test et** yolunu izleyin.
 
+## Deneme Analizi güncellemeleri
+
+GitHub Actions, `ahmedozdemir99/Deneme.analiz` deposunun `main` dalını saatte bir kontrol eder. Bilge Akademi’deki kaynak sürüm `src/deneme-analysis/upstream-revision.txt` dosyasında kayıtlıdır. İş akışını GitHub Actions’taki **Sync Deneme Analizi** ekranından elle de başlatabilirsiniz.
+
+Ortak ekran, tür ve yardımcı kodlar yeni sürümle birleştirilir. Bilge Akademi kendi Firebase bağlantısını, yedekleme akışını ve uygulama ayarlarını kullanır. Çakışma, tür hatası veya derleme hatası olursa iş akışı durur ve Cloudflare Pages’in yayındaki sürümü çalışmaya devam eder. Çakışan dosyalar iş akışının çıktısında görünür.
+
 ## Cloudflare Pages Yayınlama Rehberi
 
 Bu proje hem Node.js/Express (`server.ts`) hem de **Cloudflare Pages Functions (`functions/api/[[path]].ts`)** ile tam uyumludur.
