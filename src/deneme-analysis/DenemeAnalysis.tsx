@@ -261,6 +261,16 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
                 <button type="button" className="appearance-option" onClick={() => setSignInOpen(true)}>Yedekleme İçin Giriş Yap</button>
               )}
               {cloud.status && <p role="status" className="text-sm text-teal-700 dark:text-teal-300">{cloud.status}</p>}
+              {(cloud.busy || cloud.progress !== null) && <div role="status" aria-live="polite" className="space-y-2">
+                <div className="flex items-center justify-between gap-3 text-sm">
+                  <span className="text-slate-700">{cloud.phase || 'Firebase işlemi hazırlanıyor…'}</span>
+                  <strong className="tabular-nums text-teal-800">{cloud.progress === null ? 'Kontrol ediliyor' : `%${cloud.progress}`}</strong>
+                </div>
+                {cloud.progress === null
+                  ? <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200"><div className="h-full w-1/3 animate-pulse rounded-full bg-teal-500" /></div>
+                  : <div role="progressbar" aria-label="Firebase yedekleme ilerlemesi" aria-valuemin={0} aria-valuemax={100} aria-valuenow={cloud.progress} className="h-3 w-full overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-teal-600 transition-all duration-300" style={{width: `${cloud.progress}%`}} /></div>}
+                <p className="text-xs text-slate-500">Yüzde, Firebase tarafından onaylanan kayıt işlemlerini gösterir. Bulut verileri okunurken kesin yüzde hesaplanamaz.</p>
+              </div>
               {cloud.slow && <p role="alert" className="text-sm text-amber-800">Firebase işlemi 20 saniyeden uzun sürdü. Bağlantı veya sunucu yanıtı gecikiyor olabilir. İşlem sürerken yeniden başlatmayın; tamamlanmazsa önce JSON Yedek ile yerel arşivinizi koruyun.</p>}
               {cloud.error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{cloud.error}</p>}
             </section>
