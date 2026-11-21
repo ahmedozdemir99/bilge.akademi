@@ -12,6 +12,7 @@ import { ReportsModule } from './components/modules/ReportsModule';
 import { ScienceLabModule } from './components/modules/ScienceLabModule';
 import { SettingsModule } from './components/modules/SettingsModule';
 import { StudentTrackingModule } from './components/modules/StudentTrackingModule';
+import { SignInDialog } from './components/ui/SignInDialog';
 import { ErrorBoundary } from './components/ui/ErrorBoundary';
 import { ToastContainer } from './components/ui/ToastContainer';
 
@@ -55,6 +56,7 @@ export default function App() {
         <AppShell>
           <BilgeAkademiRouter />
         </AppShell>
+        <SignInDialog />
         <ToastContainer />
       </AcademyProvider>
     </ErrorBoundary>

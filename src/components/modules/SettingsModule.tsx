@@ -18,7 +18,7 @@ export function SettingsModule() {
     user,
     profile,
     isDemoMode,
-    signInWithGoogle,
+    setSignInOpen,
     signOutUser,
     updateProfileInfo,
     theme,
@@ -100,7 +100,7 @@ export function SettingsModule() {
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {user
                 ? `Oturum açık: ${user.email} · Firebase Firestore aktif`
-                : 'Şu anda yerel tarayıcı destekli Demo Modundasınız. Kalıcı bulut kayıtları için Google ile giriş yapın.'}
+                : 'Şu anda yerel tarayıcı destekli Demo Modundasınız. Kalıcı bulut kayıtları için hesabınızla giriş yapın.'}
             </p>
           </div>
           {user ? (
@@ -115,11 +115,11 @@ export function SettingsModule() {
           ) : (
             <button
               type="button"
-              onClick={() => void signInWithGoogle()}
+              onClick={() => setSignInOpen(true)}
               className="inline-flex items-center gap-2 px-4 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 cursor-pointer whitespace-nowrap shrink-0"
             >
               <LogIn className="w-4 h-4" />
-              <span>Google ile Giriş Yap</span>
+              <span>Giriş Yap</span>
             </button>
           )}
         </div>
@@ -298,7 +298,7 @@ export function SettingsModule() {
             <h3 className="font-semibold text-sm">Bulut Yedekleme ve Güvenli Birleştirme</h3>
             <p className="text-xs text-slate-500 dark:text-slate-400">
               Yalnızca eksik kayıtlar eklenir; aynı kimliğe sahip kayıtlar değiştirilmez.
-              Hazır demo örnekleri buluta yüklenmez. Google hesabınız açık olmalıdır.
+              Hazır demo örnekleri buluta yüklenmez. Oturumunuz açık olmalıdır.
             </p>
             <div className="flex flex-wrap gap-3">
               <button type="button" disabled={syncing} onClick={() => void runBackup('upload')}

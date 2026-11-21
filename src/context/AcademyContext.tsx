@@ -194,6 +194,8 @@ interface AcademyContextValue {
   authLoading: boolean;
   isDemoMode: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInOpen: boolean;
+  setSignInOpen: (open: boolean) => void;
   signOutUser: () => Promise<void>;
   updateProfileInfo: (schoolName: string, branch: string, displayName: string) => Promise<void>;
 
@@ -265,6 +267,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [signInOpen, setSignInOpen] = useState(false);
   const [dataLoading, setDataLoading] = useState(false);
 
   const [theme, setThemeState] = useState<ThemeMode>(() => {
@@ -389,13 +392,15 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   // Firebase Auth listener + profile bootstrap
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
-      setUser(firebaseUser);
-      if (!firebaseUser) {
+      if (!firebaseUser?.emailVerified) {
+        setUser(null);
         setProfile(null);
         setAuthLoading(false);
         return;
       }
 
+      setUser(firebaseUser);
+      setSignInOpen(false);
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
@@ -655,7 +660,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const updateProfileInfo = useCallback(
     async (schoolName: string, branch: string, displayName: string) => {
       if (!user) {
-        notify('info', 'Demo Modu', 'Profil bilgilerini kalıcı kaydetmek için Google hesabınızla giriş yapın.');
+        notify('info', 'Demo Modu', 'Profil bilgilerini kalıcı kaydetmek için hesabınızla giriş yapın.');
         return;
       }
       const safeDisplay = displayName.trim().slice(0, 100);
@@ -1576,6 +1581,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       authLoading,
       isDemoMode,
       signInWithGoogle,
+      signInOpen,
+      setSignInOpen,
       signOutUser,
       updateProfileInfo,
       theme,
@@ -1662,6 +1669,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       setTheme,
       setWorkspaceView,
       signInWithGoogle,
+      signInOpen,
+      setSignInOpen,
       signOutUser,
       theme,
       toasts,

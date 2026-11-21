@@ -57,7 +57,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     profile,
     isDemoMode,
     workspaceView,
-    signInWithGoogle,
+    setSignInOpen,
     signOutUser,
   } = useAcademy();
 
@@ -155,20 +155,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               ) : (
                 <button
                   type="button"
-                  onClick={() => void signInWithGoogle()}
+                  onClick={() => setSignInOpen(true)}
                   className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-navy-950 bg-gold-400 hover:bg-gold-500 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <LogIn className="w-3.5 h-3.5" />
-                  <span>Google ile Giriş Yap</span>
+                  <span>Giriş Yap</span>
                 </button>
               )}
             </div>
           ) : (
             <button
               type="button"
-              onClick={() => (user ? void signOutUser() : void signInWithGoogle())}
-              title={user ? 'Çıkış Yap' : 'Google ile Giriş Yap'}
-              aria-label={user ? 'Çıkış Yap' : 'Google ile Giriş Yap'}
+              onClick={() => (user ? void signOutUser() : setSignInOpen(true))}
+              title={user ? 'Çıkış Yap' : 'Giriş Yap'}
+              aria-label={user ? 'Çıkış Yap' : 'Giriş Yap'}
               className="w-full flex items-center justify-center p-2.5 rounded-lg text-gold-400 hover:bg-white/10 transition-colors cursor-pointer"
             >
               {user ? <LogOut className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
@@ -241,12 +241,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                   type="button"
                   onClick={() => {
                     setMobileMenuOpen(false);
-                    void signInWithGoogle();
+                    setSignInOpen(true);
                   }}
                   className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 cursor-pointer"
                 >
                   <LogIn className="w-4 h-4" />
-                  <span>Google ile Giriş Yap</span>
+                  <span>Giriş Yap</span>
                 </button>
               )}
             </div>
@@ -314,7 +314,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             ) : (
               <button
                 type="button"
-                onClick={() => void signInWithGoogle()}
+                onClick={() => setSignInOpen(true)}
                 className="px-3.5 py-2 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
               >
                 Giriş Yap

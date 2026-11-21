@@ -134,7 +134,7 @@ export function HomeDashboard() {
     isDemoMode,
     workspaceView,
     setWorkspaceView,
-    signInWithGoogle,
+    setSignInOpen,
   } = useAcademy();
 
   const overallAverage = calculateAverageScore(grades);
@@ -226,17 +226,17 @@ export function HomeDashboard() {
             </p>
             <p className="mt-1 text-sm text-white/95 leading-snug">
               {isDemoMode
-                ? 'Tüm özellikleri örnek verilerle hemen deneyebilir veya Google hesabınızla kalıcı veritabanına geçebilirsiniz.'
+                ? 'Tüm özellikleri örnek verilerle hemen deneyebilir veya hesabınızla kalıcı veritabanına geçebilirsiniz.'
                 : 'Sınıf, öğrenci, sınav ve devam kayıtlarınız yalnızca size özel güvenlik kurallarıyla korunur.'}
             </p>
             {isDemoMode && (
               <div className="mt-3">
                 <button
                   type="button"
-                  onClick={() => void signInWithGoogle()}
+                  onClick={() => setSignInOpen(true)}
                   className="px-3.5 py-1.5 rounded-lg text-xs font-medium bg-gold-400 text-navy-950 hover:bg-gold-500 transition-colors cursor-pointer whitespace-nowrap"
                 >
-                  Google ile Kalıcı Hesaba Geç
+                  Kalıcı Hesaba Geç
                 </button>
               </div>
             )}
