@@ -1,4 +1,6 @@
 import { lazy, Suspense, useMemo, useState } from 'react';
+import { loadArchiveState } from '../../deneme-analysis/utils/storage';
+import { SUBJECT_LIST } from '../../deneme-analysis/types/exam';
 import {
   AlertCircle,
   Bot,
@@ -104,6 +106,8 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [examTypeFilter, setExamTypeFilter] = useState<'all' | ExamType>('all');
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('all');
+  const [archiveReport, setArchiveReport] = useState(() => loadArchiveState(user?.uid ?? 'demo'));
+  const [archiveClassFilter, setArchiveClassFilter] = useState('all');
   const [trialView, setTrialView] = useState<'archive' | 'import'>(initialImport ? 'import' : 'archive');
   const [archiveClassId, setArchiveClassId] = useState(initialClass);
 
@@ -194,13 +198,35 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
     [analyticsClassId, students]
   );
 
+  const archivedResults = useMemo(() => (archiveReport?.students ?? []).flatMap((student) =>
+    student.exams.map((exam) => ({ student, exam }))), [archiveReport]);
+  const archiveClasses = useMemo(() => Array.from(new Set(archivedResults.map(({ student }) => student.sinif)))
+    .sort((a, b) => a.localeCompare(b, 'tr')), [archivedResults]);
+  const filteredArchiveResults = useMemo(() => archivedResults.filter(({ student }) =>
+    archiveClassFilter === 'all' || student.sinif === archiveClassFilter), [archivedResults, archiveClassFilter]);
+  const archivedSubjectStats = useMemo(() => SUBJECT_LIST.map((subject) => {
+    const values = filteredArchiveResults.map(({ exam }) => exam.subjects[subject.key]?.net).filter((n): n is number => typeof n === 'number' && Number.isFinite(n));
+    return { subject: subject.label, average: values.length ? Number((values.reduce((a,b) => a+b,0)/values.length).toFixed(2)) : 0, count: values.length };
+  }).filter((item) => item.count > 0), [filteredArchiveResults]);
+  const archivedExamStats = useMemo(() => (archiveReport?.exams ?? []).map((meta) => {
+    const records = filteredArchiveResults.filter(({ exam }) => exam.examId === meta.id);
+    const averageNet = records.length ? records.reduce((sum, { exam }) => sum + exam.toplam.net, 0) / records.length : 0;
+    const averageLgs = records.length ? records.reduce((sum, { exam }) => sum + exam.lgsPuan, 0) / records.length : 0;
+    return { id: meta.id, name: meta.name, order: meta.examOrder, count: records.length, averageNet: Number(averageNet.toFixed(2)), averageLgs: Number(averageLgs.toFixed(2)) };
+  }).filter((item) => item.count > 0).sort((a,b) => a.order - b.order), [archiveReport, filteredArchiveResults]);
+  const archivedClassStats = useMemo(() => archiveClasses.map((name) => {
+    const records = archivedResults.filter(({ student }) => student.sinif === name);
+    return { name, count: records.length, studentCount: new Set(records.map(({student}) => student.id)).size,
+      averageNet: records.length ? Number((records.reduce((sum,{exam})=>sum+exam.toplam.net,0)/records.length).toFixed(2)) : 0 };
+  }).filter((item) => item.count > 0), [archiveClasses, archivedResults]);
+
   const classPracticeAnalysis = useMemo(() => summarizePracticeForAnalysis(analyticsPracticeExams), [analyticsPracticeExams]);
   const analyticsSubjectBreakdown = useMemo(
     () => calculateSubjectAverages(analyticsGrades),
     [analyticsGrades]
   );
   const classComparisonData = useMemo(() => {
-    return classes.map((cls, index) => {
+    return classes.filter((cls) => grades.some((g) => g.classId === cls.id) || practiceExams.some((p) => p.classId === cls.id)).map((cls, index) => {
       const clsGrades = grades.filter((g) => g.classId === cls.id);
       const clsStudents = students.filter((s) => s.classId === cls.id);
       return {
@@ -212,7 +238,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
         examCount: clsGrades.length,
       };
     });
-  }, [classes, grades, students]);
+  }, [classes, grades, students, practiceExams]);
 
   // Student Role View: privacy-safe personal view
   if (workspaceView === 'student') {
@@ -857,7 +883,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                 className="px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200"
               >
                 <option value="all">Tüm Sınıflar</option>
-                {classes.map((c) => (
+                {classes.filter((c) => grades.some((g) => g.classId === c.id) || practiceExams.some((p) => p.classId === c.id)).map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name}
                   </option>
@@ -1063,6 +1089,41 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
       {activeTab === 'analytics' && (
         <div className="space-y-6">
+          <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+            <div className="flex flex-wrap items-center justify-between gap-3">
+              <div>
+                <h2 className="text-lg font-semibold">Deneme Arşivi Başarı Analizi</h2>
+                <p className="mt-1 text-sm text-slate-600 dark:text-slate-300">Deneme Analizi bölümüne yüklenen gerçek sonuçlardan oluşturulur.</p>
+              </div>
+              <button type="button" onClick={() => { setArchiveReport(loadArchiveState(user?.uid ?? 'demo')); setArchiveClassFilter('all'); }}
+                className="min-h-10 rounded-lg border border-slate-300 px-4 text-sm font-medium dark:border-slate-700">Verileri Yenile</button>
+            </div>
+            <label className="mt-4 flex flex-wrap items-center gap-2 text-sm">Deneme sınıfı:
+              <select value={archiveClassFilter} onChange={(event) => setArchiveClassFilter(event.target.value)}
+                className="min-h-10 rounded-lg border border-slate-300 bg-white px-3 dark:border-slate-700 dark:bg-slate-900">
+                <option value="all">Verisi Olan Tüm Sınıflar</option>
+                {archiveClasses.map((name) => <option key={name} value={name}>{name}</option>)}
+              </select>
+            </label>
+            {filteredArchiveResults.length ? <>
+              <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+                {[
+                  ['Öğrenci', new Set(filteredArchiveResults.map(({student}) => student.id)).size],
+                  ['Deneme Sonucu', filteredArchiveResults.length],
+                  ['Ortalama Net', (filteredArchiveResults.reduce((a,{exam})=>a+exam.toplam.net,0)/filteredArchiveResults.length).toFixed(2)],
+                  ['Ortalama LGS Puanı', (filteredArchiveResults.reduce((a,{exam})=>a+exam.lgsPuan,0)/filteredArchiveResults.length).toFixed(2)],
+                ].map(([label,value]) => <div key={label} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-xs text-slate-500 dark:text-slate-300">{label}</p><p className="mt-2 text-xl font-semibold tabular-nums">{value}</p></div>)}
+              </div>
+              <div className="mt-6 grid gap-6 lg:grid-cols-2">
+                <div><h3 className="mb-3 font-semibold">Ders Ders Ortalama Net</h3><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={archivedSubjectStats} margin={{top:10,right:10,bottom:55,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="subject" angle={-35} textAnchor="end" interval={0} height={75} tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="average" name="Ortalama Net" fill="#0f766e" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div></div>
+                <div><h3 className="mb-3 font-semibold">Deneme Deneme Ortalama Net</h3><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={archivedExamStats} margin={{top:10,right:10,bottom:45,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="order" tick={{fontSize:11}} label={{value:'Deneme sırası',position:'insideBottom',offset:-5}}/><YAxis/><Tooltip labelFormatter={(value) => archivedExamStats.find((e)=>e.order===Number(value))?.name ?? String(value)}/><Bar dataKey="averageNet" name="Ortalama Net" fill="#2563eb" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div></div>
+              </div>
+              <h3 className="mt-5 font-semibold">Deneme Bazında Ayrıntılı Sonuçlar</h3>
+              <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b"><th className="py-2">Deneme</th><th>Sonuç</th><th>Ort. Net</th><th>Ort. LGS</th></tr></thead><tbody>{archivedExamStats.map((item)=><tr key={item.id} className="border-b border-slate-100 dark:border-slate-800"><td className="py-2 pr-3">{item.name}</td><td>{item.count}</td><td>{item.averageNet}</td><td>{item.averageLgs}</td></tr>)}</tbody></table></div>
+              <h3 className="mt-5 font-semibold">Verisi Bulunan Sınıflar</h3>
+              <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[440px] text-left text-sm"><thead><tr className="border-b"><th className="py-2">Sınıf</th><th>Öğrenci</th><th>Sonuç</th><th>Ort. Net</th></tr></thead><tbody>{archivedClassStats.filter((item)=>archiveClassFilter==='all'||item.name===archiveClassFilter).map((item)=><tr key={item.name} className="border-b border-slate-100 dark:border-slate-800"><td className="py-2">{item.name}</td><td>{item.studentCount}</td><td>{item.count}</td><td>{item.averageNet}</td></tr>)}</tbody></table></div>
+            </> : <p className="mt-4 text-sm text-slate-600 dark:text-slate-300">Deneme Analizi arşivinde bu kapsamda sonuç bulunmuyor. Deneme yükledikten sonra Verileri Yenile'ye basın.</p>}
+          </section>
           <div className="flex flex-wrap items-center justify-between gap-3 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 no-print">
             <div className="flex items-center gap-3">
               <label htmlFor="analytics-cls" className="text-xs font-medium text-slate-600 dark:text-slate-300">
@@ -1087,7 +1148,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               </select>
             </div>
 
-            <div className="control-grid gap-2 sm:max-w-sm">
+            <div className="grid w-full grid-cols-2 gap-2">
               <button
                 type="button"
                 onClick={() => void handleRunClassAI()}
@@ -1130,7 +1191,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               </div>
               <button type="button" onClick={() => exportToCsv('sinif_basari_raporu',
                 ['Sınıf', 'Öğrenci', 'Yazılı Kaydı', 'Yazılı Ortalaması', 'Deneme Sonucu', 'Deneme Ortalama Net'],
-                classes.filter((cls) => analyticsClassId === 'all' || cls.id === analyticsClassId).map((cls) => {
+                classes.filter((cls) => (analyticsClassId === 'all' || cls.id === analyticsClassId) && (grades.some((g) => g.classId === cls.id) || practiceExams.some((p) => p.classId === cls.id))).map((cls) => {
                   const cg = grades.filter((g) => g.classId === cls.id);
                   const cp = practiceExams.filter((p) => p.classId === cls.id);
                   return [cls.name, students.filter((stu) => stu.classId === cls.id).length, cg.length,
