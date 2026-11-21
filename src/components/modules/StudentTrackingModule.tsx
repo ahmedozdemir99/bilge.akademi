@@ -532,10 +532,14 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             <button
               type="button"
               onClick={() => {
+                if (students.length === 0) {
+                  setActiveTab('bulk');
+                  return;
+                }
                 setEditingGrade(null);
                 setGradeModalOpen(true);
               }}
-              disabled={students.length === 0}
+              title={students.length === 0 ? 'Önce öğrenci ekleyin: toplu giriş ekranı açılır.' : 'Öğrenci notu gir'}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
             >
               <Plus className="w-3.5 h-3.5 text-gold-600 dark:text-gold-400" />
