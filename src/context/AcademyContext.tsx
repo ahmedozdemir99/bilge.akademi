@@ -46,6 +46,7 @@ import type {
   UserProfile,
   WorkspaceView,
 } from '../types/academy';
+import { firestoreIssue, firestoreIssueMessage, type FirestoreIssue } from '../utils/firestoreStatus';
 import { computePracticeExamTotals } from '../utils/exportUtils';
 import { buildBulkPlan, bulkRecordId, type BulkInput } from '../utils/bulkStudentRecords';
 
@@ -185,6 +186,10 @@ export interface MathAttemptInput {
   hintsUsed: number;
 }
 
+const teacherCollections = ['classes', 'students', 'grades', 'attendance', 'practiceExams'] as const;
+type TeacherCollection = typeof teacherCollections[number];
+type CloudStatus = 'loading' | 'ready' | FirestoreIssue;
+
 type GoogleSignInHelp = 'browser' | 'connection' | 'popup' | 'storage';
 
 interface AcademyContextValue {
@@ -229,7 +234,10 @@ interface AcademyContextValue {
   mathAttempts: MathAttemptSummary[];
   aiConversations: AIConversation[];
   dataLoading: boolean;
-  rosterLoadError: string | null;
+  teacherCloudStatus: CloudStatus;
+  profileIssue: FirestoreIssue | null;
+  retryTeacherData: () => void;
+  retryProfile: () => void;
 
   // CRUD Actions
   addClass: (input: ClassInput) => Promise<void>;
@@ -291,8 +299,16 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const [signInOpen, setSignInOpen] = useState(false);
   const [googleSignInHelp, setGoogleSignInHelp] = useState<GoogleSignInHelp | null>(null);
   const googleSignInPending = useRef(false);
-  const [dataLoading, setDataLoading] = useState(false);
-  const [rosterLoadError, setRosterLoadError] = useState<string | null>(null);
+  const [profileIssue, setProfileIssue] = useState<FirestoreIssue | null>(null);
+  const [profileRevision, setProfileRevision] = useState(0);
+  const retryProfile = useCallback(() => setProfileRevision((value) => value + 1), []);
+  const [teacherRevision, setTeacherRevision] = useState(0);
+  const retryTeacherData = useCallback(() => setTeacherRevision((value) => value + 1), []);
+  const [teacherSync, setTeacherSync] = useState<{
+    uid: string;
+    revision: number;
+    statuses: Partial<Record<TeacherCollection, CloudStatus>>;
+  } | null>(null);
 
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     try {
@@ -331,6 +347,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     ? demoView
     : isTeacherAccount ? teacherAccountView : 'student';
   const activeModule = isModuleAvailable(selectedModule, workspaceView) ? selectedModule : 'home';
+  const teacherStatuses = teacherSync?.uid === user?.uid && teacherSync?.revision === teacherRevision
+    ? teacherSync.statuses : {};
+  const teacherStates = teacherCollections.map((name) => teacherStatuses[name] ?? 'loading');
+  const teacherCloudStatus: CloudStatus = isDemoMode ? 'ready'
+    : teacherStates.find((status) => status === 'quota')
+      ?? teacherStates.find((status) => status !== 'ready' && status !== 'loading')
+      ?? (teacherStates.every((status) => status === 'ready') ? 'ready' : 'loading');
+  const dataLoading = teacherCloudStatus !== 'ready';
 
   const setActiveModule = useCallback((module: ModuleId) => {
     if (!isModuleAvailable(module, workspaceView)) return;
@@ -376,7 +400,6 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const persistUserSettings = useCallback(
     async (nextTheme: ThemeMode, nextView: WorkspaceView, nextCompact: boolean) => {
       if (!user) return;
-      const settingsPath = `userSettings/${user.uid}`;
       try {
         await setDoc(
           doc(db, 'userSettings', user.uid),
@@ -390,10 +413,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           { merge: false }
         );
       } catch (error) {
-        handleFirestoreError(error, OperationType.WRITE, settingsPath);
+        notify('info', 'Bulut tercihleri kaydedilemedi', firestoreIssueMessage[firestoreIssue(error)]);
       }
     },
-    [user]
+    [notify, user]
   );
 
   const setTheme = useCallback(
@@ -412,7 +435,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     (next: WorkspaceView) => {
       if (authLoading) return;
       if (!isDemoMode && !isTeacherAccount) {
-        notify('warning', 'Öğretmen yetkisi gerekli', 'Öğretmen görünümü için yetkili bir hesapla giriş yapın.');
+        notify('info', 'Öğretmen yetkisi gerekli', 'Öğretmen görünümü için yetkili bir hesapla giriş yapın.');
         return;
       }
       if (isDemoMode) setDemoView(next);
@@ -442,6 +465,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       const revision = ++authRevision;
       setProfile(null);
+      setProfileIssue(null);
       if (!firebaseUser?.emailVerified) {
         setUser(null);
         setAuthLoading(false);
@@ -496,8 +520,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
             email: firebaseUser.email ?? undefined,
           });
         }
+      } catch (error) {
+        if (revision === authRevision) setProfileIssue(firestoreIssue(error));
+      } finally {
+        if (revision === authRevision) setAuthLoading(false);
+      }
 
-        // Load saved user settings if present
+      if (revision !== authRevision || auth.currentUser?.uid !== firebaseUser.uid) return;
+      try {
         const settingsSnap = await getDoc(doc(db, 'userSettings', firebaseUser.uid));
         if (revision !== authRevision) return;
         if (settingsSnap.exists()) {
@@ -510,9 +540,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           }
         }
       } catch (error) {
-        console.error('Profil yüklenirken hata:', error);
-      } finally {
-        if (revision === authRevision) setAuthLoading(false);
+        console.warn('Bulut tercihleri yüklenemedi:', firestoreIssue(error));
       }
     });
 
@@ -520,114 +548,82 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       authRevision += 1;
       unsubscribe();
     };
-  }, []);
+  }, [profileRevision]);
 
-  // Firestore real-time subscriptions (only when signed in)
   useEffect(() => {
-    if (!user) {
-      setCloudClasses([]);
-      setCloudStudents([]);
-      setCloudGrades([]);
-      setCloudAttendance([]);
-      setCloudPracticeExams([]);
-      setCloudPoems([]);
-      setCloudQuizAttempts([]);
-      setCloudMathAttempts([]);
-      setCloudAIConversations([]);
-      setDataLoading(false);
-      setRosterLoadError(null);
-      return;
+    if (!user || !isTeacherAccount) return;
+    const uid = user.uid;
+    let active = true;
+    const statuses: Partial<Record<TeacherCollection, CloudStatus>> = {};
+    const updateStatus = (name: TeacherCollection, status: CloudStatus) => {
+      if (!active || statuses[name] === status) return;
+      statuses[name] = status;
+      setTeacherSync({ uid, revision: teacherRevision, statuses: { ...statuses } });
+    };
+
+    function watch<T extends { id: string }>(
+      name: TeacherCollection,
+      setItems: (items: T[]) => void,
+      compare: (a: T, b: T) => number,
+    ) {
+      return onSnapshot(
+        query(collection(db, name), where('teacherId', '==', uid)),
+        { includeMetadataChanges: true },
+        (snapshot) => {
+          if (!active) return;
+          if (snapshot.metadata.fromCache) {
+            if (!navigator.onLine) updateStatus(name, 'offline');
+            else if (statuses[name] === 'ready') updateStatus(name, 'unavailable');
+            return;
+          }
+          const items = snapshot.docs.map((record) => ({ ...record.data(), id: record.id } as T));
+          setItems(items.sort(compare));
+          updateStatus(name, 'ready');
+        },
+        (error) => updateStatus(name, firestoreIssue(error)),
+      );
     }
 
-    setRosterLoadError(null);
-    setDataLoading(true);
+    const unsubscribers = [
+      watch<SchoolClass>('classes', setCloudClasses, (a, b) => a.name.localeCompare(b.name, 'tr')),
+      watch<Student>('students', setCloudStudents, (a, b) => a.fullName.localeCompare(b.fullName, 'tr')),
+      watch<Grade>('grades', setCloudGrades, (a, b) => b.examDate.localeCompare(a.examDate)),
+      watch<AttendanceRecord>('attendance', setCloudAttendance, (a, b) => b.date.localeCompare(a.date)),
+      watch<PracticeExamRecord>('practiceExams', setCloudPracticeExams, (a, b) => b.examDate.localeCompare(a.examDate)),
+    ];
+    const timeout = window.setTimeout(() => {
+      for (const name of teacherCollections) {
+        if (!statuses[name]) updateStatus(name, navigator.onLine ? 'unavailable' : 'offline');
+      }
+    }, 12000);
+
+    return () => {
+      active = false;
+      window.clearTimeout(timeout);
+      unsubscribers.forEach((unsubscribe) => unsubscribe());
+    };
+  }, [isTeacherAccount, teacherRevision, user]);
+
+  useEffect(() => {
+    setCloudClasses([]);
+    setCloudStudents([]);
+    setCloudGrades([]);
+    setCloudAttendance([]);
+    setCloudPracticeExams([]);
+    setCloudPoems([]);
+    setCloudQuizAttempts([]);
+    setCloudMathAttempts([]);
+    setCloudAIConversations([]);
+    setTeacherSync(null);
+    if (!user) return;
     const uid = user.uid;
-    let classesReady = false;
-    let studentsReady = false;
-    const markReady = () => {
-      if (classesReady && studentsReady) setDataLoading(false);
-    };
-    const rosterError = (collectionName: string, err: Error) => {
-      setRosterLoadError(`${collectionName} kayıtları yüklenemedi. İnternet bağlantınızı, Google oturumunuzu ve Firebase erişim izinlerini kontrol edip sayfayı yenileyin. (${err.message})`);
-      setDataLoading(false);
-      handleFirestoreError(err, OperationType.LIST, collectionName);
-    };
-
-    const unsubClasses = onSnapshot(
-      query(collection(db, 'classes'), where('teacherId', '==', uid)),
-      (snap) => {
-        const list: SchoolClass[] = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<SchoolClass, 'id'>),
-        }));
-        list.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
-        setCloudClasses(list);
-        classesReady = true;
-        markReady();
-      },
-      (err) => rosterError('Sınıf', err)
-    );
-
-    const unsubStudents = onSnapshot(
-      query(collection(db, 'students'), where('teacherId', '==', uid)),
-      (snap) => {
-        const list: Student[] = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Student, 'id'>),
-        }));
-        list.sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr'));
-        setCloudStudents(list);
-        studentsReady = true;
-        markReady();
-      },
-      (err) => rosterError('Öğrenci', err)
-    );
-
-    const unsubGrades = onSnapshot(
-      query(collection(db, 'grades'), where('teacherId', '==', uid)),
-      (snap) => {
-        const list: Grade[] = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<Grade, 'id'>),
-        }));
-        list.sort((a, b) => b.examDate.localeCompare(a.examDate));
-        setCloudGrades(list);
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'grades')
-    );
-
-    const unsubAttendance = onSnapshot(
-      query(collection(db, 'attendance'), where('teacherId', '==', uid)),
-      (snap) => {
-        const list: AttendanceRecord[] = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<AttendanceRecord, 'id'>),
-        }));
-        list.sort((a, b) => b.date.localeCompare(a.date));
-        setCloudAttendance(list);
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'attendance')
-    );
-
-    const unsubPracticeExams = onSnapshot(
-      query(collection(db, 'practiceExams'), where('teacherId', '==', uid)),
-      (snap) => {
-        const list: PracticeExamRecord[] = snap.docs.map((d) => ({
-          id: d.id,
-          ...(d.data() as Omit<PracticeExamRecord, 'id'>),
-        }));
-        list.sort((a, b) => b.examDate.localeCompare(a.examDate));
-        setCloudPracticeExams(list);
-      },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'practiceExams')
-    );
 
     const unsubPoems = onSnapshot(
       query(collection(db, 'poems'), where('ownerId', '==', uid)),
       (snap) => {
         setCloudPoems(snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<PoemSummary, 'id'>) })));
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'poems')
+      (error) => console.warn('poems:', firestoreIssue(error))
     );
 
     const unsubQuizzes = onSnapshot(
@@ -637,7 +633,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<QuizAttemptSummary, 'id'>) }))
         );
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'quizAttempts')
+      (error) => console.warn('quizAttempts:', firestoreIssue(error))
     );
 
     const unsubMath = onSnapshot(
@@ -647,7 +643,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<MathAttemptSummary, 'id'>) }))
         );
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'mathAttempts')
+      (error) => console.warn('mathAttempts:', firestoreIssue(error))
     );
 
     const unsubAI = onSnapshot(
@@ -657,15 +653,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           snap.docs.map((d) => ({ id: d.id, ...(d.data() as Omit<AIConversation, 'id'>) }))
         );
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'aiConversations')
+      (error) => console.warn('aiConversations:', firestoreIssue(error))
     );
 
     return () => {
-      unsubClasses();
-      unsubStudents();
-      unsubGrades();
-      unsubAttendance();
-      unsubPracticeExams();
       unsubPoems();
       unsubQuizzes();
       unsubMath();
@@ -695,7 +686,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     setGoogleSignInHelp(null);
     try {
       await signInWithPopup(auth, googleProvider);
-      notify('success', 'Oturum açıldı', 'Bulut hesabınız etkin.');
+      notify('success', 'Google oturumu açıldı');
     } catch (error) {
       const code = (error as { code?: string } | null)?.code ?? '';
       switch (code) {
@@ -778,10 +769,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   );
 
   const saveBulkRecords = useCallback(async (input: BulkInput) => {
-    if (rosterLoadError) throw new Error(rosterLoadError);
-    if (workspaceView !== 'teacher' || authLoading || (user && dataLoading)) {
+    if (workspaceView !== 'teacher' || authLoading || teacherCloudStatus === 'loading') {
       throw new Error('Kayıtların yüklenmesini bekleyin ve öğretmen görünümünden tekrar deneyin.');
     }
+    if (user && teacherCloudStatus !== 'ready') throw new Error(firestoreIssueMessage[teacherCloudStatus]);
     if (user && !navigator.onLine) throw new Error('Buluta kaydetmek için internet bağlantınızı kontrol edin.');
     const teacherId = user?.uid ?? DEMO_TEACHER_ID;
     const snapshot = user
@@ -838,6 +829,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       try {
         await batch.commit();
       } catch (error) {
+        const code = (error as { code?: string } | null)?.code;
+        if (code && !['aborted', 'deadline-exceeded', 'failed-precondition', 'internal', 'permission-denied', 'unavailable', 'unknown'].includes(code)) throw error;
         // A retry after an interrupted response may find the same deterministic IDs already saved.
         const matches = await Promise.all(entries.map(async (entry) => {
           try {
@@ -869,10 +862,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         }
       }
       return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved };
-    } catch {
-      return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved, error: 'Bulut kaydı tamamlanamadı. Bağlantınızı kontrol edip aynı listeyi tekrar kaydedebilirsiniz.' };
+    } catch (error) {
+      return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved, error: firestoreIssueMessage[firestoreIssue(error)] };
     }
-  }, [authLoading, cloudClasses, cloudGrades, cloudPracticeExams, cloudStudents, dataLoading, demoStore, rosterLoadError, user, workspaceView]);
+  }, [authLoading, cloudClasses, cloudGrades, cloudPracticeExams, cloudStudents, demoStore, teacherCloudStatus, user, workspaceView]);
 
   // --- CRUD: Classes ---
   const addClass = useCallback(
@@ -1726,7 +1719,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         'Sınıflar, öğrenciler, notlar ve LGS deneme kayıtları Firestore veritabanına eklendi.'
       );
     } catch (error) {
-      handleFirestoreError(error, OperationType.WRITE, 'seedDemoToFirestore');
+      notify('error', 'Örnek kayıtlar yüklenemedi', firestoreIssueMessage[firestoreIssue(error)]);
     }
   }, [notify, user]);
 
@@ -1786,7 +1779,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       mathAttempts: isDemoMode ? demoStore.mathAttempts : cloudMathAttempts,
       aiConversations: isDemoMode ? demoStore.aiConversations : cloudAIConversations,
       dataLoading,
-      rosterLoadError,
+      teacherCloudStatus,
+      profileIssue,
+      retryTeacherData,
+      retryProfile,
       addClass,
       updateClass,
       deleteClass,
@@ -1835,7 +1831,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       cloudStudents,
       compactMode,
       dataLoading,
-      rosterLoadError,
+      teacherCloudStatus,
+      profileIssue,
+      retryTeacherData,
+      retryProfile,
       deleteAttendance,
       deleteClass,
       deleteGrade,

@@ -6,8 +6,10 @@ interface State {
   errorMessage: string;
 }
 
-export class ErrorBoundary extends React.Component<{ children: React.ReactNode }, State> {
-  constructor(props: { children: React.ReactNode }) {
+type Props = { children: React.ReactNode; embedded?: boolean };
+
+export class ErrorBoundary extends React.Component<Props, State> {
+  constructor(props: Props) {
     super(props);
     this.state = { hasError: false, errorMessage: '' };
   }
@@ -44,7 +46,7 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
   render(): React.ReactNode {
     if (this.state.hasError) {
       return (
-        <div className="min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6">
+        <div role="alert" className={this.props.embedded ? "flex justify-center py-6" : "min-h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-950 p-6"}>
           <div className="max-w-lg w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-8">
             <div className="flex items-center gap-3 text-red-700 dark:text-red-400 mb-4">
               <AlertTriangle className="w-6 h-6 shrink-0" />

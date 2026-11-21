@@ -34,6 +34,7 @@ export function AIAssistantModule() {
     assistantInitialContext,
     workspaceView,
     aiConversations,
+    notify,
     saveAIConversationSummary,
   } = useAcademy();
 
@@ -129,7 +130,7 @@ export function AIAssistantModule() {
         trimmed.slice(0, 80),
         trimmed,
         replyText
-      );
+      ).catch(() => notify('info', 'Sohbet geçmişe kaydedilemedi'));
     } catch {
       setMessages((prev) => prev.filter((message) => message.id !== userMsg.id));
       setInput((current) => current || trimmed);
