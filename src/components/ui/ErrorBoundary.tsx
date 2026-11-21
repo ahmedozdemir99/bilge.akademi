@@ -30,21 +30,12 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
     } catch {
       friendly = error.message || friendly;
     }
-    if (/Failed to fetch dynamically imported module|Importing a module script failed|ChunkLoadError|Loading chunk/i.test(error.message)) {
-      friendly = 'Yeni sürüme ait bir uygulama dosyası yüklenemedi. Bu genellikle yayın sırasında eski sayfanın açık kalmasından kaynaklanır. Aşağıdaki Güncel Sürümü Aç düğmesini kullanın.';
-    }
     return { hasError: true, errorMessage: friendly };
   }
 
   componentDidCatch(error: Error): void {
     console.error('Bilge Akademi Hata Yakalayıcı:', error);
   }
-
-  handleFreshReload = (): void => {
-    const url = new URL(window.location.href);
-    url.searchParams.set('surum', Date.now().toString());
-    window.location.replace(url.toString());
-  };
 
   handleReset = (): void => {
     this.setState({ hasError: false, errorMessage: '' });
@@ -73,10 +64,10 @@ export class ErrorBoundary extends React.Component<{ children: React.ReactNode }
               </button>
               <button
                 type="button"
-                onClick={this.handleFreshReload}
+                onClick={() => window.location.reload()}
                 className="px-4 py-2.5 text-sm font-medium rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-50 dark:hover:bg-slate-800 transition-colors cursor-pointer"
               >
-                Güncel Sürümü Aç
+                Sayfayı Yenile
               </button>
             </div>
           </div>
