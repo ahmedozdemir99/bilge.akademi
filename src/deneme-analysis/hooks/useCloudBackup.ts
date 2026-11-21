@@ -17,10 +17,26 @@ function actualRecords(archive: ExamArchiveState): ExamArchiveState {
 }
 
 function errorText(issue: unknown) {
-  const code = (issue as { code?: string } | null)?.code;
-  if (code === 'permission-denied') return 'Deneme Analiz yedeğine erişilemedi. Doğrulanmış Bilge Akademi hesabınızla tekrar deneyin.';
-  if (code === 'resource-exhausted') return 'Firebase kotası doldu. Arşivinizi JSON dosyası olarak indirebilirsiniz.';
-  return issue instanceof Error && !code ? issue.message : 'Firebase’e ulaşılamadı. Arşiviniz bu tarayıcıda duruyor.';
+  const code = issue && typeof issue === 'object' && 'code' in issue && typeof issue.code === 'string'
+    ? issue.code
+    : undefined;
+  switch (code) {
+    case 'auth/unauthorized-domain':
+      return `Google girişi ${window.location.hostname} için kullanılamıyor. Bilge Akademi’ye e-posta ile giriş yapıp tekrar deneyin.`;
+    case 'auth/user-token-expired':
+    case 'unauthenticated':
+      return 'Oturumunuzun süresi doldu. Bilge Akademi’ye yeniden giriş yapıp tekrar deneyin.';
+    case 'permission-denied':
+      return 'Deneme Analiz yedeğine erişilemedi. Doğrulanmış Bilge Akademi hesabınızla yeniden giriş yapın.';
+    case 'resource-exhausted':
+      return 'Firebase kullanım sınırına ulaşıldı. Arşivinizi JSON dosyası olarak indirebilirsiniz.';
+    case 'auth/network-request-failed':
+    case 'deadline-exceeded':
+    case 'unavailable':
+      return 'Firebase bağlantısı kesildi. Arşiviniz bu tarayıcıda duruyor. Bağlantınızı kontrol edip tekrar deneyin.';
+    default:
+      return issue instanceof Error && !code ? issue.message : 'Firebase yedekleme işlemi tamamlanamadı. Arşiviniz bu tarayıcıda duruyor.';
+  }
 }
 
 export function useCloudBackup(user: User | null, archive: ExamArchiveState, onRestore: (archive: ExamArchiveState) => void) {

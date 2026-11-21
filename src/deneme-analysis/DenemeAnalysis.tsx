@@ -1,4 +1,4 @@
-// Embedded from ahmedozdemir99/Deneme.analiz at 2784c42.
+// Embedded from ahmedozdemir99/Deneme.analiz at 946a3e408eda48fc5e6b030e856a8beb531487ef.
 import React, { useCallback, useMemo, useRef, useState } from 'react';
 import {
   FileUp,
@@ -258,7 +258,10 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
                   <button type="button" className="appearance-option" disabled={cloud.busy} onClick={() => void cloud.save().then((saved) => { if (saved) void signOutUser(); })}>Yedekle ve Çıkış Yap</button>
                 </div>
               ) : (
-                <button type="button" className="appearance-option" onClick={() => setSignInOpen(true)}>Yedekleme İçin Giriş Yap</button>
+                <div className="space-y-2">
+                  <button type="button" className="appearance-option" onClick={() => setSignInOpen(true)}>Yedekleme İçin Giriş Yap</button>
+                  <p className="text-sm text-slate-600">Google girişinde sorun yaşarsanız Bilge Akademi hesabınıza e-postayla giriş yapabilirsiniz.</p>
+                </div>
               )}
               {cloud.status && <p role="status" className="text-sm text-teal-700 dark:text-teal-300">{cloud.status}</p>}
               {(cloud.busy || cloud.progress !== null) && <div role="status" aria-live="polite" className="space-y-2">
