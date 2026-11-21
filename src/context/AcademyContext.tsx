@@ -302,6 +302,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     return 'light';
   });
   const [demoView, setDemoView] = useState<WorkspaceView>('teacher');
+  const [teacherAccountView, setTeacherAccountView] = useState<WorkspaceView>('teacher');
   const [compactMode, setCompactModeState] = useState<boolean>(false);
 
   // Demo state (used when signed out)
@@ -325,7 +326,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     && (profile.role === 'teacher' || profile.role === 'admin');
   const workspaceView: WorkspaceView = isDemoMode && !authLoading
     ? demoView
-    : isTeacherAccount ? 'teacher' : 'student';
+    : isTeacherAccount ? teacherAccountView : 'student';
   const activeModule = isModuleAvailable(selectedModule, workspaceView) ? selectedModule : 'home';
 
   const setActiveModule = useCallback((module: ModuleId) => {
@@ -406,8 +407,13 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const setWorkspaceView = useCallback(
     (next: WorkspaceView) => {
-      if (!isDemoMode || authLoading) return;
-      setDemoView(next);
+      if (authLoading) return;
+      if (!isDemoMode && !isTeacherAccount) {
+        notify('warning', 'Öğretmen yetkisi gerekli', 'Öğretmen görünümü için yetkili bir hesapla giriş yapın.');
+        return;
+      }
+      if (isDemoMode) setDemoView(next);
+      else setTeacherAccountView(next);
       notify(
         'info',
         next === 'teacher' ? 'Öğretmen Görünümü Aktif' : 'Öğrenci Görünümü Aktif',
@@ -416,7 +422,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           : 'Öğrenci odaklı çalışma, takip ve yapay zekâ rehberlik görünümüne geçildi.'
       );
     },
-    [authLoading, isDemoMode, notify]
+    [authLoading, isDemoMode, isTeacherAccount, notify]
   );
 
   const setCompactMode = useCallback(
