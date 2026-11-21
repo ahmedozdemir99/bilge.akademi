@@ -322,8 +322,9 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const isDemoMode = !user;
-  const isTeacherAccount = user !== null && profile?.uid === user.uid
-    && (profile.role === 'teacher' || profile.role === 'admin' || (user.emailVerified && user.email === 'ahmedkadiri99@gmail.com'));
+  const isBootstrapAdmin = user?.emailVerified === true && user.email?.trim().toLowerCase() === 'ahmedkadiri99@gmail.com';
+  const isTeacherAccount = isBootstrapAdmin || (user !== null && profile?.uid === user.uid
+    && (profile.role === 'teacher' || profile.role === 'admin'));
   const workspaceView: WorkspaceView = isDemoMode && !authLoading
     ? demoView
     : isTeacherAccount ? teacherAccountView : 'student';
@@ -453,7 +454,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         const snap = await getDoc(userRef);
         if (revision !== authRevision) return;
         const safeName = (firebaseUser.displayName || 'Bilge Kullanıcı').trim().slice(0, 100);
-        const isBootstrappedAdmin = firebaseUser.email === 'ahmedkadiri99@gmail.com';
+        const isBootstrappedAdmin = firebaseUser.emailVerified && firebaseUser.email?.trim().toLowerCase() === 'ahmedkadiri99@gmail.com';
 
         if (!snap.exists()) {
           await setDoc(userRef, {
