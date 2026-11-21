@@ -1,12 +1,14 @@
 import { CLASS_KINDS, classKind, encodeClassFocus, type ClassKind } from '../utils/classKinds';
 import { useMemo, useRef, useState } from 'react';
-import { BarChart3, FileUp } from 'lucide-react';
+import { BarChart3, CloudDownload, CloudUpload, FileUp } from 'lucide-react';
 import { useAcademy } from '../context/AcademyContext';
 import { DEMO_TEACHER_ID } from '../data/demoData';
 import { buildBulkPlan, bulkHeaders, publishedTrialKey, type BulkInput, type BulkPlan } from '../utils/bulkStudentRecords';
 import { importSheetWidth, inspectTrialPdf, readImportWorkbook, readPdfImport, readTrialPdfResults, type ImportSheet } from '../utils/bulkRecordFiles';
 import { trialRosterDrafts } from '../utils/trialRosterImport';
 import { calculateNet, computePracticeExamTotals, LGS_SUBJECT_CONFIG } from '../utils/exportUtils';
+
+import { connectTrialDrive, downloadTrialCloudFile, listTrialCloudFiles, readTrialBackupSettings, TrialDriveError, uploadTrialCloudFile, type TrialCloudFile } from '../utils/trialCloudFiles';
 
 const inputClass = 'w-full rounded-lg border border-slate-300 bg-white px-3 py-2.5 text-base text-slate-900 dark:border-slate-700 dark:bg-slate-950 dark:text-white';
 const primary = 'inline-flex min-h-11 items-center gap-2 rounded-lg bg-teal-700 px-4 py-2 font-semibold text-white hover:bg-teal-800 disabled:opacity-50';
@@ -26,7 +28,11 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
   const [wrongPenalty, setWrongPenalty] = useState<3 | 4>(3);
   const [classId, setClassId] = useState(initialClass);
   const [kind, setKind] = useState<ClassKind>(() => classKind(classes.find(({ id }) => id === initialClass) ?? {}));
-  const [filename, setFilename] = useState('');
+  const [sourceFile, setSourceFile] = useState<File>();
+  const [cloudFiles, setCloudFiles] = useState<{ owner: string; files: TrialCloudFile[] }>();
+  const [cloudMessage, setCloudMessage] = useState('');
+  const driveSession = useRef<{ owner: string; token: string } | undefined>(undefined);
+
   const kindClasses = useMemo(() => classes.filter((item) => classKind(item) === kind), [classes, kind]);
   const [progress, setProgress] = useState('');
   const [busy, setBusy] = useState(false);
@@ -72,6 +78,7 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
     try {
       await action();
     } catch (issue) {
+      if (issue instanceof TrialDriveError && issue.status === 401) driveSession.current = undefined;
       setError(issue instanceof Error ? issue.message : 'İşlem tamamlanamadı.');
     } finally {
       setProgress('');
@@ -82,33 +89,54 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
 
   async function readPages(file: File, pages: string) {
     setSheets([]);
+    setReadSelection('');
     setSavedCount(undefined);
     setAddMissing(false);
     setSheets(await readPdfImport(file, pages, false, setProgress, true));
     setReadSelection(pages);
   }
 
-  function open(file: File) {
-    void run(async () => {
-      setPdf(undefined);
-      setSheets([]);
-      setSavedCount(undefined);
-      setProgress('PDF açılıyor…');
-      setFilename(file.name);
-      setTitle(file.name.replace(/\.(pdf|xlsx|csv|tsv)$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 120));
-      setDate(/\b\d{4}-\d{2}-\d{2}\b/.exec(file.name)?.[0] ?? '');
-      if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
-        setAddMissing(false);
-        setProgress('Tablo okunuyor…');
-        setSheets(await readImportWorkbook(file, setProgress));
-        return;
-      }
-      const { count, schoolPages } = await inspectTrialPdf(file);
-      const preset = /^\d+$/.test(requestedPage) && Number(requestedPage) >= 1 && Number(requestedPage) <= count;
-      const pages = preset ? String(Number(requestedPage)) : schoolPages || (count === 1 ? '1' : '1-' + Math.min(count, 60));
-      setPdf({ file, count, schoolPages });
-      setSelection(pages);
-      if (preset || schoolPages || count <= 60) await readPages(file, pages);
+  async function open(file: File, backup?: TrialCloudFile) {
+    setPdf(undefined);
+    setSheets([]);
+    setReadSelection('');
+    setSavedCount(undefined);
+    setSourceFile(file);
+    setCloudMessage(backup ? 'Buluttaki dosya açıldı. Eşleşen sonuçları önizlemeden kontrol edin.' : '');
+    setProgress('Dosya açılıyor…');
+    const settings = backup ? readTrialBackupSettings(backup) : {};
+    setTitle(settings.title || file.name.replace(/\.(pdf|xlsx|csv|tsv)$/i, '').replace(/[_-]+/g, ' ').trim().slice(0, 120));
+    setDate(settings.examDate || /\b\d{4}-\d{2}-\d{2}\b/.exec(file.name)?.[0] || '');
+    if (backup) {
+      const restoredClass = classes.find(({ id }) => id === settings.classId);
+      setKind(restoredClass ? classKind(restoredClass) : settings.kind ?? 'school');
+      setClassId(restoredClass?.id ?? '');
+      setWrongPenalty(settings.wrongPenalty ?? 3);
+    }
+    if (!/\.pdf$/i.test(file.name) && file.type !== 'application/pdf') {
+      setAddMissing(false);
+      setProgress('Tablo okunuyor…');
+      setSheets(await readImportWorkbook(file, setProgress));
+      return;
+    }
+    const { count, schoolPages } = await inspectTrialPdf(file);
+    const preset = /^\d+$/.test(requestedPage) && Number(requestedPage) >= 1 && Number(requestedPage) <= count;
+    const backupPages = settings.pages;
+    const pages = backupPages || (preset ? String(Number(requestedPage)) : schoolPages || (count === 1 ? '1' : '1-' + Math.min(count, 60)));
+    setPdf({ file, count, schoolPages });
+    setSelection(pages);
+    if (backupPages || preset || schoolPages || count <= 60) await readPages(file, pages);
+  }
+
+  async function cloudAction(task: (token: string, owner: string) => Promise<void>) {
+    if (!user || !authorized) return;
+    await run(async () => {
+      setCloudMessage('');
+      setProgress('Google Drive’a bağlanılıyor…');
+      const owner = user.uid;
+      const token = driveSession.current?.owner === owner ? driveSession.current.token : await connectTrialDrive(user);
+      driveSession.current = { owner, token };
+      await task(token, owner);
     });
   }
 
@@ -177,10 +205,41 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
           <label className={primary + ' cursor-pointer focus-within:outline-2'}>
             <FileUp size={18} /> PDF / Excel Yükle
             <input className="sr-only" type="file" accept=".pdf,.xlsx,.csv,.tsv,application/pdf"
-              onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) open(file); }} />
+              onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void run(() => open(file)); }} />
           </label>
-          {filename && <p className="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300">{filename}{pdf && ' · ' + pdf.count + ' sayfa'}{pdf && sheets.length > 0 && ' · Okunan sayfa ' + readSelection}</p>}
+          {sourceFile && <p className="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300">{sourceFile.name}{pdf && ' · ' + pdf.count + ' sayfa'}{pdf && sheets.length > 0 && ' · Okunan sayfa ' + readSelection}</p>}
         </div>
+        {user && <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <div className="flex flex-wrap gap-2">
+            <button type="button" className={primary} disabled={!sourceFile} onClick={() => {
+              if (!sourceFile) return;
+              void cloudAction(async (token, owner) => {
+                setProgress('Dosya Google Drive’a yükleniyor…');
+                const item = await uploadTrialCloudFile(token, sourceFile, { title, examDate: date, pages: pdf ? readSelection : '', kind, classId, wrongPenalty: penalty });
+                setCloudFiles((current) => ({ owner, files: [item, ...(current?.owner === owner ? current.files.filter(({ id }) => id !== item.id) : [])] }));
+                setCloudMessage('Dosya Google Drive’a kaydedildi.');
+              });
+            }}><CloudUpload size={17} aria-hidden="true" /> Buluta Yükle</button>
+            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
+              onClick={() => void cloudAction(async (token, owner) => {
+                setProgress('Bulut dosyaları okunuyor…');
+                setCloudFiles({ owner, files: await listTrialCloudFiles(token) });
+              })}><CloudDownload size={17} aria-hidden="true" /> Buluttan Geri Yükle</button>
+          </div>
+          <p className="text-sm text-slate-600 dark:text-slate-300">PDF ve Excel dosyaları özel Google Drive alanınızda, kaydedilen deneme sonuçları Firebase’de tutulur.</p>
+          {cloudFiles?.owner === user.uid && (cloudFiles.files.length ? (
+            <ul className="max-h-64 space-y-2 overflow-auto rounded-lg border border-slate-200 p-2 dark:border-slate-800">
+              {cloudFiles.files.map((item) => <li key={item.id}>
+                <button type="button" className="w-full break-all rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
+                  onClick={() => void cloudAction(async (token) => {
+                    setProgress('Buluttaki dosya indiriliyor…');
+                    await open(await downloadTrialCloudFile(token, item), item);
+                  })}>{item.name} <span className="text-slate-500">· {new Date(item.createdTime).toLocaleDateString('tr-TR')}</span></button>
+              </li>)}
+            </ul>
+          ) : <p className="text-sm">Bulutta deneme dosyası yok.</p>)}
+          {cloudMessage && <p role="status" className="text-sm font-medium text-teal-800 dark:text-teal-200">{cloudMessage}</p>}
+        </div>}
         {pdf && pdf.count > 1 && <details className="space-y-2" open={pdf.count > 60 && !pdf.schoolPages && sheets.length === 0 ? true : undefined}>
           <summary className="cursor-pointer text-sm font-medium underline">PDF sayfalarını seç</summary>
           <div className="flex flex-wrap items-end gap-2">
