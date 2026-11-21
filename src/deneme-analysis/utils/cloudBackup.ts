@@ -218,7 +218,7 @@ export async function loadArchiveFromCloud(uid: string): Promise<CloudLoadResult
   const manifest = createEmptyManifest(safeUid);
   let lastBackupAt: Date | null = null;
 
-  const rootSnap = await getDocFromServer(doc(db, 'users', safeUid));
+  const rootSnap = await getDocFromServer(doc(db, 'denemeArchives', safeUid));
   if (!rootSnap.exists()) {
     return {
       exists: false,
@@ -238,7 +238,7 @@ export async function loadArchiveFromCloud(uid: string): Promise<CloudLoadResult
   const students: StudentProfile[] = [];
 
   const examsQuery = query(
-    collection(db, 'users', safeUid, 'exams'),
+    collection(db, 'denemeArchives', safeUid, 'exams'),
     where('ownerId', '==', safeUid)
   );
   const examsSnap = await getDocsFromServer(examsQuery);
@@ -272,7 +272,7 @@ export async function loadArchiveFromCloud(uid: string): Promise<CloudLoadResult
   }
 
   const studentsQuery = query(
-    collection(db, 'users', safeUid, 'students'),
+    collection(db, 'denemeArchives', safeUid, 'students'),
     where('ownerId', '==', safeUid)
   );
   const studentsSnap = await getDocsFromServer(studentsQuery);
@@ -311,7 +311,7 @@ export interface CloudSyncResult {
 /**
  * Syncs the full ExamArchiveState to Firestore using minimal diff batched writes.
  * Strictly obeys firestore.rules:
- *  - Creates parent /users/{uid} first so Master Gate parentArchiveOwnedBy(uid) always passes.
+ *  - Uses dedicated /denemeArchives/{uid} documents, separate from user profiles.
  *  - Uses `set` (with createdAt + updatedAt) for new documents and `update` (preserving createdAt) for existing documents.
  *  - Retains remote records missing from the local snapshot.
  */
@@ -328,7 +328,7 @@ export async function syncArchiveToCloud(
   }
   const safeUid = sanitizeFirestoreId(uid, 'u');
   const safeDisplayName = clampString(displayName, MAX_DISPLAY_NAME_LEN, 'Kullanıcı');
-  const rootRef = doc(db, 'users', safeUid);
+  const rootRef = doc(db, 'denemeArchives', safeUid);
 
   let manifest: CloudSyncManifest;
   if (currentManifest && currentManifest.uid === safeUid) {
@@ -405,7 +405,7 @@ export async function syncArchiveToCloud(
   for (const ex of sanitizedExams) {
     nextExamHashes.set(ex.id, ex.hash);
     const prevHash = manifest.examHashes.get(ex.id);
-    const ref = doc(db, 'users', safeUid, 'exams', ex.id);
+    const ref = doc(db, 'denemeArchives', safeUid, 'exams', ex.id);
 
     if (prevHash === undefined) {
       ops.push({
@@ -437,7 +437,7 @@ export async function syncArchiveToCloud(
   for (const st of sanitizedStudents) {
     nextStudentHashes.set(st.id, st.hash);
     const prevHash = manifest.studentHashes.get(st.id);
-    const ref = doc(db, 'users', safeUid, 'students', st.id);
+    const ref = doc(db, 'denemeArchives', safeUid, 'students', st.id);
 
     if (prevHash === undefined) {
       ops.push({
