@@ -3,7 +3,7 @@ import { auth } from '../lib/firebase';
 
 const drive = 'https://www.googleapis.com/drive/v3';
 const upload = 'https://www.googleapis.com/upload/drive/v3/files';
-const fields = 'id,name,mimeType,createdTime,description';
+const fields = 'id,name,mimeType,createdTime,description,appProperties';
 const fileFilter = "trashed = false and 'appDataFolder' in parents and appProperties has { key='bilgeDeneme' and value='1' }";
 const limit = 10 * 1024 * 1024;
 
@@ -13,6 +13,7 @@ export type TrialCloudFile = {
   mimeType: string;
   createdTime: string;
   description?: string;
+  appProperties?: { kind?: string };
 };
 
 export type TrialBackupSettings = {
@@ -87,9 +88,12 @@ async function list(token: string, filter = fileFilter) {
   return files;
 }
 
-export const listTrialCloudFiles = (token: string) => list(token);
+export async function listTrialCloudFiles(token: string, kind: 'source' | 'archive' = 'source') {
+  const files = await list(token);
+  return files.filter((file) => (file.appProperties?.kind ?? 'source') === kind);
+}
 
-export async function uploadTrialCloudFile(token: string, file: File, settings: TrialBackupSettings) {
+export async function uploadTrialCloudFile(token: string, file: File, settings: TrialBackupSettings | null, kind: 'source' | 'archive' = 'source') {
   if (!file.size || file.size > limit) throw new Error('Buluta 10 MB’a kadar dosya yükleyebilirsiniz.');
   const description = JSON.stringify(settings);
   const digest = await crypto.subtle.digest('SHA-256', await new Blob([file, description]).arrayBuffer());
@@ -100,7 +104,7 @@ export async function uploadTrialCloudFile(token: string, file: File, settings: 
   const session = await request(token, upload + '?uploadType=resumable&fields=' + encodeURIComponent(fields), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json', 'X-Upload-Content-Type': mimeType },
-    body: JSON.stringify({ name: file.name, parents: ['appDataFolder'], description, appProperties: { bilgeDeneme: '1', sha256 } }),
+    body: JSON.stringify({ name: file.name, parents: ['appDataFolder'], description, appProperties: { bilgeDeneme: '1', sha256, kind } }),
   });
   const location = session.headers.get('Location');
   if (!location || new URL(location).origin !== new URL(upload).origin) throw new Error('Drive yüklemesi başlatılamadı.');

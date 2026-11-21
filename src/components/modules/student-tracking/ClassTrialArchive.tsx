@@ -1,4 +1,8 @@
-import { useMemo } from 'react';
+import { CloudUpload } from 'lucide-react';
+import { useAcademy } from '../../../context/AcademyContext';
+import { createTrialArchiveBackup, type TrialArchiveBackup } from '../../../utils/trialArchiveBackup';
+import { TrialArchiveCloud } from './TrialArchiveCloud';
+import { useMemo, useRef, useState } from 'react';
 import { Bar, BarChart, CartesianGrid, Legend, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import type { PracticeExamRecord, SchoolClass, Student } from '../../../types/academy';
 import { calculateNet, formatTurkishDate, LGS_SUBJECT_CONFIG } from '../../../utils/exportUtils';
@@ -61,6 +65,10 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
   onReports: (id: string) => void;
   onStudent: (id: string) => void;
 }) {
+  const { user } = useAcademy();
+  const [pendingBackup, setPendingBackup] = useState<{ backup: TrialArchiveBackup; owner?: string }>();
+  const [backupError, setBackupError] = useState('');
+  const backupPanel = useRef<HTMLDivElement>(null);
   const current = classes.find((item) => item.id === classId) ?? classes.find((item) => exams.some((exam) => exam.classId === item.id)) ?? classes[0];
   const groups = useMemo(() => groupClassTrials(exams.filter((item) => item.classId === current?.id)), [exams, current?.id]);
   const roster = useMemo(() => new Map(students.map((item) => [item.id, item])), [students]);
@@ -83,6 +91,10 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
       {current && <button type="button" onClick={() => onReports(current.id)}
         className="rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">Sınıf Raporlarını Aç</button>}
     </div>
+    <div ref={backupPanel} className="scroll-mt-24">
+      <TrialArchiveCloud pending={pendingBackup} onClear={() => setPendingBackup(undefined)} onRestored={onClassChange} />
+    </div>
+    {backupError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{backupError}</p>}
     {!groups.length && <p className="text-sm text-slate-600 dark:text-slate-300">Bu sınıfta kayıtlı deneme sonucu yok.</p>}
     {groups.map((group, index) => (
       <details key={(current?.id ?? '') + group.key} open={index === 0 ? true : undefined}
@@ -90,6 +102,16 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
         <summary className="cursor-pointer font-semibold">
           {group.title} <span className="text-sm font-normal text-slate-600 dark:text-slate-300">· {formatTurkishDate(group.date)} · {group.rows.length} öğrenci</span>
         </summary>
+        <button type="button" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-teal-300 px-3 py-2 text-sm font-semibold text-teal-800 dark:border-teal-800 dark:text-teal-200"
+          onClick={() => {
+            setBackupError('');
+            try {
+              setPendingBackup({ backup: createTrialArchiveBackup(group, classes, students, exams), owner: user?.uid });
+              backupPanel.current?.scrollIntoView({ block: 'start' });
+            } catch (error) {
+              setBackupError(error instanceof Error ? error.message : 'Deneme yedeği hazırlanamadı.');
+            }
+          }}><CloudUpload size={16} aria-hidden="true" /> Denemeyi Buluta Yükle</button>
         <p className="my-2 text-xs text-slate-600 dark:text-slate-300">D Doğru · Y Yanlış · B Boş</p>
         <div role="region" aria-label={group.title + ' sınıf sonuçları'} tabIndex={0}
           className="max-h-[32rem] max-w-full overflow-auto rounded-lg border border-slate-200 dark:border-slate-800">
