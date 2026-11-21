@@ -327,11 +327,11 @@ export const StudentCardsView: React.FC<StudentCardsViewProps> = ({
 
         {/* Class filter segmented buttons (counts reflect ONLY selected exam's participants) */}
         <div className="flex flex-wrap items-center justify-between gap-2 border-t border-slate-100 pt-3">
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="grid w-full grid-cols-4 gap-2 sm:grid-cols-5 lg:grid-cols-7">
             <button
               type="button"
               onClick={() => setSelectedClass('ALL')}
-              className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors tabular-nums ${
+              className={`flex min-h-10 w-full items-center justify-center rounded-md px-1.5 py-2 text-center text-xs font-medium transition-colors tabular-nums ${
                 selectedClass === 'ALL'
                   ? 'bg-slate-900 text-white'
                   : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
@@ -346,7 +346,7 @@ export const StudentCardsView: React.FC<StudentCardsViewProps> = ({
                   key={cls}
                   type="button"
                   onClick={() => setSelectedClass(cls)}
-                  className={`rounded-md px-2.5 py-1 text-xs font-medium transition-colors tabular-nums ${
+                  className={`flex min-h-10 w-full items-center justify-center rounded-md px-1.5 py-2 text-center text-xs font-medium transition-colors tabular-nums ${
                     selectedClass === cls
                       ? 'bg-slate-900 text-white'
                       : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
