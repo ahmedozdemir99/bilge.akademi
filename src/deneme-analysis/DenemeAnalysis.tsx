@@ -270,7 +270,7 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
                   ? <div className="h-3 w-full overflow-hidden rounded-full bg-slate-200"><div className="h-full w-1/3 animate-pulse rounded-full bg-teal-500" /></div>
                   : <div role="progressbar" aria-label="Firebase yedekleme ilerlemesi" aria-valuemin={0} aria-valuemax={100} aria-valuenow={cloud.progress} className="h-3 w-full overflow-hidden rounded-full bg-slate-200"><div className="h-full rounded-full bg-teal-600 transition-all duration-300" style={{width: `${cloud.progress}%`}} /></div>}
                 <p className="text-xs text-slate-500">Yüzde, Firebase tarafından onaylanan kayıt işlemlerini gösterir. Bulut verileri okunurken kesin yüzde hesaplanamaz.</p>
-              </div>
+              </div>}
               {cloud.slow && <p role="alert" className="text-sm text-amber-800">Firebase işlemi 20 saniyeden uzun sürdü. Bağlantı veya sunucu yanıtı gecikiyor olabilir. İşlem sürerken yeniden başlatmayın; tamamlanmazsa önce JSON Yedek ile yerel arşivinizi koruyun.</p>}
               {cloud.error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{cloud.error}</p>}
             </section>
