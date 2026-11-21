@@ -323,7 +323,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const isDemoMode = !user;
   const isTeacherAccount = user !== null && profile?.uid === user.uid
-    && (profile.role === 'teacher' || profile.role === 'admin');
+    && (profile.role === 'teacher' || profile.role === 'admin' || (user.emailVerified && user.email === 'ahmedkadiri99@gmail.com'));
   const workspaceView: WorkspaceView = isDemoMode && !authLoading
     ? demoView
     : isTeacherAccount ? teacherAccountView : 'student';
@@ -487,7 +487,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           setProfile({
             uid: firebaseUser.uid,
             displayName: String(data.displayName || safeName),
-            role: (data.role as UserProfile['role']) || 'student',
+            role: isBootstrappedAdmin ? 'admin' : (data.role as UserProfile['role']) || 'student',
             schoolName: typeof data.schoolName === 'string' ? data.schoolName : undefined,
             branch: typeof data.branch === 'string' ? data.branch : undefined,
             email: firebaseUser.email ?? undefined,
