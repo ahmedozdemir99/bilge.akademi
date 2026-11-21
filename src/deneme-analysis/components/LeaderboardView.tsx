@@ -861,7 +861,7 @@ export const LeaderboardView: React.FC<LeaderboardViewProps> = ({
 
                       {/* Average LGS */}
                       <td className="bg-blue-50/30 px-3 py-2.5 text-right font-mono font-extrabold text-slate-900 tabular-nums">
-                        <div>{formatTrNumber(row.avgLgs, 2)}</div>
+                        <div>{row.avgLgs >= 100 ? formatTrNumber(row.avgLgs, 2) : 'Puan yok'}</div>
                         {row.lgsDeltaPrev !== undefined && (
                           <div
                             className={`inline-flex items-center text-[10px] font-semibold ${
