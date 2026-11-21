@@ -34,7 +34,14 @@ export default defineConfig(() => {
           if (error) return;
 
           const dist = path.resolve(__dirname, 'dist');
-          const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+          // Multi-page builds may not emit a root index.html until output is finalized.
+          // Avoid aborting the entire deployment when the share-page source is absent.
+          const indexPath = path.join(dist, 'index.html');
+          if (!fs.existsSync(indexPath)) {
+            console.warn('[share-page] dist/index.html bulunamadı; paylaşım sayfası oluşturulmadı.');
+            return;
+          }
+          const html = fs.readFileSync(indexPath, 'utf8');
           const shareHtml = html.replace(
             /(<meta property="og:url" content="[^"]+\/)(?=")/,
             '$1paylas/',
