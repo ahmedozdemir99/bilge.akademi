@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { lazy, Suspense, useMemo, useState } from 'react';
 import {
   AlertCircle,
   Bot,
@@ -61,12 +61,15 @@ import { CLASS_KINDS, classKind } from '../../utils/classKinds';
 import { ExamNetTrend } from './student-tracking/ExamNetTrend';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
-type TrackingTab = 'students' | 'grades' | 'trials' | 'archive' | 'analytics' | 'bulk';
+const DenemeAnalysis = lazy(() => import('../../deneme-analysis/DenemeAnalysis'));
+
+type TrackingTab = 'students' | 'grades' | 'trials' | 'archive' | 'analytics' | 'bulk' | 'deneme-analysis';
 
 export function StudentTrackingModule({ initialAnalysis = false, initialArchive = false, initialImport = false, initialClass = '' }: {
   initialAnalysis?: boolean; initialArchive?: boolean; initialImport?: boolean; initialClass?: string;
 }) {
   const {
+    user,
     classes,
     students,
     grades,
@@ -490,12 +493,9 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             <Calculator className="w-3.5 h-3.5" />
             <span>Deneme Net Robotu</span>
           </button>
-          <button type="button" onClick={() => {
-            if (classFilter !== 'all') setArchiveClassId(classFilter);
-            setTrialView('archive');
-            setActiveTab('archive');
-          }}
-            className="col-span-full inline-flex items-center gap-1.5 rounded-lg border border-teal-300 px-3.5 py-2 text-xs font-semibold text-teal-800 transition-colors hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200 dark:hover:bg-teal-950"
+          <button type="button" onClick={() => setActiveTab('deneme-analysis')}
+            aria-pressed={activeTab === 'deneme-analysis'}
+            className="appearance-option"
           >
             <BarChart3 className="size-3.5" aria-hidden="true" />
             Deneme Analiz
@@ -545,7 +545,8 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             [
               { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
               { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
-              { id: 'archive', label: 'Deneme Analiz ve Arşiv' },
+              { id: 'archive', label: 'Sınıf Deneme Arşivi' },
+              { id: 'deneme-analysis', label: 'Deneme Analiz' },
               { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
               { id: 'bulk', label: 'Toplu Giriş' },
@@ -1034,6 +1035,12 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           }
         />
         </div>
+      )}
+
+      {activeTab === 'deneme-analysis' && (
+        <Suspense fallback={<p role="status" className="text-sm">Deneme Analiz açılıyor…</p>}>
+          <DenemeAnalysis key={user?.uid ?? 'demo'} owner={user?.uid ?? 'demo'} demo={isDemoMode} />
+        </Suspense>
       )}
 
       {activeTab === 'archive' && (

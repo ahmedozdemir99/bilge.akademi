@@ -1,0 +1,52 @@
+/* Embedded Deneme Analiz uses the academy's type, controls and surfaces. */
+.deneme-analysis {
+  --color-blue-50: var(--color-teal-50);
+  --color-blue-100: var(--color-teal-100);
+  --color-blue-200: var(--color-teal-200);
+  --color-blue-300: var(--color-teal-300);
+  --color-blue-400: var(--color-teal-400);
+  --color-blue-500: var(--color-teal-500);
+  --color-blue-600: var(--color-teal-600);
+  --color-blue-700: var(--color-teal-700);
+  --color-blue-800: var(--color-teal-800);
+  --color-blue-900: var(--color-teal-900);
+  font-family: var(--font-sans);
+}
+
+.deneme-analysis button:not([aria-label]) {
+  min-height: 2.75rem;
+}
+
+.deneme-analysis :is(select, input:not([type='file'], [type='checkbox'], [type='radio'])) {
+  min-height: 2.75rem;
+  max-width: 100%;
+  font-size: 0.875rem;
+}
+
+.dark .deneme-analysis {
+  --color-blue-50: var(--color-teal-950);
+  --color-blue-100: var(--color-teal-900);
+  --color-blue-200: var(--color-teal-800);
+  --color-blue-300: var(--color-teal-700);
+  --color-blue-500: var(--color-teal-500);
+  --color-blue-900: var(--color-teal-100);
+  color: var(--color-slate-100);
+}
+
+.dark .deneme-analysis :is(.bg-white, .bg-slate-50) { background-color: var(--color-slate-900); }
+.dark .deneme-analysis .bg-slate-100 { background-color: var(--color-slate-800); }
+.dark .deneme-analysis .hover\:bg-slate-50:hover { background-color: var(--color-slate-800); }
+.dark .deneme-analysis .hover\:bg-slate-100:hover { background-color: var(--color-slate-700); }
+.dark .deneme-analysis :is(.border-slate-100,.border-slate-200,.border-slate-300) { border-color: var(--color-slate-700); }
+.dark .deneme-analysis :is(.text-slate-900,.text-slate-800,.text-slate-700) { color: var(--color-slate-100); }
+.dark .deneme-analysis :is(.text-slate-600,.text-slate-500,.text-slate-400) { color: var(--color-slate-300); }
+.dark .deneme-analysis :is(.text-blue-700,.text-blue-800,.text-blue-900) { color: var(--color-teal-200); }
+.dark .deneme-analysis :is(.bg-amber-50,.bg-emerald-50,.bg-rose-50,.bg-red-50) { background-color: var(--color-slate-800); }
+.dark .deneme-analysis :is(.text-amber-700,.text-amber-800,.text-amber-900) { color: var(--color-amber-300); }
+.dark .deneme-analysis :is(.text-emerald-700,.text-emerald-800,.text-emerald-900) { color: var(--color-emerald-300); }
+.dark .deneme-analysis :is(.text-rose-700,.text-rose-800,.text-red-700,.text-red-800) { color: var(--color-rose-300); }
+.dark .deneme-analysis :is(select,input,textarea) { color: var(--color-slate-100); background-color: var(--color-slate-950); }
+.dark .deneme-analysis .recharts-cartesian-axis-tick-value { fill: var(--color-slate-300); }
+.dark .deneme-analysis .recharts-cartesian-grid line,
+.dark .deneme-analysis .recharts-polar-grid :is(line,polygon) { stroke: var(--color-slate-700); }
+.dark .deneme-analysis .recharts-tooltip-wrapper { color: var(--color-slate-900); }
