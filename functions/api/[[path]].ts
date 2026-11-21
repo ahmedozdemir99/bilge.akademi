@@ -1,5 +1,8 @@
+import { formatPracticeForAnalysis } from '../../src/utils/practiceAnalysis';
+
 interface PagesEnv {
   GEMINI_API_KEY?: string;
+  'Gemini API Key'?: string;
 }
 
 interface PagesContext {
@@ -8,14 +11,15 @@ interface PagesContext {
   params: { path?: string | string[] };
 }
 
-const PRIMARY_MODEL = 'gemini-4-hydrogen';
-const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+const PRIMARY_MODEL = 'gemini-3.8-flash';
+const FALLBACK_MODEL = 'gemini-3.5-flash-lite';
 const TTS_MODEL = 'gemini-3.8-flash-lite-tts';
 const ALLOWED_TTS_VOICES = new Set(['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr']);
 const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
 
 const PRIMARY_TIMEOUT_MS = 15000;
 const FALLBACK_TIMEOUT_MS = 12000;
+const ASSISTANT_FAST_TIMEOUT_MS = 20000;
 const DISCOVERY_TIMEOUT_MS = 6000;
 const DISCOVERY_CACHE_TTL_MS = 10 * 60 * 1000;
 
@@ -48,9 +52,10 @@ function jsonResponse(body: unknown, status = 200, extraHeaders?: Record<string,
 }
 
 function getApiKey(env: PagesEnv): string | null {
-  const key = env.GEMINI_API_KEY?.trim();
-  if (!key || key === 'MY_GEMINI_API_KEY') return null;
-  return key;
+  const configuredKeys = [env.GEMINI_API_KEY, env['Gemini API Key']];
+  return configuredKeys
+    .map((key) => key?.trim())
+    .find((key) => key && key !== 'MY_GEMINI_API_KEY') ?? null;
 }
 
 function isTimeoutError(err: unknown): boolean {
@@ -111,7 +116,7 @@ function formatGeminiError(rawOrErr: unknown): { status: number; message: string
       status: 403,
       code: 'AUTH_ERROR',
       message:
-        'Gemini API anahtarı geçersiz veya yetkisiz görünüyor. Cloudflare Pages > Settings > Environment variables bölümünden GEMINI_API_KEY değerini kontrol edin.',
+        'Gemini API anahtarı geçersiz veya yetkisiz görünüyor. Yönetici, sitenin GEMINI_API_KEY ayarını kontrol edebilir.',
     };
   }
   if (isTimeoutError(rawOrErr)) {
@@ -119,7 +124,7 @@ function formatGeminiError(rawOrErr: unknown): { status: number; message: string
       status: 504,
       code: 'TIMEOUT',
       message:
-        'Yapay zekâ isteği zaman aşımına uğradı. Lütfen sorunuzu kısaltıp birkaç saniye sonra tekrar deneyin.',
+        'Yapay zekâ isteği zaman aşımına uğradı. Lütfen birkaç saniye sonra tekrar deneyin.',
     };
   }
   if (isQuotaError(raw)) {
@@ -140,7 +145,7 @@ function formatGeminiError(rawOrErr: unknown): { status: number; message: string
   }
   return {
     status: 500,
-    code: raw.slice(0, 180).replace(/AIza[0-9A-Za-z_-]+/g, '[REDACTED]') || 'UPSTREAM_ERROR',
+    code: 'UPSTREAM_ERROR',
     message:
       'Yapay zekâ servisine bağlanırken bir hata oluştu. Lütfen birkaç saniye sonra tekrar deneyin.',
   };
@@ -256,10 +261,10 @@ async function discoverAccessibleModels(apiKey: string): Promise<DiscoveredModel
   const timeoutId = setTimeout(() => controller.abort(), DISCOVERY_TIMEOUT_MS);
   try {
     const res = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=100&key=${encodeURIComponent(apiKey)}`,
+      `https://generativelanguage.googleapis.com/v1beta/models?pageSize=100`,
       {
         method: 'GET',
-        headers: { 'User-Agent': 'aistudio-build' },
+        headers: { 'x-goog-api-key': apiKey },
         signal: controller.signal,
       }
     );
@@ -309,7 +314,7 @@ async function callGeminiModel(
     timeoutMs?: number;
   }
 ): Promise<GeminiRestResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
   const generationConfig: Record<string, unknown> = {};
   if (opts.responseMimeType) generationConfig.responseMimeType = opts.responseMimeType;
@@ -335,7 +340,7 @@ async function callGeminiModel(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'aistudio-build',
+        'x-goog-api-key': apiKey,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -348,6 +353,7 @@ async function callGeminiModel(
       }>;
     };
 
+    controller.signal.throwIfAborted();
     if (!res.ok) {
       const errMsg = data.error?.message || data.error?.status || `HTTP ${res.status}`;
       throw new Error(`${res.status} ${errMsg}`);
@@ -377,6 +383,7 @@ async function generateResilient(
     systemInstruction?: string;
     responseMimeType?: string;
     responseSchema?: Record<string, unknown>;
+    preferFastModel?: boolean;
   } = {}
 ): Promise<GeminiRestResult> {
   const keyHash = getKeyFingerprint(apiKey);
@@ -394,6 +401,9 @@ async function generateResilient(
     initialQueue.push({ model, useLowThinking, timeoutMs });
   };
 
+  if (opts.preferFastModel) {
+    pushUnique(cached?.fallback ?? FALLBACK_MODEL, false, ASSISTANT_FAST_TIMEOUT_MS);
+  }
   if (cached?.primary) {
     pushUnique(cached.primary, true, PRIMARY_TIMEOUT_MS);
     pushUnique(cached.fallback, false, FALLBACK_TIMEOUT_MS);
@@ -493,7 +503,10 @@ function toArabicIndicNumber(n: number): string {
 
 async function readJsonBody(request: Request): Promise<Record<string, unknown>> {
   try {
-    return (await request.json()) as Record<string, unknown>;
+    const body: unknown = await request.json();
+    return body && typeof body === 'object' && !Array.isArray(body)
+      ? body as Record<string, unknown>
+      : {};
   } catch {
     return {};
   }
@@ -529,7 +542,7 @@ export async function onRequest(context: PagesContext): Promise<Response> {
       model: cached?.primary ?? PRIMARY_MODEL,
       fallbackModel: cached?.fallback ?? FALLBACK_MODEL,
       ttsModel: cached?.tts ?? TTS_MODEL,
-    });
+    }, 200, { 'Cache-Control': 'no-store' });
   }
 
   /* ---------------- QURAN ARABIC SCRIPT PROXY ---------------- */
@@ -601,11 +614,29 @@ export async function onRequest(context: PagesContext): Promise<Response> {
     return jsonResponse(
       {
         error:
-          'Cloudflare Pages ortam değişkenlerinde GEMINI_API_KEY tanımlı değil. Lütfen Cloudflare Pages > Settings > Environment variables kısmına GEMINI_API_KEY ekleyip yeniden yayınlayın.',
+          'Yapay zekâ servisi henüz yapılandırılmadı. Site yöneticisinin GEMINI_API_KEY gizli değişkenini tanımlaması gerekiyor.',
         code: 'MISSING_API_KEY',
       },
       503
     );
+  }
+
+  if (route === 'ai/connection') {
+    const headers = { 'Cache-Control': 'no-store' };
+    try {
+      const upstream = await fetch('https://generativelanguage.googleapis.com/v1beta/models?pageSize=1', {
+        headers: { 'x-goog-api-key': apiKey },
+        signal: AbortSignal.timeout(DISCOVERY_TIMEOUT_MS),
+      });
+      if (upstream.ok) return jsonResponse({ ok: true }, 200, headers);
+
+      const body = await upstream.json().catch(() => null) as { error?: { status?: string; message?: string } } | null;
+      const error = formatGeminiError(`${upstream.status} ${body?.error?.status ?? ''} ${body?.error?.message ?? ''}`);
+      return jsonResponse({ error: error.message, code: error.code }, error.status, headers);
+    } catch (error) {
+      const formatted = formatGeminiError(error);
+      return jsonResponse({ error: formatted.message, code: formatted.code }, formatted.status, headers);
+    }
   }
 
   const body = await readJsonBody(request);
@@ -626,12 +657,12 @@ export async function onRequest(context: PagesContext): Promise<Response> {
         const controller = new AbortController();
         const timeoutId = setTimeout(() => controller.abort(), FALLBACK_TIMEOUT_MS);
         try {
-          const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+          const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(modelId)}:generateContent`;
           const ttsRes = await fetch(ttsUrl, {
             method: 'POST',
             headers: {
               'Content-Type': 'application/json',
-              'User-Agent': 'aistudio-build',
+              'x-goog-api-key': apiKey,
             },
             body: JSON.stringify({
               contents: [
@@ -736,6 +767,7 @@ Kullanıcının bulunduğu modül bağlamı: ${safeModule}.
 
 Görevlerin:
 - Türkçe doğal, akıcı ve akademik açıdan özenli bir dille yanıt ver.
+- Basit sorulara kısa ve doğrudan yanıt ver. Ayrıntılı açıklama ve materyal taleplerinde istenen kapsamı karşıla.
 - Ders anlat, örnekler sun, çalışma planı öner ve öğretmenlere ders materyali / rubrik / soru taslağı hazırlamada destek ol.
 - Öğrenci hakkında kesin psikolojik veya akademik teşhis koyma; yapıcı rehberlik sun.
 - Tarihî veya bilimsel konularda kesin kaynak yoksa belirsizliği açıkça ifade et.
@@ -745,8 +777,12 @@ Görevlerin:
         ? `Önceki konuşma özeti:\n${conversationLines}\n\nYeni kullanıcı mesajı:\n${message.slice(0, 2000)}`
         : message.slice(0, 2000);
 
-      const res = await generateResilient(apiKey, fullPrompt, { systemInstruction });
-      return jsonResponse({ reply: res.text || 'Yanıt oluşturulamadı.' });
+      const res = await generateResilient(apiKey, fullPrompt, { systemInstruction, preferFastModel: true });
+      const reply = res.text.trim();
+      if (!reply) {
+        return jsonResponse({ error: 'Yapay zekâ yanıt üretemedi. Sorunuzu başka bir şekilde yazıp tekrar deneyin.', code: 'EMPTY_REPLY' }, 502);
+      }
+      return jsonResponse({ reply });
     }
 
     /* ---------------- SOCRATIC DIALOGUE ---------------- */
@@ -1049,7 +1085,7 @@ Her dizenin hece sayısını seçilen ölçüye mümkün olduğunca tam uydur.`;
 
     /* ---------------- STUDENT ANALYSIS ---------------- */
     if (route === 'ai/student-analysis') {
-      const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary } = body;
+      const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary, practiceExamSummary } = body;
       if (!anonymousCode || !Array.isArray(subjectAverages)) {
         return jsonResponse({ error: 'Geçersiz analiz isteği. Anonim öğrenci akademik verileri eksik.' }, 400);
       }
@@ -1075,8 +1111,11 @@ ${
       (g: { date?: string; subject?: string; examType?: string; score?: number; maxScore?: number }) =>
         `- ${String(g.date ?? '').slice(0, 10)} | ${String(g.subject ?? '').slice(0, 40)} (${String(g.examType ?? '').slice(0, 20)}): ${Number(g.score ?? 0)}/${Number(g.maxScore ?? 100)}`
     )
-    .join('\n') || 'Henüz sınav kaydı bulunmuyor.'
+    .join('\n') || 'Henüz not kaydı bulunmuyor.'
 }
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excused || 0)}, Mazeretsiz ${Number(att.unexcused || 0)}, Geç ${Number(att.late || 0)}.`;
 
@@ -1109,7 +1148,7 @@ Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excu
 
     /* ---------------- CLASS ANALYSIS ---------------- */
     if (route === 'ai/class-analysis') {
-      const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals } = body;
+      const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals, gradeCount, practiceExamSummary } = body;
       if (!className || !Array.isArray(subjectBreakdown)) {
         return jsonResponse({ error: 'Sınıf analizi için gerekli özet veriler eksik.' }, 400);
       }
@@ -1118,7 +1157,7 @@ Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excu
 
 Sınıf: ${String(className).slice(0, 60)} (${Number(gradeLevel) || '?'}. Sınıf)
 Öğrenci Sayısı: ${Number(studentCount) || 0}
-Genel Not Ortalaması: ${Number(overallAverage || 0).toFixed(1)}
+Genel Not Ortalaması: ${gradeCount === 0 ? 'Not kaydı yok' : Number(overallAverage || 0).toFixed(1)}
 
 Ders Dağılımı:
 ${subjectBreakdown
@@ -1128,6 +1167,9 @@ ${subjectBreakdown
       `- ${String(item.subject ?? '').slice(0, 60)}: ${Number(item.average ?? 0).toFixed(1)} (${Number(item.examCount ?? 0)} not kaydı)`
   )
   .join('\n')}
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Toplam Devam Özeti: Katılım ${Number(att.present || 0)}, Mazeretli ${Number(att.excused || 0)}, Mazeretsiz ${Number(att.unexcused || 0)}, Geç ${Number(att.late || 0)}.`;
 

@@ -14,11 +14,14 @@ import {
   Trash2,
   UserPlus,
   Users,
+  BarChart3,
+  FileUp,
 } from 'lucide-react';
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
@@ -33,9 +36,9 @@ import type {
   Student,
 } from '../../types/academy';
 import {
+  calculateAttendanceSummary,
   calculateAverageScore,
   calculateSubjectAverages,
-  calculateTrialRobotSummary,
   exportToCsv,
   formatTurkishDate,
   triggerPrintReport,
@@ -47,16 +50,28 @@ import {
   GradeFormModal,
   StudentFormModal,
 } from './student-tracking/StudentForms';
+import { normalizeSearchText } from '../../utils/searchText';
+import { classChartColors, getSubjectColor } from '../../utils/subjectColors';
+import { summarizePracticeForAnalysis } from '../../utils/practiceAnalysis';
+import { BulkRecordsPanel } from './student-tracking/BulkRecordsPanel';
+import { orderStudentsByNet, STUDENT_NET_ORDERS, summarizeStudentNets, type StudentNetOrder } from '../../utils/studentNetOrder';
+import { ClassTrialArchive, ClassTrialDistribution } from './student-tracking/ClassTrialArchive';
+import { TrialImporter } from '../../trial-import/TrialImporter';
+import { CLASS_KINDS, classKind } from '../../utils/classKinds';
+import { ExamNetTrend } from './student-tracking/ExamNetTrend';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
-type TrackingTab = 'students' | 'grades' | 'trials' | 'analytics';
+type TrackingTab = 'students' | 'grades' | 'trials' | 'archive' | 'analytics' | 'bulk';
 
-export function StudentTrackingModule() {
+export function StudentTrackingModule({ initialAnalysis = false, initialArchive = false, initialImport = false, initialClass = '' }: {
+  initialAnalysis?: boolean; initialArchive?: boolean; initialImport?: boolean; initialClass?: string;
+}) {
   const {
     classes,
     students,
     grades,
     practiceExams,
+    attendance,
     isDemoMode,
     workspaceView,
     compactMode,
@@ -75,16 +90,24 @@ export function StudentTrackingModule() {
     seedDemoToFirestore,
   } = useAcademy();
 
-  const [activeTab, setActiveTab] = useState<TrackingTab>('students');
+  const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive || initialImport ? 'archive' : initialAnalysis ? 'analytics' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
   const [classFilter, setClassFilter] = useState<string>('all');
+  const [netOrder, setNetOrder] = useState<StudentNetOrder>('default');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive'>('all');
   const [subjectFilter, setSubjectFilter] = useState<string>('all');
   const [examTypeFilter, setExamTypeFilter] = useState<'all' | ExamType>('all');
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('all');
+  const [trialView, setTrialView] = useState<'archive' | 'import'>(initialImport ? 'import' : 'archive');
+  const [archiveClassId, setArchiveClassId] = useState(initialClass);
+
+  function openTrialImport() {
+    setTrialView('import');
+    setActiveTab('archive');
+  }
 
   // Modals
   const [classModalOpen, setClassModalOpen] = useState(false);
@@ -115,22 +138,24 @@ export function StudentTrackingModule() {
   const selectedStudent = selectedStudentId ? studentMap.get(selectedStudentId) ?? null : null;
 
   // Derived lists
+  const studentNets = useMemo(() => summarizeStudentNets(practiceExams), [practiceExams]);
   const filteredStudents = useMemo(() => {
-    const q = searchQuery.trim().toLocaleLowerCase('tr');
-    return students.filter((s) => {
+    const q = normalizeSearchText(searchQuery);
+    const visible = students.filter((s) => {
       if (classFilter !== 'all' && s.classId !== classFilter) return false;
       if (statusFilter !== 'all' && s.status !== statusFilter) return false;
       if (q) {
-        const clsName = classMap.get(s.classId)?.name.toLocaleLowerCase('tr') ?? '';
+        const clsName = normalizeSearchText(classMap.get(s.classId)?.name ?? '');
         const match =
-          s.fullName.toLocaleLowerCase('tr').includes(q) ||
-          s.studentNumber.toLocaleLowerCase('tr').includes(q) ||
+          normalizeSearchText(s.fullName).includes(q) ||
+          normalizeSearchText(s.studentNumber).includes(q) ||
           clsName.includes(q);
         if (!match) return false;
       }
       return true;
     });
-  }, [classFilter, classMap, searchQuery, statusFilter, students]);
+    return orderStudentsByNet(visible, studentNets, netOrder);
+  }, [classFilter, classMap, searchQuery, statusFilter, students, studentNets, netOrder]);
 
   const uniqueSubjects = useMemo(() => {
     const set = new Set(grades.map((g) => g.subjectName));
@@ -166,16 +191,19 @@ export function StudentTrackingModule() {
     [analyticsClassId, students]
   );
 
+  const classPracticeAnalysis = useMemo(() => summarizePracticeForAnalysis(analyticsPracticeExams), [analyticsPracticeExams]);
   const analyticsSubjectBreakdown = useMemo(
     () => calculateSubjectAverages(analyticsGrades),
     [analyticsGrades]
   );
   const classComparisonData = useMemo(() => {
-    return classes.map((cls) => {
+    return classes.map((cls, index) => {
       const clsGrades = grades.filter((g) => g.classId === cls.id);
       const clsStudents = students.filter((s) => s.classId === cls.id);
       return {
+        id: cls.id,
         name: cls.name,
+        color: classChartColors[index % classChartColors.length],
         average: calculateAverageScore(clsGrades),
         studentCount: clsStudents.length,
         examCount: clsGrades.length,
@@ -205,13 +233,14 @@ export function StudentTrackingModule() {
       <div className="space-y-4">
         <div className="bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl px-5 py-3.5 text-xs text-slate-600 dark:text-slate-300">
           <strong>Öğrenci Görünümü:</strong> Diğer öğrencilerin kayıtları gizlidir. Yalnızca
-          kendi yazılı notlarınız, LGS deneme netleriniz ve yapay zekâ çalışma önerileriniz gösterilir.
+          kendi notlarınız, LGS deneme netleriniz ve yapay zekâ çalışma önerileriniz gösterilir.
         </div>
         <StudentProfileView
           student={personalStudent}
           schoolClass={classMap.get(personalStudent.classId)}
           grades={grades.filter((g) => g.studentId === personalStudent.id)}
           practiceExams={practiceExams.filter((p) => p.studentId === personalStudent.id)}
+          attendance={attendance.filter((item) => item.studentId === personalStudent.id)}
           readOnly
         />
       </div>
@@ -220,14 +249,28 @@ export function StudentTrackingModule() {
 
   // Individual Student Profile View (Teacher Mode)
   if (selectedStudent) {
+    const classmates = orderStudentsByNet(
+      students.filter(({ classId }) => classId === selectedStudent.classId), studentNets, netOrder
+    );
+    const index = classmates.findIndex(({ id }) => id === selectedStudent.id);
+    const previous = classmates[index - 1];
+    const next = classmates[index + 1];
     return (
       <>
         <StudentProfileView
+          key={selectedStudent.id}
           student={selectedStudent}
           schoolClass={classMap.get(selectedStudent.classId)}
           grades={grades.filter((g) => g.studentId === selectedStudent.id)}
           practiceExams={practiceExams.filter((p) => p.studentId === selectedStudent.id)}
+          attendance={attendance.filter((item) => item.studentId === selectedStudent.id)}
           onBack={() => setSelectedStudentId(null)}
+          classNavigation={{
+            position: index + 1,
+            count: classmates.length,
+            onPrevious: previous ? () => setSelectedStudentId(previous.id) : undefined,
+            onNext: next ? () => setSelectedStudentId(next.id) : undefined,
+          }}
           onEditStudent={() => {
             setEditingStudent(selectedStudent);
             setStudentModalOpen(true);
@@ -243,7 +286,7 @@ export function StudentTrackingModule() {
           onDeleteGrade={(g) =>
             setConfirmState({
               open: true,
-              title: 'Sınav Notunu Sil',
+              title: 'Notu Sil',
               message: `${g.subjectName} — ${g.examTitle} (${g.score}/${g.maxScore}) not kaydını silmek istediğinize emin misiniz?`,
               action: async () => {
                 await deleteGrade(g.id);
@@ -305,14 +348,14 @@ export function StudentTrackingModule() {
   const handleRunClassAI = async () => {
     setClassAILoading(true);
     setClassAIError('');
+    setClassAI(null);
     const targetClass = analyticsClassId === 'all' ? null : classMap.get(analyticsClassId);
-    const trialSummary = calculateTrialRobotSummary(analyticsPracticeExams);
     try {
       const response = await fetch('/api/ai/class-analysis', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          className: targetClass ? targetClass.name : 'Tüm Ortaokul Sınıfları Geneli',
+          className: targetClass ? 'Seçilen şube' : 'Tüm Ortaokul Sınıfları Geneli',
           gradeLevel: targetClass ? targetClass.gradeLevel : 8,
           studentCount: analyticsStudents.length,
           overallAverage: calculateAverageScore(analyticsGrades),
@@ -321,12 +364,11 @@ export function StudentTrackingModule() {
             average: s.average,
             examCount: s.count,
           })),
-          practiceExamSummary: {
-            examCount: trialSummary.examCount,
-            avgTotalNet: trialSummary.avgTotalNet,
-            avgTotalCorrect: trialSummary.avgTotalCorrect,
-            avgLgsScore: trialSummary.avgLgsScore,
-          },
+          gradeCount: analyticsGrades.length,
+          practiceExamSummary: classPracticeAnalysis,
+          attendanceTotals: calculateAttendanceSummary(analyticsClassId === 'all'
+            ? attendance
+            : attendance.filter((item) => item.classId === analyticsClassId)),
         }),
       });
       const data = await response.json();
@@ -345,20 +387,18 @@ export function StudentTrackingModule() {
   const handleExportStudentsCsv = () => {
     exportToCsv(
       'bilge_akademi_ogrenciler',
-      ['Okul No', 'Ad Soyad', 'Sınıf', 'Seviye', 'Yazılı Ort.', 'Deneme Sayısı', 'Deneme Ort. Net', 'Durum'],
+      ['Okul No', 'Ad Soyad', 'Sınıf', 'Seviye', 'Not Ort.', 'Deneme Sayısı', 'Deneme Ort. Net', 'Durum'],
       filteredStudents.map((stu) => {
         const sGrades = grades.filter((g) => g.studentId === stu.id);
-        const sTrials = calculateTrialRobotSummary(
-          practiceExams.filter((p) => p.studentId === stu.id)
-        );
+        const sTrials = studentNets.get(stu.id);
         return [
           stu.studentNumber,
           stu.fullName,
           classMap.get(stu.classId)?.name ?? '-',
           `${stu.gradeLevel}. Sınıf`,
           sGrades.length > 0 ? calculateAverageScore(sGrades) : '-',
-          sTrials.examCount,
-          sTrials.examCount > 0 ? sTrials.avgTotalNet : '-',
+          sTrials?.count ?? 0,
+          sTrials?.average ?? '-',
           stu.status === 'active' ? 'Aktif' : 'Pasif',
         ];
       })
@@ -368,7 +408,7 @@ export function StudentTrackingModule() {
   const handleExportGradesCsv = () => {
     exportToCsv(
       'bilge_akademi_sinav_notlari',
-      ['Tarih', 'Öğrenci', 'Okul No', 'Sınıf', 'Ders', 'Sınav', 'Tür', 'Puan', 'Tam Puan'],
+      ['Tarih', 'Öğrenci', 'Okul No', 'Sınıf', 'Ders', 'Değerlendirme', 'Tür', 'Puan', 'Tam Puan'],
       filteredGrades.map((g) => {
         const stu = studentMap.get(g.studentId);
         return [
@@ -391,7 +431,7 @@ export function StudentTrackingModule() {
   return (
     <div className="space-y-6">
       {/* Header */}
-      <div className="flex flex-col lg:flex-row lg:items-end justify-between gap-4">
+      <div className="flex flex-col gap-4">
         <div>
           <p className="text-xs font-medium text-teal-700 dark:text-teal-400">
             Modül 01 · {isDemoMode ? 'Demo Modu (Örnek Veri)' : 'Firebase Bulut Kayıtları'}
@@ -400,12 +440,12 @@ export function StudentTrackingModule() {
             Öğrenci Takip ve Analiz Sistemi
           </h1>
           <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-            Ortaokul (5–8. Sınıf &amp; LGS) sınıflarını, yazılı notlarını, ders ders deneme doğru-yanlış-net
+            Ortaokul (5–8. Sınıf &amp; LGS) sınıflarını, öğrenci notlarını, ders ders deneme doğru-yanlış-net
             hesaplama robotunu ve yapay zekâ analizlerini yönetin.
           </p>
         </div>
 
-        <div className="flex flex-wrap items-center gap-2 no-print">
+        <div role="group" aria-label="Öğrenci takip işlemleri" className="control-grid gap-2 no-print">
           <button
             type="button"
             onClick={() => {
@@ -439,7 +479,7 @@ export function StudentTrackingModule() {
             className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
           >
             <Plus className="w-3.5 h-3.5 text-gold-600 dark:text-gold-400" />
-            <span>Yazılı Notu Gir</span>
+            <span>Not Gir</span>
           </button>
           <button
             type="button"
@@ -449,6 +489,16 @@ export function StudentTrackingModule() {
           >
             <Calculator className="w-3.5 h-3.5" />
             <span>Deneme Net Robotu</span>
+          </button>
+          <button type="button" onClick={() => {
+            if (classFilter !== 'all') setArchiveClassId(classFilter);
+            setTrialView('archive');
+            setActiveTab('archive');
+          }}
+            className="col-span-full inline-flex items-center gap-1.5 rounded-lg border border-teal-300 px-3.5 py-2 text-xs font-semibold text-teal-800 transition-colors hover:bg-teal-50 dark:border-teal-800 dark:text-teal-200 dark:hover:bg-teal-950"
+          >
+            <BarChart3 className="size-3.5" aria-hidden="true" />
+            Deneme Analiz
           </button>
         </div>
       </div>
@@ -487,7 +537,7 @@ export function StudentTrackingModule() {
       {/* Segmented Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <div
-          className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+          className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
           role="tablist"
           aria-label="Öğrenci Takip Sekmeleri"
         >
@@ -495,8 +545,10 @@ export function StudentTrackingModule() {
             [
               { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
               { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
-              { id: 'grades', label: `Yazılı Notları (${grades.length})` },
+              { id: 'archive', label: 'Deneme Analiz ve Arşiv' },
+              { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
+              { id: 'bulk', label: 'Toplu Giriş' },
             ] as { id: TrackingTab; label: string }[]
           ).map((tab) => (
             <button
@@ -504,7 +556,10 @@ export function StudentTrackingModule() {
               type="button"
               role="tab"
               aria-selected={activeTab === tab.id}
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (tab.id === 'archive') setTrialView('archive');
+                setActiveTab(tab.id);
+              }}
               className={`px-3.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-slate-800 text-navy-900 dark:text-white shadow-xs'
@@ -520,21 +575,17 @@ export function StudentTrackingModule() {
       {/* TAB 1: STUDENTS & CLASSES */}
       {activeTab === 'students' && (
         <div className="space-y-6">
-          {/* Classes Strip */}
-          <section>
-            <div className="flex items-center justify-between mb-3">
-              <h2 className="text-base font-semibold text-navy-900 dark:text-white">
-                Sınıflar ve Şubeler ({classes.length})
-              </h2>
-            </div>
-
-            {classes.length === 0 ? (
-              <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 text-sm text-slate-500 dark:text-slate-400">
-                Henüz sınıf oluşturulmadı. Başlamak için yukarıdaki “Sınıf Ekle” butonunu kullanın.
-              </div>
-            ) : (
+          {CLASS_KINDS.map(({ value, label }) => {
+            const group = classes.filter((item) => classKind(item) === value);
+            return <section key={value} className="space-y-3">
+              <h2 className="text-base font-semibold text-navy-900 dark:text-white">{label} ({group.length})</h2>
+              {group.length === 0 ? (
+                <p className="rounded-xl border border-slate-200 bg-white p-4 text-sm text-slate-600 dark:border-slate-800 dark:bg-slate-900 dark:text-slate-300">
+                  {value === 'school' ? 'Henüz okul sınıfı yok.' : 'Henüz kurs sınıfı yok.'}
+                </p>
+              ) : (
               <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
-                {classes.map((cls) => {
+                {group.map((cls) => {
                   const clsStudents = students.filter((s) => s.classId === cls.id);
                   const clsGrades = grades.filter((g) => g.classId === cls.id);
                   const clsAvg = calculateAverageScore(clsGrades);
@@ -608,8 +659,10 @@ export function StudentTrackingModule() {
                   );
                 })}
               </div>
-            )}
-          </section>
+              )}
+            </section>;
+          })}
+
 
           {/* Student Filter Toolbar + Data Table */}
           <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
@@ -640,6 +693,17 @@ export function StudentTrackingModule() {
                   ))}
                 </select>
 
+                <label className="flex items-center gap-2 text-sm font-medium text-slate-700 dark:text-slate-200">
+                  Net sırası
+                  <select
+                    value={netOrder}
+                    onChange={(event) => setNetOrder(event.target.value as StudentNetOrder)}
+                    className="min-h-10 rounded-lg border border-slate-200 bg-white px-3 py-2 text-sm dark:border-slate-700 dark:bg-slate-950"
+                  >
+                    {STUDENT_NET_ORDERS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                  </select>
+                </label>
+
                 <select
                   aria-label="Duruma göre filtrele"
                   value={statusFilter}
@@ -652,7 +716,7 @@ export function StudentTrackingModule() {
                 </select>
               </div>
 
-              <div className="flex items-center gap-2 shrink-0">
+              <div className="control-grid gap-2 sm:max-w-80">
                 <button
                   type="button"
                   onClick={handleExportStudentsCsv}
@@ -690,8 +754,8 @@ export function StudentTrackingModule() {
                       <th className="py-3 px-4 font-medium">No</th>
                       <th className="py-3 px-4 font-medium">Öğrenci</th>
                       <th className="py-3 px-4 font-medium">Sınıf</th>
-                      <th className="py-3 px-4 font-medium text-right">Yazılı Ort.</th>
-                      <th className="py-3 px-4 font-medium text-right">Deneme Ort. Net</th>
+                      <th className="py-3 px-4 font-medium text-right">Not Ort.</th>
+                      <th scope="col" aria-sort={netOrder === 'default' ? 'none' : netOrder} className="py-3 px-4 font-medium text-right">Deneme Ort. Net</th>
                       <th className="py-3 px-4 font-medium">Durum</th>
                       <th className="py-3 px-4 font-medium text-right no-print">İşlemler</th>
                     </tr>
@@ -700,9 +764,7 @@ export function StudentTrackingModule() {
                     {filteredStudents.map((stu) => {
                       const sGrades = grades.filter((g) => g.studentId === stu.id);
                       const sAvg = calculateAverageScore(sGrades);
-                      const sTrial = calculateTrialRobotSummary(
-                        practiceExams.filter((p) => p.studentId === stu.id)
-                      );
+                      const sTrial = studentNets.get(stu.id);
                       const cls = classMap.get(stu.classId);
 
                       return (
@@ -729,7 +791,7 @@ export function StudentTrackingModule() {
                             {sGrades.length > 0 ? sAvg.toFixed(1) : '—'}
                           </td>
                           <td className={`${rowPad} px-4 text-right font-mono text-xs tabular-nums text-teal-700 dark:text-teal-400 font-semibold`}>
-                            {sTrial.examCount > 0 ? `${sTrial.avgTotalNet.toFixed(2)} net` : '—'}
+                            {sTrial ? `${sTrial.average.toFixed(2)} net` : '—'}
                           </td>
                           <td className={`${rowPad} px-4 text-xs whitespace-nowrap`}>
                             <span
@@ -826,12 +888,12 @@ export function StudentTrackingModule() {
               </select>
 
               <select
-                aria-label="Sınav türü filtresi"
+                aria-label="Not türü filtresi"
                 value={examTypeFilter}
                 onChange={(e) => setExamTypeFilter(e.target.value as 'all' | ExamType)}
                 className="px-3 py-2 text-xs font-medium rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-950 text-slate-700 dark:text-slate-200"
               >
-                <option value="all">Tüm Sınav Türleri</option>
+                <option value="all">Tüm Not Türleri</option>
                 <option value="Yazılı">Yazılı</option>
                 <option value="Deneme">Deneme</option>
                 <option value="Sözlü">Sözlü</option>
@@ -858,7 +920,7 @@ export function StudentTrackingModule() {
 
           {filteredGrades.length === 0 ? (
             <div className="p-10 text-center text-sm text-slate-500 dark:text-slate-400">
-              Seçili kriterlere uygun sınav kaydı bulunmuyor.
+              Seçili ölçütlere uygun not bulunmuyor.
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -868,7 +930,7 @@ export function StudentTrackingModule() {
                     <th className="py-3 px-4 font-medium">Tarih</th>
                     <th className="py-3 px-4 font-medium">Öğrenci</th>
                     <th className="py-3 px-4 font-medium">Sınıf</th>
-                    <th className="py-3 px-4 font-medium">Ders / Sınav</th>
+                    <th className="py-3 px-4 font-medium">Ders / Değerlendirme</th>
                     <th className="py-3 px-4 font-medium">Tür</th>
                     <th className="py-3 px-4 font-medium text-right">Puan</th>
                     <th className="py-3 px-4 font-medium text-right no-print">İşlem</th>
@@ -896,7 +958,10 @@ export function StudentTrackingModule() {
                           {cls?.name ?? '—'}
                         </td>
                         <td className={`${rowPad} px-4`}>
-                          <p className="font-medium text-slate-900 dark:text-slate-100">{g.subjectName}</p>
+                          <p className="flex items-center gap-2 font-medium text-slate-900 dark:text-slate-100">
+                            <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: getSubjectColor(g.subjectName) }} />
+                            {g.subjectName}
+                          </p>
                           <p className="text-xs text-slate-500 dark:text-slate-400">{g.examTitle}</p>
                         </td>
                         <td className={`${rowPad} px-4 text-xs text-slate-600 dark:text-slate-300 whitespace-nowrap`}>
@@ -949,7 +1014,10 @@ export function StudentTrackingModule() {
 
       {/* TAB 3: PRACTICE EXAMS & NET ROBOT */}
       {activeTab === 'trials' && (
-        <PracticeExamRobotPanel
+        <div className="space-y-4">
+          <PracticeExamRobotPanel
+          onTrialImport={openTrialImport}
+          initialClassId={classFilter}
           students={students}
           classes={classes}
           practiceExams={practiceExams}
@@ -965,7 +1033,35 @@ export function StudentTrackingModule() {
             })
           }
         />
+        </div>
       )}
+
+      {activeTab === 'archive' && (
+        <div className="min-w-0 space-y-4">
+          {trialView === 'import' ? <>
+            <button type="button" onClick={() => setTrialView('archive')} className="rounded-lg border border-slate-300 px-4 py-2 text-sm font-medium dark:border-slate-700">
+              Deneme Arşivine Dön
+            </button>
+            <TrialImporter initialClass={archiveClassId || (classFilter !== 'all' ? classFilter : '')} onArchive={(id) => {
+              setArchiveClassId(id);
+              setTrialView('archive');
+            }} />
+          </> : <>
+            <button type="button" onClick={openTrialImport} className="inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white dark:bg-teal-700">
+              <FileUp className="size-4" aria-hidden="true" /> PDF / Excel Yükle
+            </button>
+            <ClassTrialArchive classes={classes} students={students} exams={practiceExams} classId={archiveClassId}
+              onClassChange={setArchiveClassId} onStudent={setSelectedStudentId} onReports={(id) => {
+                setAnalyticsClassId(id);
+                setClassAI(null);
+                setClassAIError('');
+                setActiveTab('analytics');
+              }} />
+          </>}
+        </div>
+      )}
+
+      {activeTab === 'bulk' && <BulkRecordsPanel onTrialImport={openTrialImport} />}
 
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
       {activeTab === 'analytics' && (
@@ -994,11 +1090,11 @@ export function StudentTrackingModule() {
               </select>
             </div>
 
-            <div className="flex items-center gap-2">
+            <div className="control-grid gap-2 sm:max-w-sm">
               <button
                 type="button"
                 onClick={() => void handleRunClassAI()}
-                disabled={classAILoading || analyticsGrades.length === 0}
+                disabled={classAILoading || (analyticsGrades.length === 0 && analyticsPracticeExams.length === 0)}
                 className="inline-flex items-center gap-1.5 px-4 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-60 cursor-pointer whitespace-nowrap"
               >
                 {classAILoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Bot className="w-3.5 h-3.5" />}
@@ -1026,7 +1122,7 @@ export function StudentTrackingModule() {
               </p>
               <div className="h-64 w-full">
                 {analyticsSubjectBreakdown.length === 0 ? (
-                  <p className="text-sm text-slate-500 py-10 text-center">Yeterli sınav verisi yok.</p>
+                  <p className="text-sm text-slate-500 py-10 text-center">Grafik için kayıtlı not bulunmuyor.</p>
                 ) : (
                   <ResponsiveContainer width="100%" height="100%">
                     <BarChart data={analyticsSubjectBreakdown} margin={{ top: 8, right: 12, left: -16, bottom: 8 }}>
@@ -1034,7 +1130,11 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="subject" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Ortalama']} />
-                      <Bar dataKey="average" fill="#0B1F3A" radius={[6, 6, 0, 0]} maxBarSize={44} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={44}>
+                        {analyticsSubjectBreakdown.map(({ subject }) => (
+                          <Cell key={subject} fill={getSubjectColor(subject)} />
+                        ))}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
@@ -1058,13 +1158,38 @@ export function StudentTrackingModule() {
                       <XAxis dataKey="name" tick={{ fontSize: 11, fill: '#64748b' }} />
                       <YAxis domain={[0, 100]} tick={{ fontSize: 11, fill: '#64748b' }} />
                       <Tooltip formatter={(val) => [`${val ?? 0} puan`, 'Sınıf Ortalaması']} />
-                      <Bar dataKey="average" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={48} />
+                      <Bar dataKey="average" radius={[6, 6, 0, 0]} maxBarSize={48}>
+                        {classComparisonData.map(({ id, color }) => <Cell key={id} fill={color} />)}
+                      </Bar>
                     </BarChart>
                   </ResponsiveContainer>
                 )}
               </div>
             </div>
           </div>
+
+          {classPracticeAnalysis.examCount > 0 && (
+            <section className="space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+              <div className="flex flex-wrap items-baseline justify-between gap-2">
+                <h3 className="font-semibold text-navy-900 dark:text-white">Sınıfın Deneme Özeti</h3>
+                <p className="text-sm text-slate-600 dark:text-slate-300">
+                  {classPracticeAnalysis.examCount} sonuç · Ortalama {classPracticeAnalysis.avgTotalNet.toLocaleString('tr-TR')} net
+                </p>
+              </div>
+              <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3 xl:grid-cols-6">
+                {classPracticeAnalysis.subjects.map(({ label, avgNet, maxQuestions }) => (
+                  <div key={label} className="rounded-lg border border-slate-200 p-2.5 dark:border-slate-800"
+                    style={{ borderTop: '3px solid ' + getSubjectColor(label) }}>
+                    <dt className="text-xs font-medium text-slate-600 dark:text-slate-300">{label}</dt>
+                    <dd className="text-sm font-semibold tabular-nums">{avgNet.toLocaleString('tr-TR')} net / {maxQuestions} soru</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          )}
+
+          <ExamNetTrend exams={analyticsPracticeExams} group />
+          <ClassTrialDistribution exams={analyticsPracticeExams} />
 
           {/* Class AI Result */}
           {classAIError && (

@@ -1,3 +1,4 @@
+import { WorkshopLinks } from './workshop/WorkshopLinks';
 import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -227,7 +228,7 @@ export function HistoryAtlasModule() {
         </div>
 
         <div
-          className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+          className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
           role="tablist"
         >
           {(
@@ -260,6 +261,7 @@ export function HistoryAtlasModule() {
       </div>
 
       {/* NEW RICH HISTORY TABS */}
+
       {activeTab === 'campaigns' && <AnimatedCampaignsMap />}
       {activeTab === 'sultans' && <SultansGalleryPanel />}
       {activeTab === 'wisdom' && <HistoryWisdomPanel />}
@@ -477,7 +479,7 @@ export function HistoryAtlasModule() {
           <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
             <div className="lg:col-span-8 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4 space-y-3">
               <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
+                <div className="control-grid gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
                   {(
                     [
                       { id: 'all', label: 'Tüm İşaretler' },
@@ -1187,6 +1189,8 @@ export function HistoryAtlasModule() {
           )}
         </div>
       )}
+
+      <WorkshopLinks activities={['chronology', 'source-types', 'compare-sources']} />
     </div>
   );
 }

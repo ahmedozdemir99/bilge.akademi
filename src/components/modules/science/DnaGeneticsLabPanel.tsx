@@ -119,7 +119,7 @@ export function DnaGeneticsLabPanel() {
             </h2>
           </div>
 
-          <div className="flex flex-wrap gap-1.5">
+          <div className="control-grid gap-1.5">
             {GENETIC_TRAITS.map((item) => (
               <button
                 key={item.id}

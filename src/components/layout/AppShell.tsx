@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
   BookMarked,
@@ -21,8 +21,9 @@ import {
   Sun,
   Users,
   X,
+  Zap,
 } from 'lucide-react';
-import { useAcademy } from '../../context/AcademyContext';
+import { isModuleAvailable, useAcademy } from '../../context/AcademyContext';
 import type { ModuleId } from '../../types/academy';
 
 export interface NavItem {
@@ -35,6 +36,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { id: 'home', label: 'Ana Sayfa', shortLabel: 'Ana Sayfa', icon: Home },
   { id: 'student-tracking', label: 'Öğrenci Takip Sistemi', shortLabel: 'Öğrenci Takip', icon: Users },
+  { id: 'ai-assistant', label: 'Yapay Zekâ Asistanı', shortLabel: 'YZ Asistanı', icon: Bot },
   { id: 'literature', label: 'Şiir ve Edebiyat Atölyesi', shortLabel: 'Edebiyat', icon: Feather },
   { id: 'history', label: 'İnteraktif Tarih Atlası', shortLabel: 'Tarih Atlası', icon: Compass },
   { id: 'mathematics', label: 'Matematik Öğretmeni', shortLabel: 'Matematik', icon: Calculator },
@@ -42,7 +44,7 @@ export const NAV_ITEMS: NavItem[] = [
   { id: 'english', label: 'İngilizce Dil Atölyesi', shortLabel: 'İngilizce', icon: Languages },
   { id: 'religion', label: 'Din Kültürü ve Ahlak Bilgisi', shortLabel: 'Din Kültürü', icon: MoonStar },
   { id: 'philosophy', label: 'Felsefe Akademisi', shortLabel: 'Felsefe', icon: BookMarked },
-  { id: 'ai-assistant', label: 'Yapay Zekâ Asistanı', shortLabel: 'YZ Asistanı', icon: Bot },
+  { id: 'activity-workshop', label: 'Keşif Atölyesi', shortLabel: 'Keşif Atölyesi', icon: Zap },
   { id: 'reports', label: 'Raporlar ve İstatistikler', shortLabel: 'Raporlar', icon: BarChart3 },
   { id: 'settings', label: 'Ayarlar', shortLabel: 'Ayarlar', icon: Settings },
 ];
@@ -63,8 +65,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const [collapsed, setCollapsed] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const drawerRef = useRef<HTMLDialogElement>(null);
+  const previousModule = useRef(activeModule);
 
-  const currentNav = NAV_ITEMS.find((item) => item.id === activeModule) ?? NAV_ITEMS[0];
+  const visibleNav = NAV_ITEMS.filter((item) => isModuleAvailable(item.id, workspaceView));
+  const currentNav = visibleNav.find((item) => item.id === activeModule) ?? NAV_ITEMS[0];
+
+  useEffect(() => {
+    if (previousModule.current === activeModule) return;
+    previousModule.current = activeModule;
+    window.scrollTo({ top: 0, behavior: 'instant' });
+  }, [activeModule]);
+
+  useEffect(() => {
+    if (!mobileMenuOpen) return;
+    const drawer = drawerRef.current;
+    const desktop = window.matchMedia('(min-width: 64rem)');
+    const closeOnDesktop = () => {
+      if (desktop.matches) setMobileMenuOpen(false);
+    };
+    closeOnDesktop();
+    if (!desktop.matches) drawer?.showModal();
+    desktop.addEventListener('change', closeOnDesktop);
+    return () => {
+      desktop.removeEventListener('change', closeOnDesktop);
+      drawer?.close();
+    };
+  }, [mobileMenuOpen]);
 
   const handleSelect = (id: ModuleId) => {
     setActiveModule(id);
@@ -73,41 +100,48 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   return (
     <div className="min-h-screen flex bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100">
+      <a
+        href="#bilge-main"
+        className="sr-only focus:not-sr-only focus:fixed focus:top-2 focus:left-2 focus:z-50 focus:rounded-lg focus:bg-navy-900 focus:px-4 focus:py-2 focus:text-white no-print"
+      >
+        Ana içeriğe geç
+      </a>
       {/* Desktop Sidebar */}
       <aside
         aria-label="Ana Modül Menüsü"
-        className={`hidden lg:flex flex-col shrink-0 bg-navy-900 text-slate-100 border-r border-navy-800 transition-all duration-200 no-print ${
+        className={`hidden lg:sticky lg:top-0 lg:flex lg:h-dvh flex-col shrink-0 bg-navy-900 text-slate-100 border-r border-navy-800 transition-all duration-200 no-print ${
           collapsed ? 'w-[76px]' : 'w-[272px]'
         }`}
       >
-        <div className="h-16 px-4 flex items-center justify-between border-b border-white/10">
-          <button
-            type="button"
-            onClick={() => handleSelect('home')}
-            className="flex items-center gap-3 min-w-0 text-left cursor-pointer focus-visible:outline-teal-400 rounded-md"
-          >
-            <div className="w-9 h-9 rounded-lg bg-teal-600/20 border border-gold-400/40 flex items-center justify-center shrink-0">
-              <GraduationCap className="w-5 h-5 text-gold-400" />
-            </div>
-            {!collapsed && (
+        <div className={`h-16 shrink-0 gap-2 px-4 flex items-center border-b border-white/10 ${collapsed ? 'justify-center' : 'justify-between'}`}>
+          {!collapsed && (
+            <button
+              type="button"
+              onClick={() => handleSelect('home')}
+              aria-label="Ana sayfa"
+              className="flex min-h-11 items-center gap-2 min-w-0 text-left cursor-pointer focus-visible:outline-teal-400 rounded-md"
+            >
+              <div className="w-9 h-9 rounded-lg bg-teal-600/20 border border-gold-400/40 flex items-center justify-center shrink-0">
+                <GraduationCap className="w-5 h-5 text-gold-400" />
+              </div>
               <span className="font-display text-lg font-semibold tracking-tight text-white whitespace-nowrap truncate">
                 BİLGE AKADEMİ
               </span>
-            )}
-          </button>
+            </button>
+          )}
           <button
             type="button"
             onClick={() => setCollapsed((c) => !c)}
             aria-label={collapsed ? 'Menüyü genişlet' : 'Menüyü daralt'}
             title={collapsed ? 'Menüyü genişlet' : 'Menüyü daralt'}
-            className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer shrink-0"
+            className="grid size-10 shrink-0 place-items-center rounded-lg text-slate-300 hover:text-white hover:bg-white/10 transition-colors cursor-pointer"
           >
             {collapsed ? <PanelLeftOpen className="w-4 h-4" /> : <PanelLeftClose className="w-4 h-4" />}
           </button>
         </div>
 
-        <nav className="flex-1 py-4 px-3 space-y-1 overflow-y-auto">
-          {NAV_ITEMS.map((item) => {
+        <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain px-3 py-3">
+          {visibleNav.map((item) => {
             const Icon = item.icon;
             const isActive = activeModule === item.id;
             return (
@@ -115,23 +149,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 key={item.id}
                 type="button"
                 onClick={() => handleSelect(item.id)}
-                title={collapsed ? item.label : undefined}
+                title={item.label}
+                aria-label={collapsed ? item.label : undefined}
                 aria-current={isActive ? 'page' : undefined}
-                className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                className={`w-full flex items-center min-h-10 gap-3 px-3 py-1 rounded-lg text-left text-sm font-medium leading-tight transition-colors cursor-pointer ${
                   isActive
-                    ? 'bg-teal-600 text-white'
+                    ? 'bg-teal-300 font-semibold text-navy-950'
                     : 'text-slate-300 hover:bg-white/8 hover:text-white'
                 } ${collapsed ? 'justify-center' : ''}`}
               >
-                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-white' : 'text-gold-400/90'}`} />
-                {!collapsed && <span className="truncate whitespace-nowrap">{item.label}</span>}
+                <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-navy-950' : 'text-gold-400/90'}`} />
+                {!collapsed && <span className="min-w-0 break-words">{item.label}</span>}
               </button>
             );
           })}
         </nav>
 
         {/* Bottom Account Summary */}
-        <div className="p-3 border-t border-white/10">
+        <div className="shrink-0 p-3 border-t border-white/10">
           {!collapsed ? (
             <div className="px-2 py-2 space-y-2">
               <div className="min-w-0">
@@ -147,7 +182,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => void signOutUser()}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-slate-200 bg-white/8 hover:bg-white/15 transition-colors cursor-pointer whitespace-nowrap"
+                  className="w-full min-h-10 inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-slate-200 bg-white/8 hover:bg-white/15 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <LogOut className="w-3.5 h-3.5" />
                   <span>Çıkış Yap</span>
@@ -156,7 +191,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <button
                   type="button"
                   onClick={() => setSignInOpen(true)}
-                  className="w-full inline-flex items-center justify-center gap-2 px-3 py-2 rounded-lg text-xs font-medium text-navy-950 bg-gold-400 hover:bg-gold-500 transition-colors cursor-pointer whitespace-nowrap"
+                  className="w-full min-h-10 inline-flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium text-navy-950 bg-gold-400 hover:bg-gold-500 transition-colors cursor-pointer whitespace-nowrap"
                 >
                   <LogIn className="w-3.5 h-3.5" />
                   <span>Giriş Yap</span>
@@ -169,7 +204,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               onClick={() => (user ? void signOutUser() : setSignInOpen(true))}
               title={user ? 'Çıkış Yap' : 'Giriş Yap'}
               aria-label={user ? 'Çıkış Yap' : 'Giriş Yap'}
-              className="w-full flex items-center justify-center p-2.5 rounded-lg text-gold-400 hover:bg-white/10 transition-colors cursor-pointer"
+              className="w-full min-h-10 flex items-center justify-center rounded-lg text-gold-400 hover:bg-white/10 transition-colors cursor-pointer"
             >
               {user ? <LogOut className="w-4 h-4" /> : <LogIn className="w-4 h-4" />}
             </button>
@@ -179,16 +214,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
       {/* Mobile Drawer */}
       {mobileMenuOpen && (
-        <div
-          className="fixed inset-0 z-50 lg:hidden flex bg-slate-950/60"
-          onClick={() => setMobileMenuOpen(false)}
+        <dialog
+          ref={drawerRef}
+          id="mobile-module-menu"
+          aria-label="Mobil modül menüsü"
+          className="fixed inset-y-0 left-0 m-0 h-dvh max-h-none w-72 max-w-[90vw] bg-navy-900 text-slate-100 backdrop:bg-slate-950/60"
+          onCancel={(event) => {
+            event.preventDefault();
+            setMobileMenuOpen(false);
+          }}
+          onClick={(event) => {
+            if (event.target === event.currentTarget) setMobileMenuOpen(false);
+          }}
         >
-          <aside
-            aria-label="Mobil Menü"
-            className="w-72 max-w-[85vw] bg-navy-900 text-slate-100 h-full flex flex-col"
-            onClick={(e) => e.stopPropagation()}
-          >
-            <div className="h-14 px-4 flex items-center justify-between border-b border-white/10">
+          <div className="h-full flex flex-col">
+            <div className="h-16 shrink-0 gap-2 px-3 flex items-center justify-between border-b border-white/10">
               <div className="flex items-center gap-2.5">
                 <GraduationCap className="w-5 h-5 text-gold-400" />
                 <span className="font-display text-base font-semibold text-white">BİLGE AKADEMİ</span>
@@ -197,13 +237,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 type="button"
                 onClick={() => setMobileMenuOpen(false)}
                 aria-label="Menüyü kapat"
-                className="p-2 rounded-lg text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
+                className="grid size-11 shrink-0 place-items-center rounded-lg text-slate-300 hover:text-white hover:bg-white/10 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
-            <nav className="flex-1 p-3 space-y-1 overflow-y-auto">
-              {NAV_ITEMS.map((item) => {
+            <nav className="min-h-0 flex-1 space-y-1 overflow-y-auto overscroll-contain p-3">
+              {visibleNav.map((item) => {
                 const Icon = item.icon;
                 const isActive = activeModule === item.id;
                 return (
@@ -211,19 +251,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     key={item.id}
                     type="button"
                     onClick={() => handleSelect(item.id)}
-                    className={`w-full flex items-center gap-3 px-3.5 py-3 rounded-lg text-sm font-medium transition-colors cursor-pointer ${
+                    aria-current={isActive ? 'page' : undefined}
+                    className={`w-full flex items-center min-h-11 gap-3 px-3 py-1 rounded-lg text-left text-sm font-medium leading-tight transition-colors cursor-pointer ${
                       isActive
-                        ? 'bg-teal-600 text-white'
+                        ? 'bg-teal-300 font-semibold text-navy-950'
                         : 'text-slate-200 hover:bg-white/10 hover:text-white'
                     }`}
                   >
-                    <Icon className="w-4 h-4 shrink-0 text-gold-400" />
-                    <span className="truncate">{item.label}</span>
+                    <Icon className={`w-4 h-4 shrink-0 ${isActive ? 'text-navy-950' : 'text-gold-400'}`} />
+                    <span className="min-w-0 break-words">{item.label}</span>
                   </button>
                 );
               })}
             </nav>
-            <div className="p-4 border-t border-white/10">
+            <div className="shrink-0 p-3 border-t border-white/10">
               {user ? (
                 <button
                   type="button"
@@ -231,7 +272,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     setMobileMenuOpen(false);
                     void signOutUser();
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-white/10 text-white cursor-pointer"
+                  className="w-full min-h-11 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-white/10 text-white cursor-pointer"
                 >
                   <LogOut className="w-4 h-4" />
                   <span>Çıkış Yap</span>
@@ -243,28 +284,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                     setMobileMenuOpen(false);
                     setSignInOpen(true);
                   }}
-                  className="w-full flex items-center justify-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 cursor-pointer"
+                  className="w-full min-h-11 flex items-center justify-center gap-2 px-3 py-1.5 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 cursor-pointer"
                 >
                   <LogIn className="w-4 h-4" />
                   <span>Giriş Yap</span>
                 </button>
               )}
             </div>
-          </aside>
-        </div>
+          </div>
+        </dialog>
       )}
 
       {/* Main Content Shell */}
       <div className="flex-1 flex flex-col min-w-0">
         {/* Top Bar (3 clean zones) */}
-        <header className="sticky top-0 z-30 h-16 px-4 sm:px-6 lg:px-8 flex items-center justify-between gap-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 no-print">
+        <header className="sticky top-0 z-30 h-16 px-3 sm:px-6 lg:px-8 flex items-center justify-between gap-2 sm:gap-4 bg-white/95 dark:bg-slate-900/95 backdrop-blur-sm border-b border-slate-200 dark:border-slate-800 no-print">
           {/* Zone 1: Mobile Menu Trigger + Breadcrumb */}
-          <div className="flex items-center gap-3 min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
             <button
               type="button"
               onClick={() => setMobileMenuOpen(true)}
               aria-label="Menüyü aç"
-              className="lg:hidden p-2 -ml-2 rounded-lg text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
+              aria-haspopup="dialog"
+              aria-expanded={mobileMenuOpen}
+              aria-controls={mobileMenuOpen ? 'mobile-module-menu' : undefined}
+              className="grid size-11 shrink-0 place-items-center rounded-lg lg:hidden text-slate-600 dark:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer"
             >
               <Menu className="w-5 h-5" />
             </button>
@@ -272,15 +316,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setActiveModule('home')}
-                className="hidden sm:inline text-slate-500 dark:text-slate-400 hover:text-navy-900 dark:hover:text-white transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="hidden min-h-11 sm:inline-flex items-center text-slate-500 dark:text-slate-400 hover:text-navy-900 dark:hover:text-white transition-colors cursor-pointer"
               >
                 Bilge Akademi
               </button>
               <span className="hidden sm:inline text-slate-300 dark:text-slate-600" aria-hidden="true">
                 /
               </span>
-              <span className="font-semibold text-slate-900 dark:text-slate-100 truncate">
-                {currentNav.label}
+              <span title={currentNav.label} className="font-semibold text-slate-900 dark:text-slate-100 truncate">
+                <span className="sm:hidden">{currentNav.shortLabel}</span>
+                <span className="hidden sm:inline">{currentNav.label}</span>
               </span>
             </div>
           </div>
@@ -293,21 +338,22 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </div>
 
           {/* Zone 3: Theme Toggle + Primary Action */}
-          <div className="flex items-center gap-2.5 shrink-0">
+          <div className="flex max-w-[50%] items-center gap-2 shrink-0">
             <button
               type="button"
               onClick={toggleTheme}
-              aria-label={theme === 'dark' ? 'Açık temaya geç' : 'Koyu temaya geç'}
+              aria-label="Koyu tema"
+              aria-pressed={theme === 'dark'}
               title={theme === 'dark' ? 'Açık tema' : 'Koyu tema'}
-              className="p-2.5 rounded-lg border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer"
+              className="appearance-option size-11 shrink-0 cursor-pointer px-0"
             >
-              {theme === 'dark' ? <Sun className="w-4 h-4 text-gold-400" /> : <Moon className="w-4 h-4 text-navy-900" />}
+              {theme === 'dark' ? <Sun aria-hidden="true" className="size-4" /> : <Moon aria-hidden="true" className="size-4" />}
             </button>
             {user ? (
               <button
                 type="button"
                 onClick={() => setActiveModule('settings')}
-                className="px-3.5 py-2 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-11 min-w-0 truncate px-3 rounded-lg text-sm font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
               >
                 {profile?.displayName?.split(' ')[0] || 'Hesabım'}
               </button>
@@ -315,7 +361,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               <button
                 type="button"
                 onClick={() => setSignInOpen(true)}
-                className="px-3.5 py-2 rounded-lg text-xs font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors whitespace-nowrap shrink-0 cursor-pointer"
+                className="min-h-11 min-w-0 truncate px-3 rounded-lg text-sm font-medium bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer"
               >
                 Giriş Yap
               </button>
@@ -324,7 +370,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         </header>
 
         {/* Main Viewport */}
-        <main className="flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
+        <main id="bilge-main" tabIndex={-1} className="scroll-mt-16 flex-1 w-full max-w-[1320px] mx-auto px-4 sm:px-6 lg:px-8 py-6 lg:py-8">
           {children}
         </main>
       </div>

@@ -84,7 +84,7 @@ export function EnglishVocabAndBuilderPanel({
     return (
       <div className="space-y-5">
         <div className="flex flex-col md:flex-row md:items-center justify-between gap-3">
-          <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80">
+          <div className="control-grid gap-1.5 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80">
             {units.map((u) => (
               <button
                 key={u}
@@ -232,7 +232,7 @@ export function EnglishVocabAndBuilderPanel({
             </h2>
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5">
+          <div className="control-grid gap-2 [--control-min-width:4rem]">
             {SENTENCE_BUILDER_CHALLENGES.map((ch, idx) => (
               <button
                 key={ch.id}
@@ -317,7 +317,7 @@ export function EnglishVocabAndBuilderPanel({
           })}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2.5 pt-2">
+        <div className="control-grid gap-2.5 pt-2">
           <button
             type="button"
             disabled={pickedIndices.length === 0}

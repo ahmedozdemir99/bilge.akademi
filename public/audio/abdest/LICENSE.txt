@@ -1,0 +1,4 @@
+Abdest rehberi seslendirmesi, Piper tr_TR-dfki-medium modeliyle sentezlenmiştir. Ses perdesi ve ses düzeyi düzenlenmiştir.
+Model ve veri kümesi: https://huggingface.co/rhasspy/piper-voices/tree/main/tr/tr_TR/dfki/medium
+DFKI Türkçe ses veri kümesi: https://github.com/marytts/dfki-ot-data/
+Ses dosyaları: CC BY-NC-SA 4.0 (https://creativecommons.org/licenses/by-nc-sa/4.0/)

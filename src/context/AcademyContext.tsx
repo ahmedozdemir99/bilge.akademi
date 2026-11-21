@@ -1,16 +1,19 @@
-import React, { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react';
+import type { ActivityId } from '../components/modules/workshop/activityTitles';
+import React, { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signInWithPopup, signOut, type User } from 'firebase/auth';
 import {
   collection,
   deleteDoc,
   doc,
   getDoc,
+  getDocFromServer,
   onSnapshot,
   query,
   serverTimestamp,
   setDoc,
   updateDoc,
   where,
+  writeBatch,
 } from 'firebase/firestore';
 import { auth, db, googleProvider, handleFirestoreError, OperationType } from '../lib/firebase';
 import {
@@ -44,6 +47,7 @@ import type {
   WorkspaceView,
 } from '../types/academy';
 import { computePracticeExamTotals } from '../utils/exportUtils';
+import { buildBulkPlan, bulkRecordId, type BulkInput } from '../utils/bulkStudentRecords';
 
 const DEMO_STORAGE_KEY = 'bilge_akademi_demo_v2';
 const THEME_STORAGE_KEY = 'bilge_akademi_theme_v1';
@@ -181,10 +185,14 @@ export interface MathAttemptInput {
   hintsUsed: number;
 }
 
+type GoogleSignInHelp = 'browser' | 'connection' | 'popup' | 'storage';
+
 interface AcademyContextValue {
   // Navigation
   activeModule: ModuleId;
   setActiveModule: (module: ModuleId) => void;
+  workshopActivityId: ActivityId | null;
+  openWorkshopActivity: (id: ActivityId) => void;
   assistantInitialContext: string;
   openAssistantForModule: (moduleLabel: string) => void;
 
@@ -196,6 +204,8 @@ interface AcademyContextValue {
   signInWithGoogle: () => Promise<void>;
   signInOpen: boolean;
   setSignInOpen: (open: boolean) => void;
+  googleSignInHelp: GoogleSignInHelp | null;
+  dismissGoogleSignInHelp: () => void;
   signOutUser: () => Promise<void>;
   updateProfileInfo: (schoolName: string, branch: string, displayName: string) => Promise<void>;
 
@@ -238,6 +248,7 @@ interface AcademyContextValue {
 
   addPracticeExam: (input: PracticeExamInput) => Promise<void>;
   deletePracticeExam: (id: string) => Promise<void>;
+  saveBulkRecords: (input: BulkInput) => Promise<{ classId: string; saved: number; skipped: number; studentsSaved?: number; trialsSaved?: number; error?: string }>;
 
   addPoem: (input: PoemInput) => Promise<string>;
   updatePoem: (id: string, input: PoemInput) => Promise<void>;
@@ -260,14 +271,25 @@ interface AcademyContextValue {
 
 const AcademyContext = createContext<AcademyContextValue | null>(null);
 
+export function isModuleAvailable(module: ModuleId, view: WorkspaceView): boolean {
+  return view === 'teacher' || (module !== 'student-tracking' && module !== 'reports');
+}
+
 export function AcademyProvider({ children }: { children: React.ReactNode }) {
-  const [activeModule, setActiveModule] = useState<ModuleId>('home');
+  const [selectedModule, setModule] = useState<ModuleId>('home');
+  const [workshopActivityId, setWorkshopActivityId] = useState<ActivityId | null>(null);
+  const openWorkshopActivity = useCallback((id: ActivityId) => {
+    setWorkshopActivityId(id);
+    setModule('activity-workshop');
+  }, []);
   const [assistantInitialContext, setAssistantInitialContext] = useState<string>('Genel Platform');
 
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
   const [signInOpen, setSignInOpen] = useState(false);
+  const [googleSignInHelp, setGoogleSignInHelp] = useState<GoogleSignInHelp | null>(null);
+  const googleSignInPending = useRef(false);
   const [dataLoading, setDataLoading] = useState(false);
 
   const [theme, setThemeState] = useState<ThemeMode>(() => {
@@ -279,7 +301,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     }
     return 'light';
   });
-  const [workspaceView, setWorkspaceViewState] = useState<WorkspaceView>('teacher');
+  const [demoView, setDemoView] = useState<WorkspaceView>('teacher');
   const [compactMode, setCompactModeState] = useState<boolean>(false);
 
   // Demo state (used when signed out)
@@ -299,6 +321,22 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
   const isDemoMode = !user;
+  const isTeacherAccount = user !== null && profile?.uid === user.uid
+    && (profile.role === 'teacher' || profile.role === 'admin');
+  const workspaceView: WorkspaceView = isDemoMode && !authLoading
+    ? demoView
+    : isTeacherAccount ? 'teacher' : 'student';
+  const activeModule = isModuleAvailable(selectedModule, workspaceView) ? selectedModule : 'home';
+
+  const setActiveModule = useCallback((module: ModuleId) => {
+    if (!isModuleAvailable(module, workspaceView)) return;
+    setWorkshopActivityId(null);
+    setModule(module);
+  }, [workspaceView]);
+
+  useEffect(() => {
+    setModule((module) => isModuleAvailable(module, workspaceView) ? module : 'home');
+  }, [workspaceView]);
 
   const notify = useCallback((type: ToastItem['type'], title: string, description?: string) => {
     const id = generateValidId('toast');
@@ -368,8 +406,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const setWorkspaceView = useCallback(
     (next: WorkspaceView) => {
-      setWorkspaceViewState(next);
-      void persistUserSettings(theme, next, compactMode);
+      if (!isDemoMode || authLoading) return;
+      setDemoView(next);
       notify(
         'info',
         next === 'teacher' ? 'Öğretmen Görünümü Aktif' : 'Öğrenci Görünümü Aktif',
@@ -378,7 +416,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           : 'Öğrenci odaklı çalışma, takip ve yapay zekâ rehberlik görünümüne geçildi.'
       );
     },
-    [compactMode, notify, persistUserSettings, theme]
+    [authLoading, isDemoMode, notify]
   );
 
   const setCompactMode = useCallback(
@@ -391,19 +429,23 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   // Firebase Auth listener + profile bootstrap
   useEffect(() => {
+    let authRevision = 0;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
+      const revision = ++authRevision;
+      setProfile(null);
       if (!firebaseUser?.emailVerified) {
         setUser(null);
-        setProfile(null);
         setAuthLoading(false);
         return;
       }
+      setAuthLoading(true);
 
       setUser(firebaseUser);
       setSignInOpen(false);
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
+        if (revision !== authRevision) return;
         const safeName = (firebaseUser.displayName || 'Bilge Kullanıcı').trim().slice(0, 100);
         const isBootstrappedAdmin = firebaseUser.email === 'ahmedkadiri99@gmail.com';
 
@@ -417,6 +459,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
             createdAt: serverTimestamp(),
             updatedAt: serverTimestamp(),
           });
+          if (revision !== authRevision) return;
           if (firebaseUser.email) {
             await setDoc(doc(db, 'users', firebaseUser.uid, 'private', 'contact'), {
               ownerId: firebaseUser.uid,
@@ -424,6 +467,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
               updatedAt: serverTimestamp(),
             });
           }
+          if (revision !== authRevision) return;
           setProfile({
             uid: firebaseUser.uid,
             displayName: safeName,
@@ -446,13 +490,11 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
         // Load saved user settings if present
         const settingsSnap = await getDoc(doc(db, 'userSettings', firebaseUser.uid));
+        if (revision !== authRevision) return;
         if (settingsSnap.exists()) {
           const sData = settingsSnap.data();
           if (sData.theme === 'dark' || sData.theme === 'light') {
             setThemeState(sData.theme);
-          }
-          if (sData.workspaceView === 'teacher' || sData.workspaceView === 'student') {
-            setWorkspaceViewState(sData.workspaceView);
           }
           if (typeof sData.compactMode === 'boolean') {
             setCompactModeState(sData.compactMode);
@@ -461,11 +503,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       } catch (error) {
         console.error('Profil yüklenirken hata:', error);
       } finally {
-        setAuthLoading(false);
+        if (revision === authRevision) setAuthLoading(false);
       }
     });
 
-    return () => unsubscribe();
+    return () => {
+      authRevision += 1;
+      unsubscribe();
+    };
   }, []);
 
   // Firestore real-time subscriptions (only when signed in)
@@ -604,47 +649,56 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     };
   }, [user]);
 
+  const dismissGoogleSignInHelp = useCallback(() => setGoogleSignInHelp(null), []);
+
   const signInWithGoogle = useCallback(async () => {
+    if (googleSignInPending.current || auth.currentUser) return;
+
+    const userAgent = navigator.userAgent;
+    const isAndroidWebView = /Android.*(?:; wv\)|Version\/4\.0.*Chrome\/)/i.test(userAgent);
+    const isAppleWebView = /(?:iPhone|iPad|iPod).*AppleWebKit/i.test(userAgent)
+      && !/(?:Safari|CriOS|FxiOS|EdgiOS|OPiOS)\//i.test(userAgent);
+    if (window.self !== window.top || isAndroidWebView || isAppleWebView) {
+      setGoogleSignInHelp('browser');
+      return;
+    }
+    if (!navigator.onLine) {
+      setGoogleSignInHelp('connection');
+      return;
+    }
+
+    googleSignInPending.current = true;
+    setGoogleSignInHelp(null);
     try {
       await signInWithPopup(auth, googleProvider);
-      notify('success', 'Oturum açıldı', 'Verileriniz artık Firebase Firestore üzerinde güvenle saklanır.');
+      notify('success', 'Oturum açıldı', 'Bulut hesabınız etkin.');
     } catch (error) {
-      const errObj = error as { code?: string; message?: string };
-      const code = errObj?.code ?? '';
-      const msg = errObj?.message ?? '';
-      if (code === 'auth/popup-closed-by-user' || code === 'auth/cancelled-popup-request' || msg.includes('popup-closed-by-user')) {
-        return;
+      const code = (error as { code?: string } | null)?.code ?? '';
+      switch (code) {
+        case 'auth/popup-closed-by-user':
+        case 'auth/cancelled-popup-request':
+          return;
+        case 'auth/network-request-failed':
+          setGoogleSignInHelp('connection');
+          return;
+        case 'auth/popup-blocked':
+          setGoogleSignInHelp('popup');
+          return;
+        case 'auth/web-storage-unsupported':
+        case 'auth/operation-not-supported-in-this-environment':
+          setGoogleSignInHelp('storage');
+          return;
+        case 'auth/unauthorized-domain':
+          notify('error', 'Bu adres Google girişi için yetkili değil', 'Google ile giriş yapmak için Bilge Akademi’nin yayın adresini açın.');
+          return;
+        case 'auth/operation-not-allowed':
+          notify('error', 'Google girişi devre dışı', 'Site yöneticisinin Firebase Authentication’da Google girişini etkinleştirmesi gerekiyor.');
+          return;
+        default:
+          notify('error', 'Google ile giriş tamamlanamadı', 'Tekrar deneyebilir veya Demo Modunda devam edebilirsiniz.');
       }
-      if (code === 'auth/unauthorized-domain' || msg.includes('unauthorized-domain')) {
-        const host = typeof window !== 'undefined' ? window.location.hostname : '';
-        notify(
-          'error',
-          'Alan adı Firebase’de yetkilendirilmemiş',
-          `Google girişi için "${host}" alan adını Firebase Console > Authentication > Settings > Authorized domains listesine ekleyin. Tüm dersleri Demo Modunda giriş yapmadan kullanabilirsiniz.`
-        );
-        return;
-      }
-      if (code === 'auth/popup-blocked' || msg.includes('popup-blocked')) {
-        notify(
-          'error',
-          'Açılır pencere engellendi',
-          'Tarayıcı ayarlarından bu site için açılır pencerelere (pop-up) izin verip tekrar deneyin.'
-        );
-        return;
-      }
-      if (code.includes('api-key') || msg.includes('API key')) {
-        notify(
-          'error',
-          'Firebase API anahtarı kısıtlı',
-          'Google Cloud Console > Credentials bölümünde bu alan adının Firebase API anahtarına izinli olduğunu kontrol edin.'
-        );
-        return;
-      }
-      notify(
-        'error',
-        'Giriş başarısız',
-        `Google ile oturum açılırken bir hata oluştu${code ? ` (${code})` : ''}. Demo Moduyla tüm özellikler kullanılabilir.`
-      );
+    } finally {
+      googleSignInPending.current = false;
     }
   }, [notify]);
 
@@ -693,6 +747,102 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     },
     [notify, user]
   );
+
+  const saveBulkRecords = useCallback(async (input: BulkInput) => {
+    if (workspaceView !== 'teacher' || authLoading || (user && dataLoading)) {
+      throw new Error('Kayıtların yüklenmesini bekleyin ve öğretmen görünümünden tekrar deneyin.');
+    }
+    if (user && !navigator.onLine) throw new Error('Buluta kaydetmek için internet bağlantınızı kontrol edin.');
+    const teacherId = user?.uid ?? DEMO_TEACHER_ID;
+    const snapshot = user
+      ? { classes: cloudClasses, students: cloudStudents, grades: cloudGrades, practiceExams: cloudPracticeExams }
+      : demoStore;
+    const plan = await buildBulkPlan(input, snapshot, teacherId);
+    const skipped = plan.rows.filter((row) => row.skip).length;
+    const records = await Promise.all(plan.rows.filter((row) => !row.skip).map(async (row) => ({
+      ...row,
+      id: await bulkRecordId(teacherId, row.collection, row.key, row.collection === 'practiceExams' && row.published, row.collection === 'practiceExams' && row.fromFile),
+    })));
+    if (auth.currentUser?.uid !== user?.uid) throw new Error('Oturum değişti. İşlemi yeniden açın.');
+
+    if (!user) {
+      setDemoStore((current) => {
+        const students: Student[] = [];
+        const grades: Grade[] = [];
+        const practiceExams: PracticeExamRecord[] = [];
+        for (const row of records) {
+          const meta = { id: row.id, teacherId, isDemo: true };
+          if (row.collection === 'students') students.push({ ...row.data, ...meta });
+          if (row.collection === 'grades') grades.push({ ...row.data, ...meta });
+          if (row.collection === 'practiceExams') practiceExams.push({ ...row.data, ...meta });
+        }
+        const merge = <T extends { id: string },>(existing: T[], added: T[]): T[] => {
+          const existingIds = new Set(existing.map(({ id }) => id));
+          return [...added.filter(({ id }) => !existingIds.has(id)), ...existing];
+        };
+        return {
+          ...current,
+          classes: plan.newClass
+            ? merge(current.classes, [{ ...plan.newClass, id: plan.classId, teacherId, isDemo: true }])
+            : current.classes,
+          students: merge(current.students, students),
+          grades: merge(current.grades, grades),
+          practiceExams: merge(current.practiceExams, practiceExams),
+        };
+      });
+      return {
+        classId: plan.classId, saved: records.length, skipped,
+        studentsSaved: records.filter(({ collection }) => collection === 'students').length,
+        trialsSaved: records.filter(({ collection }) => collection === 'practiceExams').length,
+      };
+    }
+
+    const writeRecords = async (entries: { collection: string; id: string; data: object }[]) => {
+      if (auth.currentUser?.uid !== teacherId) throw new Error('Oturum değişti.');
+      const batch = writeBatch(db);
+      for (const entry of entries) {
+        batch.set(doc(db, entry.collection, entry.id), {
+          ...entry.data, teacherId, createdAt: serverTimestamp(), updatedAt: serverTimestamp(),
+        });
+      }
+      try {
+        await batch.commit();
+      } catch (error) {
+        // A retry after an interrupted response may find the same deterministic IDs already saved.
+        const matches = await Promise.all(entries.map(async (entry) => {
+          try {
+            const existing = (await getDocFromServer(doc(db, entry.collection, entry.id))).data();
+            return existing?.teacherId === teacherId &&
+              Object.entries(entry.data).every(([key, value]) => existing[key] === value);
+          } catch {
+            return false;
+          }
+        }));
+        if (matches.some((match) => !match)) throw error;
+      }
+    };
+
+    let saved = 0;
+    let studentsSaved = 0;
+    let trialsSaved = 0;
+    try {
+      if (plan.newClass) await writeRecords([{ collection: 'classes', id: plan.classId, data: plan.newClass }]);
+      // Firestore rules require the parent class and student to exist before a result is written.
+      for (const collection of ['students', 'grades', 'practiceExams'] as const) {
+        const phase = records.filter((row) => row.collection === collection);
+        for (let offset = 0; offset < phase.length; offset += 5) {
+          const chunk = phase.slice(offset, offset + 5);
+          await writeRecords(chunk);
+          saved += chunk.length;
+          if (collection === 'students') studentsSaved += chunk.length;
+          if (collection === 'practiceExams') trialsSaved += chunk.length;
+        }
+      }
+      return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved };
+    } catch {
+      return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved, error: 'Bulut kaydı tamamlanamadı. Bağlantınızı kontrol edip aynı listeyi tekrar kaydedebilirsiniz.' };
+    }
+  }, [authLoading, cloudClasses, cloudGrades, cloudPracticeExams, cloudStudents, dataLoading, demoStore, user, workspaceView]);
 
   // --- CRUD: Classes ---
   const addClass = useCallback(
@@ -1543,7 +1693,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       notify(
         'success',
         'Ortaokul örnek sınıfları hesabınıza yüklendi',
-        'Sınıflar, öğrenciler, yazılı notları ve LGS deneme kayıtları Firestore veritabanına eklendi.'
+        'Sınıflar, öğrenciler, notlar ve LGS deneme kayıtları Firestore veritabanına eklendi.'
       );
     } catch (error) {
       handleFirestoreError(error, OperationType.WRITE, 'seedDemoToFirestore');
@@ -1568,12 +1718,14 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const openAssistantForModule = useCallback((moduleLabel: string) => {
     setAssistantInitialContext(moduleLabel);
     setActiveModule('ai-assistant');
-  }, []);
+  }, [setActiveModule]);
 
   const value = useMemo<AcademyContextValue>(
     () => ({
       activeModule,
       setActiveModule,
+      workshopActivityId,
+      openWorkshopActivity,
       assistantInitialContext,
       openAssistantForModule,
       user,
@@ -1583,6 +1735,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       signInWithGoogle,
       signInOpen,
       setSignInOpen,
+      googleSignInHelp,
+      dismissGoogleSignInHelp,
       signOutUser,
       updateProfileInfo,
       theme,
@@ -1615,6 +1769,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       deleteAttendance,
       addPracticeExam,
       deletePracticeExam,
+      saveBulkRecords,
       addPoem,
       updatePoem,
       deletePoem,
@@ -1634,6 +1789,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       addGrade,
       addPoem,
       addPracticeExam,
+      saveBulkRecords,
       addStudent,
       assistantInitialContext,
       authLoading,
@@ -1656,15 +1812,19 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       deleteStudent,
       demoStore,
       dismissToast,
+      dismissGoogleSignInHelp,
+      googleSignInHelp,
       isDemoMode,
       notify,
       openAssistantForModule,
+      openWorkshopActivity,
       profile,
       recordMathAttempt,
       recordQuizAttempt,
       resetDemoData,
       saveAIConversationSummary,
       seedDemoToFirestore,
+      setActiveModule,
       setCompactMode,
       setTheme,
       setWorkspaceView,
@@ -1681,6 +1841,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       updateProfileInfo,
       updateStudent,
       user,
+      workshopActivityId,
       workspaceView,
     ]
   );

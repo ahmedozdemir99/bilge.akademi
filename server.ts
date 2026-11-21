@@ -1,8 +1,10 @@
+import { formatPracticeForAnalysis } from './src/utils/practiceAnalysis';
 import 'dotenv/config';
 import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { GoogleGenAI, ThinkingLevel, Type } from '@google/genai';
+import { onRequest as handlePagesApi } from './functions/api/[[path]].ts';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -11,11 +13,11 @@ const app = express();
 app.use(express.json({ limit: '1.5mb' }));
 
 const PORT = Number(process.env.PORT) || 3000;
-const MODEL_NAME = 'gemini-4-hydrogen';
-const FALLBACK_MODEL_NAME = 'gemini-3.1-flash-lite';
+const MODEL_NAME = 'gemini-3.8-flash';
+const FALLBACK_MODEL_NAME = 'gemini-3.5-flash-lite';
 
 function getGenAIClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     return null;
   }
@@ -30,7 +32,7 @@ function getGenAIClient(): GoogleGenAI | null {
 }
 
 function getGenAITtsClient(): GoogleGenAI | null {
-  const apiKey = process.env.GEMINI_API_KEY;
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
   if (!apiKey || apiKey === 'MY_GEMINI_API_KEY') {
     return null;
   }
@@ -198,7 +200,9 @@ function ensureClient(res: express.Response): GoogleGenAI | null {
 }
 
 app.get('/api/health', (_req, res) => {
-  const hasKey = Boolean(process.env.GEMINI_API_KEY && process.env.GEMINI_API_KEY !== 'MY_GEMINI_API_KEY');
+  const apiKey = process.env.GEMINI_API_KEY?.trim();
+  const hasKey = Boolean(apiKey && apiKey !== 'MY_GEMINI_API_KEY');
+  res.set('Cache-Control', 'no-store');
   res.json({
     ok: true,
     runtime: 'node-express',
@@ -209,13 +213,22 @@ app.get('/api/health', (_req, res) => {
   });
 });
 
+app.post('/api/ai/connection', async (_req, res) => {
+  const result = await handlePagesApi({
+    request: new Request('http://localhost/api/ai/connection', { method: 'POST' }),
+    env: { GEMINI_API_KEY: process.env.GEMINI_API_KEY },
+    params: {},
+  });
+  res.set('Cache-Control', 'no-store').status(result.status).json(await result.json());
+});
+
 /* ---------------- MODULE 1: STUDENT & CLASS AI ANALYSIS ---------------- */
 
 app.post('/api/ai/student-analysis', async (req, res) => {
   const ai = ensureClient(res);
   if (!ai) return;
 
-  const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary } = req.body ?? {};
+  const { anonymousCode, gradeLevel, subjectAverages, recentGrades, attendanceSummary, practiceExamSummary } = req.body ?? {};
   if (!anonymousCode || !Array.isArray(subjectAverages)) {
     res.status(400).json({ error: 'Geçersiz analiz isteği. Anonim öğrenci akademik verileri eksik.' });
     return;
@@ -241,7 +254,10 @@ ${subjectAverages
 Son Sınav Seyri:
 ${(Array.isArray(recentGrades) ? recentGrades.slice(0, 15) : [])
   .map((g: { date: string; subject: string; examType: string; score: number; maxScore: number }) => `- ${String(g.date).slice(0, 10)} | ${String(g.subject).slice(0, 40)} (${String(g.examType).slice(0, 20)}): ${Number(g.score)}/${Number(g.maxScore)}`)
-  .join('\n') || 'Henüz sınav kaydı bulunmuyor.'}
+  .join('\n') || 'Henüz not kaydı bulunmuyor.'}
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Devam Özeti:
 - Katılım: ${Number(attendanceSummary?.present || 0)} gün
@@ -286,7 +302,7 @@ app.post('/api/ai/class-analysis', async (req, res) => {
   const ai = ensureClient(res);
   if (!ai) return;
 
-  const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals } =
+  const { className, gradeLevel, studentCount, overallAverage, subjectBreakdown, attendanceTotals, gradeCount, practiceExamSummary } =
     req.body ?? {};
   if (!className || !Array.isArray(subjectBreakdown)) {
     res.status(400).json({ error: 'Sınıf analizi için gerekli özet veriler eksik.' });
@@ -299,13 +315,16 @@ Kesin yargılar yerine pedagojik stratejiler ve uygulanabilir sınıf içi etkin
 
 Sınıf: ${String(className).slice(0, 60)} (${Number(gradeLevel) || '?'}. Sınıf)
 Öğrenci Sayısı: ${Number(studentCount) || 0}
-Genel Not Ortalaması: ${Number(overallAverage || 0).toFixed(1)}
+Genel Not Ortalaması: ${gradeCount === 0 ? 'Not kaydı yok' : Number(overallAverage || 0).toFixed(1)}
 
 Ders Dağılımı:
 ${subjectBreakdown
   .slice(0, 20)
   .map((item: { subject: string; average: number; examCount: number }) => `- ${String(item.subject).slice(0, 60)}: ${Number(item.average).toFixed(1)} (${Number(item.examCount)} not kaydı)`)
   .join('\n')}
+
+Deneme Sonuçları:
+${formatPracticeForAnalysis(practiceExamSummary)}
 
 Toplam Devam Özeti: Katılım ${Number(attendanceTotals?.present || 0)}, Mazeretli ${Number(attendanceTotals?.excused || 0)}, Mazeretsiz ${Number(attendanceTotals?.unexcused || 0)}, Geç ${Number(attendanceTotals?.late || 0)}.
 `;

@@ -280,7 +280,7 @@ export function InteractiveExperimentsLab() {
   return (
     <div className="space-y-6">
       {/* Experiment Selector Strip */}
-      <div className="flex flex-wrap items-center gap-2 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div className="control-grid gap-2 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         {EXPERIMENT_TABS.map((exp) => {
           const Icon = exp.icon;
           const active = activeExp === exp.id;

@@ -27,7 +27,37 @@ export default defineConfig(() => {
           }
         },
       },
+      {
+        name: 'share-page',
+        apply: 'build',
+        closeBundle(error?: Error): void {
+          if (error) return;
+
+          const dist = path.resolve(__dirname, 'dist');
+          const html = fs.readFileSync(path.join(dist, 'index.html'), 'utf8');
+          const shareHtml = html.replace(
+            /(<meta property="og:url" content="[^"]+\/)(?=")/,
+            '$1paylas/',
+          );
+          const shareDir = path.join(dist, 'paylas');
+          fs.mkdirSync(shareDir, { recursive: true });
+          fs.writeFileSync(path.join(shareDir, 'index.html'), shareHtml);
+        },
+      },
     ],
+    build: {
+      rolldownOptions: {
+        input: {
+          academy: path.resolve(__dirname, 'index.html'),
+          trialImport: path.resolve(__dirname, 'deneme-aktarim/index.html'),
+        },
+        output: {
+          assetFileNames: ({ names }) => names.includes('tur.traineddata.gz')
+            ? 'assets/ocr/v1/tur.traineddata.gz'
+            : 'assets/[name]-[hash][extname]',
+        },
+      },
+    },
     resolve: {
       alias: {
         '@': path.resolve(__dirname, '.'),

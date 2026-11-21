@@ -1,9 +1,10 @@
 import React, { useMemo, useState } from 'react';
-import { Calculator, Download, Plus, Printer, Trash2 } from 'lucide-react';
+import { Calculator, Download, FileUp, Plus, Printer, Trash2 } from 'lucide-react';
 import {
   Bar,
   BarChart,
   CartesianGrid,
+  Cell,
   Line,
   LineChart,
   ResponsiveContainer,
@@ -28,6 +29,10 @@ import {
   LGS_SUBJECT_CONFIG,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { orderStudentsByNet, STUDENT_NET_ORDERS, summarizeStudentNets, type StudentNetOrder } from '../../../utils/studentNetOrder';
+import { hasPublishedTrialScore } from '../../../utils/bulkStudentRecords';
+import { CLASS_KINDS, classKind } from '../../../utils/classKinds';
+import { trialSubjectColors } from '../../../utils/subjectColors';
 
 interface PracticeExamRobotPanelProps {
   students: Student[];
@@ -36,17 +41,19 @@ interface PracticeExamRobotPanelProps {
   onAddPracticeExam: (input: PracticeExamInput) => Promise<void>;
   onDeletePracticeExam: (exam: PracticeExamRecord) => void;
   lockedStudentId?: string;
+  initialClassId?: string;
+  onTrialImport?: () => void;
 }
 
-type SubjectInputs = Record<MiddleSchoolTrialSubjectKey, { d: number; y: number }>;
+type SubjectInputs = Record<MiddleSchoolTrialSubjectKey, { d: number | ''; y: number | '' }>;
 
-const INITIAL_SUBJECT_INPUTS: SubjectInputs = {
-  turkce: { d: 16, y: 2 },
-  matematik: { d: 14, y: 3 },
-  fen: { d: 17, y: 2 },
-  inkilap: { d: 9, y: 1 },
-  din: { d: 9, y: 0 },
-  ingilizce: { d: 8, y: 1 },
+const EMPTY_SUBJECT_INPUTS: SubjectInputs = {
+  turkce: { d: '', y: '' },
+  matematik: { d: '', y: '' },
+  fen: { d: '', y: '' },
+  inkilap: { d: '', y: '' },
+  din: { d: '', y: '' },
+  ingilizce: { d: '', y: '' },
 };
 
 export function PracticeExamRobotPanel({
@@ -56,40 +63,75 @@ export function PracticeExamRobotPanel({
   onAddPracticeExam,
   onDeletePracticeExam,
   lockedStudentId,
+  initialClassId = 'all',
+  onTrialImport,
 }: PracticeExamRobotPanelProps) {
   const today = new Date().toISOString().slice(0, 10);
-  const [selectedStudentId, setSelectedStudentId] = useState<string>(
-    lockedStudentId || students[0]?.id || ''
-  );
+  const [selectedStudentId, setSelectedStudentId] = useState('');
+  const [entryClassId, setEntryClassId] = useState(initialClassId);
+  const [entryNetOrder, setEntryNetOrder] = useState<StudentNetOrder>('default');
   const [filterStudentId, setFilterStudentId] = useState<string>(lockedStudentId || 'all');
   const [filterClassId, setFilterClassId] = useState<string>('all');
 
   const [examTitle, setExamTitle] = useState('LGS Kurumsal Deneme Sınavı');
   const [examDate, setExamDate] = useState(today);
-  const wrongPenalty: 3 = 3;
+  const [resultChoice, setResultChoice] = useState<{ studentId: string; id: string }>();
   const [targetLgsScore, setTargetLgsScore] = useState(440);
-  const [subjects, setSubjects] = useState<SubjectInputs>(INITIAL_SUBJECT_INPUTS);
+  const [draft, setDraft] = useState<{ studentId: string; subjects: SubjectInputs }>();
+  const [entryError, setEntryError] = useState('');
   const [saving, setSaving] = useState(false);
 
   const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
 
+  const studentNets = useMemo(() => summarizeStudentNets(practiceExams), [practiceExams]);
+  const entryClass = classes.some(({ id }) => id === entryClassId) ? entryClassId : 'all';
+  const entryStudents = useMemo(() => orderStudentsByNet(
+    students.filter((student) => entryClass === 'all' || student.classId === entryClass),
+    studentNets,
+    entryNetOrder
+  ), [students, entryClass, studentNets, entryNetOrder]);
+  const targetStudent = lockedStudentId
+    ? studentMap.get(lockedStudentId)
+    : entryStudents.find(({ id }) => id === selectedStudentId) ?? entryStudents[0];
+
+  const studentResults = useMemo(() => practiceExams.filter((exam) => exam.studentId === targetStudent?.id)
+    .sort((a, b) => b.examDate.localeCompare(a.examDate)), [practiceExams, targetStudent?.id]);
+  const latestResult = studentResults[0];
+  const savedResult = resultChoice && resultChoice.studentId === targetStudent?.id
+    ? studentResults.find(({ id }) => id === resultChoice.id)
+    : studentResults.find(({ id }) => hasPublishedTrialScore(id) || id.startsWith('bulk_file_'));
+  const wrongPenalty = savedResult?.wrongPenalty ?? 3;
+  const subjects = savedResult
+    ? Object.fromEntries(LGS_SUBJECT_CONFIG.map(({ key }) => [key, { d: savedResult[`${key}D`], y: savedResult[`${key}Y`] }])) as SubjectInputs
+    : draft && draft.studentId === targetStudent?.id ? draft.subjects : EMPTY_SUBJECT_INPUTS;
+  const hasEntry = Object.values(subjects).some(({ d, y }) => d !== '' || y !== '');
+
+  function selectStudent(id: string) {
+    if (id !== targetStudent?.id) {
+      setDraft(undefined);
+      setResultChoice(undefined);
+      setEntryError('');
+    }
+    setSelectedStudentId(id);
+  }
+
   const liveTotals = useMemo(
     () =>
       computePracticeExamTotals({
         wrongPenalty,
-        turkceD: subjects.turkce.d,
-        turkceY: subjects.turkce.y,
-        matematikD: subjects.matematik.d,
-        matematikY: subjects.matematik.y,
-        fenD: subjects.fen.d,
-        fenY: subjects.fen.y,
-        inkilapD: subjects.inkilap.d,
-        inkilapY: subjects.inkilap.y,
-        dinD: subjects.din.d,
-        dinY: subjects.din.y,
-        ingilizceD: subjects.ingilizce.d,
-        ingilizceY: subjects.ingilizce.y,
+        turkceD: Number(subjects.turkce.d),
+        turkceY: Number(subjects.turkce.y),
+        matematikD: Number(subjects.matematik.d),
+        matematikY: Number(subjects.matematik.y),
+        fenD: Number(subjects.fen.d),
+        fenY: Number(subjects.fen.y),
+        inkilapD: Number(subjects.inkilap.d),
+        inkilapY: Number(subjects.inkilap.y),
+        dinD: Number(subjects.din.d),
+        dinY: Number(subjects.din.y),
+        ingilizceD: Number(subjects.ingilizce.d),
+        ingilizceY: Number(subjects.ingilizce.y),
       }),
     [subjects, wrongPenalty]
   );
@@ -142,26 +184,27 @@ export function PracticeExamRobotPanel({
   const updateSubjectValue = (
     key: MiddleSchoolTrialSubjectKey,
     field: 'd' | 'y',
-    rawValue: number,
+    rawValue: string,
     maxQ: number
   ) => {
-    const safeVal = Number.isFinite(rawValue) ? Math.max(0, Math.min(maxQ, Math.floor(rawValue))) : 0;
-    setSubjects((prev) => {
-      const current = prev[key];
-      if (field === 'd') {
-        const nextY = Math.min(current.y, maxQ - safeVal);
-        return { ...prev, [key]: { d: safeVal, y: nextY } };
-      }
-      const nextD = Math.min(current.d, maxQ - safeVal);
-      return { ...prev, [key]: { d: nextD, y: safeVal } };
+    if (!targetStudent) return;
+    const value = rawValue === '' ? '' : Math.max(0, Math.min(maxQ, Math.floor(Number(rawValue))));
+    const other = field === 'd' ? 'y' : 'd';
+    setEntryError('');
+    setDraft((previous) => {
+      const current = previous?.studentId === targetStudent.id ? previous.subjects : EMPTY_SUBJECT_INPUTS;
+      const pair = current[key];
+      const otherValue = pair[other] === '' ? '' : Math.min(pair[other], maxQ - Number(value));
+      const nextPair = field === 'd' ? { d: value, y: otherValue } : { d: otherValue, y: value };
+      return { studentId: targetStudent.id, subjects: { ...current, [key]: nextPair } };
     });
   };
 
   const handleSaveExam = async (e: React.FormEvent) => {
     e.preventDefault();
-    const targetId = lockedStudentId || selectedStudentId || students[0]?.id;
-    const stu = students.find((s) => s.id === targetId);
-    if (!stu || examTitle.trim().length < 2) return;
+    const stu = targetStudent;
+    if (!stu || savedResult || !hasEntry || saving || examTitle.trim().length < 2) return;
+    setEntryError('');
 
     setSaving(true);
     try {
@@ -171,19 +214,22 @@ export function PracticeExamRobotPanel({
         examTitle: examTitle.trim(),
         examDate,
         wrongPenalty,
-        turkceD: subjects.turkce.d,
-        turkceY: subjects.turkce.y,
-        matematikD: subjects.matematik.d,
-        matematikY: subjects.matematik.y,
-        fenD: subjects.fen.d,
-        fenY: subjects.fen.y,
-        inkilapD: subjects.inkilap.d,
-        inkilapY: subjects.inkilap.y,
-        dinD: subjects.din.d,
-        dinY: subjects.din.y,
-        ingilizceD: subjects.ingilizce.d,
-        ingilizceY: subjects.ingilizce.y,
+        turkceD: Number(subjects.turkce.d),
+        turkceY: Number(subjects.turkce.y),
+        matematikD: Number(subjects.matematik.d),
+        matematikY: Number(subjects.matematik.y),
+        fenD: Number(subjects.fen.d),
+        fenY: Number(subjects.fen.y),
+        inkilapD: Number(subjects.inkilap.d),
+        inkilapY: Number(subjects.inkilap.y),
+        dinD: Number(subjects.din.d),
+        dinY: Number(subjects.din.y),
+        ingilizceD: Number(subjects.ingilizce.d),
+        ingilizceY: Number(subjects.ingilizce.y),
       });
+      setDraft((current) => current === draft ? undefined : current);
+    } catch {
+      setEntryError('Deneme sonucu kaydedilemedi. Bağlantınızı kontrol edip yeniden deneyin.');
     } finally {
       setSaving(false);
     }
@@ -206,7 +252,7 @@ export function PracticeExamRobotPanel({
         'Toplam Doğru',
         'Toplam Yanlış',
         'Toplam Net',
-        'Tahmini LGS Puanı',
+        'LGS Puanı',
       ],
       filteredExams.map((ex) => {
         const stu = studentMap.get(ex.studentId);
@@ -255,30 +301,68 @@ export function PracticeExamRobotPanel({
           <div className="text-xs text-slate-600 dark:text-slate-300 self-start md:self-center">
             <span className="font-semibold text-teal-700 dark:text-teal-400">LGS Standardı</span>
             <span className="mx-1.5 text-slate-400" aria-hidden="true">·</span>
-            <span>3 Yanlış 1 Doğruyu Götürür</span>
+            <span>{wrongPenalty} Yanlış 1 Doğruyu Götürür</span>
           </div>
         </div>
 
         <form onSubmit={(e) => void handleSaveExam(e)} className="space-y-5">
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-            {!lockedStudentId && (
-              <div>
-                <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
-                  Öğrenci
-                </label>
-                <select
-                  value={selectedStudentId || students[0]?.id || ''}
-                  onChange={(e) => setSelectedStudentId(e.target.value)}
-                  className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100"
-                >
-                  {students.map((s) => (
-                    <option key={s.id} value={s.id}>
-                      {s.fullName} ({classMap.get(s.classId)?.name ?? `${s.gradeLevel}. Sınıf`})
-                    </option>
-                  ))}
+            {!lockedStudentId && <>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Sınıf
+                <select value={entryClass} onChange={(event) => {
+                  const nextClass = event.target.value;
+                  const nextStudents = orderStudentsByNet(students.filter((student) => nextClass === 'all' || student.classId === nextClass), studentNets, entryNetOrder);
+                  setEntryClassId(nextClass);
+                  selectStudent(nextStudents.find(({ id }) => id === targetStudent?.id)?.id ?? nextStudents[0]?.id ?? '');
+                }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                  <option value="all">Tüm Sınıflar</option>
+                  {CLASS_KINDS.map(({ value, label }) => <optgroup key={value} label={label}>
+                    {classes.filter((item) => classKind(item) === value).map((item) => <option value={item.id} key={item.id}>{item.name} · {item.academicYear}</option>)}
+                  </optgroup>)}
                 </select>
-              </div>
-            )}
+              </label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Net sırası
+                <select value={entryNetOrder} onChange={(event) => {
+                  setSelectedStudentId(targetStudent?.id ?? '');
+                  setEntryNetOrder(event.target.value as StudentNetOrder);
+                }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                  {STUDENT_NET_ORDERS.map(({ value, label }) => <option key={value} value={value}>{label}</option>)}
+                </select>
+              </label>
+              <label className="block text-sm font-medium text-slate-700 dark:text-slate-200">
+                Öğrenci
+                <select
+                  value={targetStudent?.id ?? ''}
+                  onChange={(event) => selectStudent(event.target.value)}
+                  disabled={!entryStudents.length}
+                  className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950"
+                >
+                  {!entryStudents.length && <option value="">Bu sınıfta öğrenci yok</option>}
+                  {entryStudents.map((student) => {
+                    const net = studentNets.get(student.id);
+                    const schoolClass = classMap.get(student.classId);
+                    return <option key={student.id} value={student.id}>
+                      {student.fullName}{entryClass === 'all' ? ' (' + (schoolClass?.name ?? student.gradeLevel + '. Sınıf') + ')' : ''}
+                      {net ? ' · ' + net.average.toFixed(2) + ' net' : ''}
+                    </option>;
+                  })}
+                </select>
+              </label>
+            </>}
+
+            <label className="block text-sm font-medium text-slate-700 dark:text-slate-200 md:col-span-3">
+              Gösterilecek deneme
+              <select value={savedResult?.id ?? ''} disabled={!targetStudent || saving} onChange={(event) => {
+                if (!targetStudent) return;
+                setResultChoice({ studentId: targetStudent.id, id: event.target.value });
+                setEntryError('');
+              }} className="mt-1 block min-h-11 w-full rounded-lg border border-slate-200 bg-slate-50 px-3 py-2 dark:border-slate-700 dark:bg-slate-950">
+                <option value="">Yeni deneme girişi</option>
+                {studentResults.map((exam) => <option key={exam.id} value={exam.id}>{formatTurkishDate(exam.examDate)} · {exam.examTitle}</option>)}
+              </select>
+            </label>
 
             <div className={lockedStudentId ? 'md:col-span-2' : ''}>
               <label className="block text-xs font-medium text-slate-600 dark:text-slate-400 mb-1.5">
@@ -286,7 +370,8 @@ export function PracticeExamRobotPanel({
               </label>
               <input
                 type="text"
-                value={examTitle}
+                value={savedResult?.examTitle ?? examTitle}
+                readOnly={Boolean(savedResult)}
                 onChange={(e) => setExamTitle(e.target.value)}
                 maxLength={120}
                 required
@@ -301,7 +386,8 @@ export function PracticeExamRobotPanel({
               </label>
               <input
                 type="date"
-                value={examDate}
+                value={savedResult?.examDate ?? examDate}
+                readOnly={Boolean(savedResult)}
                 onChange={(e) => setExamDate(e.target.value)}
                 required
                 className="w-full px-3 py-2 text-sm rounded-lg border border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-950 text-slate-900 dark:text-slate-100"
@@ -309,6 +395,43 @@ export function PracticeExamRobotPanel({
             </div>
           </div>
 
+          {targetStudent && !savedResult && (
+            <section aria-label="Seçili öğrencinin kayıtlı denemesi" className="space-y-2 rounded-xl border border-teal-200 bg-teal-50/60 p-4 dark:border-teal-900 dark:bg-teal-950/30">
+              <h3 className="text-sm font-semibold">{targetStudent.fullName} · Son kayıtlı deneme</h3>
+              {latestResult ? (
+                <details key={latestResult.id} className="space-y-2 text-sm">
+                  <summary className="cursor-pointer">
+                    {latestResult.examTitle} · {formatTurkishDate(latestResult.examDate)} · <strong>{latestResult.totalNet.toFixed(2)} net</strong>
+                  </summary>
+                  <p>
+                    {latestResult.totalCorrect} doğru · {latestResult.totalWrong} yanlış · {90 - latestResult.totalCorrect - latestResult.totalWrong} boş ·{' '}
+                    {hasPublishedTrialScore(latestResult.id) ? 'PDF’deki LGS puanı' : 'Tahmini LGS puanı'} {latestResult.estimatedLgsScore.toLocaleString('tr-TR', { maximumFractionDigits: 3 })}
+                  </p>
+                  <dl className="grid gap-2 sm:grid-cols-3">
+                    {LGS_SUBJECT_CONFIG.map(({ key, label }) => {
+                      const d = latestResult[`${key}D`];
+                      const y = latestResult[`${key}Y`];
+                      return <div key={key}>
+                        <dt className="font-medium">{label}</dt>
+                        <dd>{d} D · {y} Y · {calculateNet(d, y, latestResult.wrongPenalty).toFixed(2)} net</dd>
+                      </div>;
+                    })}
+                  </dl>
+                </details>
+              ) : <p className="text-sm">Bu öğrencinin kayıtlı denemesi yok.</p>}
+            </section>
+          )}
+
+          <div className="space-y-1">
+            <h3 className="text-sm font-semibold">{savedResult ? targetStudent?.fullName + ' · Kayıtlı deneme' : 'Yeni deneme girişi'}</h3>
+            <p className="text-xs text-slate-600 dark:text-slate-300">
+              {savedResult ? 'Değerler seçilen deneme kaydından dolduruldu.' : targetStudent ? 'Aşağıdaki alanlara bu öğrencinin yeni sonucunu girin. Boş bırakılan doğru ve yanlış alanları 0 sayılır.' : 'Yeni sonuç girmek için bir öğrenci seçin.'}
+            </p>
+          </div>
+          {onTrialImport && <button type="button" onClick={onTrialImport}
+            className="inline-flex items-center gap-2 text-sm font-semibold text-teal-700 underline dark:text-teal-300">
+            <FileUp className="size-4" aria-hidden="true" /> Deneme Sonuçlarını Yükle
+          </button>}
           {/* 6 Subjects Grid */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3.5">
             {LGS_SUBJECT_CONFIG.map((cfg) => {
@@ -337,9 +460,12 @@ export function PracticeExamRobotPanel({
                         type="number"
                         min={0}
                         max={cfg.maxQuestions}
+                        aria-label={cfg.label + ' doğru'}
+                        readOnly={Boolean(savedResult)}
+                        disabled={!targetStudent || saving}
                         value={pair.d}
                         onChange={(e) =>
-                          updateSubjectValue(cfg.key, 'd', Number(e.target.value), cfg.maxQuestions)
+                          updateSubjectValue(cfg.key, 'd', e.target.value, cfg.maxQuestions)
                         }
                         className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -351,10 +477,13 @@ export function PracticeExamRobotPanel({
                       <input
                         type="number"
                         min={0}
-                        max={cfg.maxQuestions - pair.d}
+                        max={cfg.maxQuestions - Number(pair.d)}
+                        aria-label={cfg.label + ' yanlış'}
+                        readOnly={Boolean(savedResult)}
+                        disabled={!targetStudent || saving}
                         value={pair.y}
                         onChange={(e) =>
-                          updateSubjectValue(cfg.key, 'y', Number(e.target.value), cfg.maxQuestions)
+                          updateSubjectValue(cfg.key, 'y', e.target.value, cfg.maxQuestions)
                         }
                         className="w-full px-2.5 py-1.5 text-sm font-mono tabular-nums rounded-lg border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-900 dark:text-white"
                       />
@@ -362,9 +491,9 @@ export function PracticeExamRobotPanel({
                   </div>
 
                   <div className="flex items-center justify-between text-xs pt-2 border-t border-slate-200/80 dark:border-slate-800 tabular-nums">
-                    <span className="text-slate-500 dark:text-slate-400">Boş: {stat.blank}</span>
+                    <span className="text-slate-500 dark:text-slate-400">Boş: {hasEntry ? stat.blank : '—'}</span>
                     <span className="font-mono font-semibold text-teal-700 dark:text-teal-400">
-                      Net: {stat.net.toFixed(2)}
+                      Net: {hasEntry ? stat.net.toFixed(2) : '—'}
                     </span>
                   </div>
                 </div>
@@ -372,43 +501,46 @@ export function PracticeExamRobotPanel({
             })}
           </div>
 
+          {entryError && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{entryError}</p>}
+          {targetStudent && !savedResult && <p className="text-sm font-semibold" aria-live="polite">Yeni sonuç · {targetStudent.fullName} · No {targetStudent.studentNumber}</p>}
+
           {/* Live Calculated Robot Strip + Save CTA */}
           <div className="p-4 rounded-xl bg-navy-900 text-white flex flex-col lg:flex-row lg:items-center justify-between gap-4">
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 flex-1">
               <div>
                 <p className="text-[11px] text-slate-300">Toplam Doğru</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-emerald-300">
-                  {liveTotals.totalCorrect} / 90
+                  {hasEntry ? `${liveTotals.totalCorrect} / 90` : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-[11px] text-slate-300">Toplam Yanlış / Boş</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-white">
-                  {liveTotals.totalWrong}Y · {liveTotals.totalBlank}B
+                  {hasEntry ? `${liveTotals.totalWrong}Y · ${liveTotals.totalBlank}B` : '—'}
                 </p>
               </div>
               <div>
                 <p className="text-[11px] text-slate-300">Toplam Net</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-gold-400">
-                  {liveTotals.totalNet.toFixed(2)}
+                  {hasEntry ? (savedResult?.totalNet ?? liveTotals.totalNet).toFixed(2) : '—'}
                 </p>
               </div>
               <div>
-                <p className="text-[11px] text-slate-300">Tahmini LGS Puanı</p>
+                <p className="text-[11px] text-slate-300">{savedResult && hasPublishedTrialScore(savedResult.id) ? 'PDF’deki LGS Puanı' : 'Tahmini LGS Puanı'}</p>
                 <p className="text-xl font-semibold font-mono tabular-nums text-teal-300">
-                  {liveTotals.estimatedLgsScore.toFixed(1)}
+                  {savedResult ? savedResult.estimatedLgsScore.toLocaleString('tr-TR', { maximumFractionDigits: 3 }) : hasEntry ? liveTotals.estimatedLgsScore.toFixed(1) : '—'}
                 </p>
               </div>
             </div>
 
-            <button
+            {!savedResult && <button
               type="submit"
-              disabled={saving || students.length === 0}
+              disabled={saving || !targetStudent || !hasEntry}
               className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg text-sm font-medium bg-gold-400 text-navy-950 hover:bg-gold-500 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0"
             >
               <Plus className="w-4 h-4" />
               <span>{saving ? 'Kaydediliyor...' : 'Deneme Sonucunu Kaydet'}</span>
-            </button>
+            </button>}
           </div>
         </form>
       </section>
@@ -449,7 +581,7 @@ export function PracticeExamRobotPanel({
             )}
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="control-grid gap-2 sm:max-w-80">
             <button
               type="button"
               onClick={handleExportCsv}
@@ -498,7 +630,7 @@ export function PracticeExamRobotPanel({
             <p className="text-[11px] text-slate-500 dark:text-slate-400">90 soru üzerinden</p>
           </div>
           <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-4">
-            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama Tahmini LGS</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama LGS Puanı</p>
             <p className="mt-1 text-2xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
               {robotSummary.examCount > 0 ? robotSummary.avgLgsScore.toFixed(1) : '—'}
             </p>
@@ -606,7 +738,11 @@ export function PracticeExamRobotPanel({
                     <XAxis dataKey="shortLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
                     <YAxis domain={[0, 20]} tick={{ fontSize: 11, fill: '#64748b' }} />
                     <Tooltip formatter={(val) => [`${val ?? 0}`, 'Ortalama Net']} />
-                    <Bar dataKey="avgNet" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={38} />
+                    <Bar dataKey="avgNet" radius={[6, 6, 0, 0]} maxBarSize={38}>
+                      {robotSummary.subjectAverages.map(({ key }) => (
+                        <Cell key={key} fill={trialSubjectColors[key].color} />
+                      ))}
+                    </Bar>
                   </BarChart>
                 </ResponsiveContainer>
               </div>
@@ -616,7 +752,10 @@ export function PracticeExamRobotPanel({
                     key={sub.key}
                     className="p-2 rounded-lg bg-slate-50 dark:bg-slate-950/60 border border-slate-200/70 dark:border-slate-800"
                   >
-                    <p className="font-medium text-navy-900 dark:text-white">{sub.shortLabel}</p>
+                    <p className="flex items-center gap-2 font-medium text-navy-900 dark:text-white">
+                      <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: trialSubjectColors[sub.key].color }} />
+                      {sub.shortLabel}
+                    </p>
                     <p className="text-[11px] text-slate-500 dark:text-slate-400">
                       Ort. {sub.avgCorrect}D ·{' '}
                       <strong className="text-teal-700 dark:text-teal-400">{sub.avgNet} Net</strong>

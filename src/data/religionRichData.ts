@@ -97,10 +97,17 @@ export interface SurahDuaEntry {
   ayahCode?: string;
   quranApiRef?: { type: 'surah' | 'ayah'; ref: string };
   staticArabicText?: string;
+  recordingFile?: string;
   transliteration: string;
   turkishMeaning: string;
   keyMessage: string;
 }
+
+export const NAMAZ_DUA_RECORDINGS = {
+  reciter: 'Hafız Hasan Hüseyin Varol',
+  sourceUrl: 'https://hasanhuseyinvarol.com/kisa-sureler-namaz-dualari/',
+  audioBaseUrl: 'https://hasanhuseyinvarol.com/uploads/kisa-sureler/',
+};
 
 export function getQariAudioUrl(
   entry: SurahDuaEntry,
@@ -226,7 +233,7 @@ export const PRAYER_POSTURE_STEPS: PrayerPostureStep[] = [
     ruleType: 'Farz',
     recitationTr: 'Allâhu Ekber',
     meaningTr: 'Allah en büyüktür.',
-    howToPerform: 'Erkekler başparmakları kulak yumuşağına değecek şekilde, hanımlar elleri omuz hizasına kaldırarak tekbir alır ve namaza girer.',
+    howToPerform: 'Hanefî uygulamasında erkekler iki elini, başparmakları kulak memeleri hizasına gelecek şekilde kaldırır. Kadınlar parmak uçlarını omuz hizasına kaldırır. “Allâhu Ekber” diyerek namaza başlanır.',
   },
   {
     stepNumber: 3,
@@ -666,8 +673,9 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     title: 'Sübhaneke Duası',
     category: 'Namaz Duası',
     audioType: 'dua',
+    recordingFile: '01_SUBHANEKE.mp3',
     staticArabicText:
-      'سُبْحَانَكَ اللَّهُمَّ وَبِحَمْدِكَ وَتَبَارَكَ اسْمُكَ وَتَعَالَى جَدُّكَ وَجَلَّ ثَنَاؤُكَ وَلَا إِلَهَ غَيْرُكَ',
+      'سُبْحَانَكَ اللَّهُمَّ وَبِحَمْدِكَ وَتَبَارَكَ اسْمُكَ وَتَعَالَى جَدُّكَ وَلَا إِلَهَ غَيْرُكَ',
     transliteration:
       'Sübhânekellâhümme ve bihamdik ve tebârakesmük ve teâlâ ceddük (ve celle senâük*) ve lâ ilâhe ğayrük.',
     turkishMeaning:
@@ -679,6 +687,7 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     title: 'Ettehiyyâtü (Tahiyyat) Duası',
     category: 'Namaz Duası',
     audioType: 'dua',
+    recordingFile: '02_ETTEHIYYATU.mp3',
     staticArabicText:
       'التَّحِيَّاتُ لِلَّهِ وَالصَّلَوَاتُ وَالطَّيِّبَاتُ ۝ السَّلَامُ عَلَيْكَ أَيُّهَا النَّبِيُّ وَرَحْمَةُ اللَّهِ وَبَرَكَاتُهُ ۝ السَّلَامُ عَلَيْنَا وَعَلَى عِبَادِ اللَّهِ الصَّالِحِينَ ۝ أَشْهَدُ أَنْ لَا إِلَهَ إِلَّا اللَّهُ وَأَشْهَدُ أَنَّ مُحَمَّدًا عَبْدُهُ وَرَسُولُهُ',
     transliteration:
@@ -692,6 +701,7 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     title: 'Allâhümme Salli Duası',
     category: 'Namaz Duası',
     audioType: 'dua',
+    recordingFile: '03_ALLAHUMME_SALLI.mp3',
     staticArabicText:
       'اللَّهُمَّ صَلِّ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا صَلَّيْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ',
     transliteration:
@@ -705,6 +715,7 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
     title: 'Allâhümme Bârik Duası',
     category: 'Namaz Duası',
     audioType: 'dua',
+    recordingFile: '04_ALLAHUMME_BARIK.mp3',
     staticArabicText:
       'اللَّهُمَّ بَارِكْ عَلَى مُحَمَّدٍ وَعَلَى آلِ مُحَمَّدٍ كَمَا بَارَكْتَ عَلَى إِبْرَاهِيمَ وَعَلَى آلِ إِبْرَاهِيمَ إِنَّكَ حَمِيدٌ مَجِيدٌ',
     transliteration:
@@ -715,16 +726,31 @@ export const SURAH_DUA_LIBRARY: SurahDuaEntry[] = [
   },
   {
     id: 'sd-13',
-    title: 'Kunut Duaları (Vitir Namazı)',
+    title: 'Birinci Kunut Duası',
     category: 'Namaz Duası',
     audioType: 'dua',
+    recordingFile: '06_KUNUT_DUASI_1.mp3',
     staticArabicText:
-      'اللَّهُمَّ إِنَّا نَسْتَعِينُكَ وَنَسْتَغْفِرُكَ وَنَسْتَهْدِيكَ وَنُؤْمِنُ بِكَ وَنَتُوبُ إِلَيْكَ وَنَتَوَكَّلُ عَلَيْكَ وَنُثْنِي عَلَيْكَ الْخَيْرَ كُلَّهُ نَشْكُرُكَ وَلَا نَكْفُرُكَ وَنَخْلَعُ وَنَتْرُكُ مَنْ يَفْجُرُكَ ۝ اللَّهُمَّ إِيَّاكَ نَعْبُدُ وَلَكَ نُصَلِّي وَنَسْجُدُ وَإِلَيْكَ نَسْعَى وَنَحْفِدُ نَرْجُو رَحْمَتَكَ وَنَخْشَى عَذَابَكَ إِنَّ عَذَابَكَ بِالْكُفَّارِ مُلْحِقٌ',
+      'اللَّهُمَّ إِنَّا نَسْتَعِينُكَ وَنَسْتَغْفِرُكَ وَنَسْتَهْدِيكَ وَنُؤْمِنُ بِكَ وَنَتُوبُ إِلَيْكَ وَنَتَوَكَّلُ عَلَيْكَ وَنُثْنِي عَلَيْكَ الْخَيْرَ كُلَّهُ، نَشْكُرُكَ وَلَا نَكْفُرُكَ وَنَخْلَعُ وَنَتْرُكُ مَنْ يَفْجُرُكَ',
     transliteration:
-      'Allâhümme innâ nesteînüke ve nestağfirüke ve nestehdîk ve nü’minü bike ve netûbü ileyk ve netevekkelü aleyk ve nüsnî aleykel-hayra küllehû neşkürüke ve lâ nekfürük ve nahleu ve netrükü men yefcürük. Allâhümme iyyâke na’büdü ve leke nüsallî ve nescüdü ve ileyke nes’â ve nahfidü nercû rahmeteke ve nahşâ azâbeke inne azâbeke bil-küffâri mülhık.',
+      'Allâhümme innâ nesteînüke ve nestağfirüke ve nestehdîk ve nü’minü bike ve netûbü ileyk ve netevekkelü aleyk ve nüsnî aleykel-hayra küllehû. Neşkürüke ve lâ nekfürük ve nahleu ve netrükü men yefcürük.',
     turkishMeaning:
-      'Allah’ım! Senden yardım isteriz, günahlarımızı bağışlamanı ve bizi doğru yola iletmeni dileriz. Sana inanır, sana tövbe eder ve sana güveniriz. Seni bütün hayırlarla över, sana şükrederiz. Allah’ım! Biz yalnız sana kulluk eder, senin için namaz kılar ve secde ederiz; rahmetini umar, azabından korkarız.',
-    keyMessage: 'Yatsıdan sonra kılınan Vitir namazının 3. rekatında okunan vacip dualardır.',
+      'Allah’ım! Senden yardım, bağışlanma ve doğru yolu göstermeni dileriz. Sana inanır, sana tövbe eder, sana güvenir ve seni bütün iyiliklerinle överiz. Sana şükreder, nankörlük etmeyiz. Sana karşı gelenlerden uzaklaşırız.',
+    keyMessage: 'Vitir namazında okunan ilk kunut duasıdır.',
+  },
+  {
+    id: 'sd-13b',
+    title: 'İkinci Kunut Duası',
+    category: 'Namaz Duası',
+    audioType: 'dua',
+    recordingFile: '07_KUNUT_DUASI_2.mp3',
+    staticArabicText:
+      'اللَّهُمَّ إِيَّاكَ نَعْبُدُ وَلَكَ نُصَلِّي وَنَسْجُدُ وَإِلَيْكَ نَسْعَى وَنَحْفِدُ، نَرْجُو رَحْمَتَكَ وَنَخْشَى عَذَابَكَ، إِنَّ عَذَابَكَ بِالْكُفَّارِ مُلْحِقٌ',
+    transliteration:
+      'Allâhümme iyyâke na’büdü ve leke nüsallî ve nescüdü ve ileyke nes’â ve nahfidü. Nercû rahmeteke ve nahşâ azâbeke. İnne azâbeke bil-küffâri mülhık.',
+    turkishMeaning:
+      'Allah’ım! Yalnız sana kulluk eder, senin için namaz kılar ve secde ederiz. Sana yönelir ve kulluğunda gayret gösteririz. Rahmetini umar, azabından korkarız. Şüphesiz azabın inkâr edenlere ulaşır.',
+    keyMessage: 'Vitir namazında okunan ikinci kunut duasıdır.',
   },
   {
     id: 'sd-14',

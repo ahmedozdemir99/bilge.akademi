@@ -70,7 +70,7 @@ export function AnimatedCampaignsMap() {
       </div>
 
       {/* Campaign Selector Strip */}
-      <div className="flex flex-wrap gap-2">
+      <div className="control-grid gap-2">
         {MILITARY_CAMPAIGNS.map((c) => (
           <button
             key={c.id}
@@ -541,7 +541,7 @@ export function SultansGalleryPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         {(['all', 'Kuruluş', 'Yükselme', 'Duraklama & Yenileşme'] as const).map((per) => (
           <button
             key={per}
@@ -690,7 +690,7 @@ export function HistoryWisdomPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         {(['all', 'İlginç Anekdot', 'Hikmetli Hikâye', 'Tarihî Hiciv & Nükte'] as const).map((cat) => (
           <button
             key={cat}

@@ -1,3 +1,4 @@
+import { WorkshopLinks } from './workshop/WorkshopLinks';
 import { useMemo, useState } from 'react';
 import {
   AlertTriangle,
@@ -271,7 +272,7 @@ export function PhilosophyModule() {
       {/* Navigation Tabs */}
       <nav
         aria-label="Felsefe Akademisi Sekmeleri"
-        className="flex flex-wrap gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 no-print"
+        className="control-grid gap-2 border-b border-slate-200 dark:border-slate-800 pb-3 no-print"
       >
         {[
           { id: 'library' as const, label: 'Kütüphane ve Filozoflar', icon: BookOpen },
@@ -329,7 +330,7 @@ export function PhilosophyModule() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="control-grid gap-2">
               <button
                 type="button"
                 onClick={() => setSelectedEra('ALL')}
@@ -998,7 +999,7 @@ export function PhilosophyModule() {
               </div>
             </div>
 
-            <div className="flex flex-wrap gap-2">
+            <div className="control-grid gap-2">
               {OPEN_ENDED_THOUGHT_PROMPTS.map((item) => (
                 <button
                   key={item.id}
@@ -1064,6 +1065,8 @@ export function PhilosophyModule() {
           </section>
         </div>
       )}
+
+      <WorkshopLinks activities={['argument', 'counterexamples', 'fairness']} />
     </div>
   );
 }

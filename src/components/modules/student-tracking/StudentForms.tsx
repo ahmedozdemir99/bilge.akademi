@@ -16,6 +16,8 @@ import type {
 } from '../../../context/AcademyContext';
 import { Modal } from '../../ui/Modal';
 
+import { classKind, classSubjectFocus, encodeClassFocus, type ClassKind } from '../../../utils/classKinds';
+
 const EXAM_TYPES: ExamType[] = ['Yazılı', 'Deneme', 'Sözlü', 'Proje', 'Performans'];
 
 const inputClass =
@@ -41,6 +43,7 @@ export function ClassFormModal({
   const [section, setSection] = useState('A');
   const [academicYear, setAcademicYear] = useState('2026-2027');
   const [subjectFocus, setSubjectFocus] = useState('');
+  const [kind, setKind] = useState<ClassKind>('school');
   const [error, setError] = useState('');
   const [saving, setSaving] = useState(false);
 
@@ -51,13 +54,15 @@ export function ClassFormModal({
         setGradeLevel(editingClass.gradeLevel);
         setSection(editingClass.section);
         setAcademicYear(editingClass.academicYear);
-        setSubjectFocus(editingClass.subjectFocus ?? '');
+        setSubjectFocus(classSubjectFocus(editingClass));
+        setKind(classKind(editingClass));
       } else {
         setName('');
         setGradeLevel(8);
         setSection('A');
         setAcademicYear('2026-2027');
         setSubjectFocus('Ortaokul Müfredatı');
+        setKind('school');
       }
       setError('');
     }
@@ -94,7 +99,7 @@ export function ClassFormModal({
         gradeLevel,
         section: trimmedSection.toUpperCase(),
         academicYear: trimmedYear,
-        subjectFocus: subjectFocus.trim().slice(0, 80),
+        subjectFocus: encodeClassFocus(kind, subjectFocus),
       });
       onClose();
     } catch {
@@ -202,7 +207,15 @@ export function ClassFormModal({
           </div>
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <label className={labelClass}>
+          Sınıf türü
+          <select className={inputClass + ' mt-1'} value={kind} onChange={(event) => setKind(event.target.value === 'course' ? 'course' : 'school')}>
+            <option value="school">Okul</option>
+            <option value="course">Kurs</option>
+          </select>
+        </label>
+
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -407,7 +420,7 @@ export function StudentFormModal({
           </p>
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -540,8 +553,8 @@ export function GradeFormModal({
     <Modal
       open={open}
       onClose={onClose}
-      title={editingGrade ? 'Sınav Notunu Düzenle' : 'Yeni Sınav Notu Kaydet'}
-      subtitle="Yazılı, deneme, sözlü veya proje değerlendirmesi girin."
+      title={editingGrade ? 'Notu Düzenle' : 'Yeni Not Kaydet'}
+      subtitle="Yazılı, deneme, sözlü, proje veya performans notu girin."
     >
       <form onSubmit={handleSubmit} className="space-y-4">
         {error && (
@@ -590,7 +603,7 @@ export function GradeFormModal({
 
           <div>
             <label htmlFor="grd-type" className={labelClass}>
-              Sınav Türü *
+              Not Türü *
             </label>
             <select
               id="grd-type"
@@ -609,7 +622,7 @@ export function GradeFormModal({
 
         <div>
           <label htmlFor="grd-title" className={labelClass}>
-            Sınav / Değerlendirme Adı *
+            Değerlendirme Adı *
           </label>
           <input
             id="grd-title"
@@ -685,7 +698,7 @@ export function GradeFormModal({
           />
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}
@@ -851,7 +864,7 @@ export function AttendanceFormModal({
           />
         </div>
 
-        <div className="pt-3 flex items-center justify-end gap-3 border-t border-slate-200 dark:border-slate-800">
+        <div className="control-grid ml-auto max-w-sm gap-3 border-t pt-3 border-slate-200 dark:border-slate-800">
           <button
             type="button"
             onClick={onClose}

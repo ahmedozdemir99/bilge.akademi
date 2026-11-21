@@ -128,7 +128,7 @@ export function SignInDialog() {
           <>
             <button type="button" disabled={busy} onClick={() => changeMode('register')} className="underline">Hesap oluştur</button>
             <button type="button" disabled={busy} onClick={() => changeMode('reset')} className="underline">Parolamı unuttum</button>
-            <button type="button" disabled={busy} onClick={() => void signInWithGoogle()} className="underline">Google ile giriş</button>
+            <button type="button" disabled={busy} onClick={() => { dialog.current?.close(); void signInWithGoogle(); }} className="underline">Google ile giriş</button>
           </>
         ) : (
           <button type="button" disabled={busy} onClick={() => changeMode('login')} className="underline">Girişe dön</button>

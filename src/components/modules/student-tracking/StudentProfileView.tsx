@@ -3,6 +3,8 @@ import {
   AlertCircle,
   ArrowLeft,
   Bot,
+  ChevronLeft,
+  ChevronRight,
   Download,
   Edit3,
   Loader2,
@@ -15,14 +17,14 @@ import {
   Bar,
   BarChart,
   CartesianGrid,
-  Line,
-  LineChart,
+  Cell,
   ResponsiveContainer,
   Tooltip,
   XAxis,
   YAxis,
 } from 'recharts';
 import type {
+  AttendanceRecord,
   Grade,
   PracticeExamRecord,
   SchoolClass,
@@ -36,18 +38,29 @@ import {
   calculateSubjectAverages,
   calculateTrialRobotSummary,
   exportToCsv,
-  formatShortTurkishDate,
   formatTurkishDate,
+  LGS_SUBJECT_CONFIG,
   triggerPrintReport,
 } from '../../../utils/exportUtils';
+import { hasPublishedTrialScore } from '../../../utils/bulkStudentRecords';
+import { ExamNetTrend } from './ExamNetTrend';
+import { summarizePracticeForAnalysis } from '../../../utils/practiceAnalysis';
+import { getSubjectColor, trialSubjectColors } from '../../../utils/subjectColors';
 
 interface StudentProfileViewProps {
   student: Student;
   schoolClass?: SchoolClass;
   grades: Grade[];
   practiceExams: PracticeExamRecord[];
+  attendance: AttendanceRecord[];
   readOnly?: boolean;
   onBack?: () => void;
+  classNavigation?: {
+    position: number;
+    count: number;
+    onPrevious?: () => void;
+    onNext?: () => void;
+  };
   onEditStudent?: () => void;
   onAddGrade?: () => void;
   onEditGrade?: (grade: Grade) => void;
@@ -60,8 +73,10 @@ export function StudentProfileView({
   schoolClass,
   grades,
   practiceExams,
+  attendance,
   readOnly = false,
   onBack,
+  classNavigation,
   onEditStudent,
   onAddGrade,
   onEditGrade,
@@ -72,32 +87,23 @@ export function StudentProfileView({
   const [aiLoading, setAiLoading] = useState(false);
   const [aiError, setAiError] = useState('');
 
+  const archive = useMemo(() => [...practiceExams].sort((a, b) =>
+    b.examDate.localeCompare(a.examDate) || a.examTitle.localeCompare(b.examTitle, 'tr')), [practiceExams]);
   const avgScore = useMemo(() => calculateAverageScore(grades), [grades]);
   const subjectAverages = useMemo(() => calculateSubjectAverages(grades), [grades]);
   const trialSummary = useMemo(
     () => calculateTrialRobotSummary(practiceExams),
     [practiceExams]
   );
-  const trialTrend = useMemo(
-    () =>
-      [...practiceExams]
-        .sort((a, b) => a.examDate.localeCompare(b.examDate))
-        .map((ex) => ({
-          label: formatShortTurkishDate(ex.examDate),
-          examTitle: ex.examTitle,
-          totalNet: ex.totalNet,
-          lgsScore: ex.estimatedLgsScore,
-        })),
-    [practiceExams]
-  );
   const anonymizedPreview = useMemo(
-    () => anonymizeStudentForAI(student, grades, []),
-    [grades, student]
+    () => ({ ...anonymizeStudentForAI(student, grades, attendance), practiceExamSummary: summarizePracticeForAnalysis(practiceExams) }),
+    [attendance, grades, practiceExams, student]
   );
 
   const handleRunAIAnalysis = async () => {
     setAiLoading(true);
     setAiError('');
+    setAiAnalysis(null);
     try {
       const response = await fetch('/api/ai/student-analysis', {
         method: 'POST',
@@ -127,7 +133,7 @@ export function StudentProfileView({
           'LGS Deneme',
           ex.examTitle,
           `${ex.totalNet.toFixed(2)} Net (${ex.totalCorrect}D/${ex.totalWrong}Y)`,
-          `Tahmini LGS: ${ex.estimatedLgsScore.toFixed(1)}`,
+          `${hasPublishedTrialScore(ex.id) ? 'PDF puanı' : 'Tahmini LGS'}: ${ex.estimatedLgsScore}`,
         ]),
         ...grades.map((g) => [
           formatTurkishDate(g.examDate),
@@ -157,7 +163,7 @@ export function StudentProfileView({
           )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
+        <div className="control-grid gap-2 sm:max-w-lg">
           {!readOnly && onEditStudent && (
             <button
               type="button"
@@ -186,6 +192,22 @@ export function StudentProfileView({
           </button>
         </div>
       </div>
+
+      {classNavigation && !readOnly && (
+        <nav aria-label="Sınıftaki öğrenciler" className="flex flex-wrap items-center justify-between gap-2 no-print">
+          <button type="button" onClick={classNavigation.onPrevious} disabled={!classNavigation.onPrevious}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-45 dark:border-slate-700 dark:hover:bg-slate-800">
+            <ChevronLeft className="size-4" aria-hidden="true" /> Önceki
+          </button>
+          <span className="text-sm tabular-nums text-slate-600 dark:text-slate-300" aria-live="polite">
+            {classNavigation.position} / {classNavigation.count}
+          </span>
+          <button type="button" onClick={classNavigation.onNext} disabled={!classNavigation.onNext}
+            className="inline-flex min-h-11 items-center gap-1.5 rounded-lg border border-slate-200 px-3 py-2 text-sm font-medium hover:bg-slate-100 disabled:opacity-45 dark:border-slate-700 dark:hover:bg-slate-800">
+            Sonraki <ChevronRight className="size-4" aria-hidden="true" />
+          </button>
+        </nav>
+      )}
 
       {/* Student Identity & KPI Summary */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
@@ -217,7 +239,7 @@ export function StudentProfileView({
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 transition-colors cursor-pointer whitespace-nowrap shrink-0 no-print"
             >
               <Plus className="w-3.5 h-3.5" />
-              <span>Yazılı Notu Ekle</span>
+              <span>Not Ekle</span>
             </button>
           )}
         </div>
@@ -233,7 +255,7 @@ export function StudentProfileView({
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama Tahmini LGS</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Ortalama LGS Puanı</p>
             <p className="mt-1 text-2xl font-semibold font-mono tabular-nums text-gold-600 dark:text-gold-400">
               {trialSummary.examCount > 0 ? trialSummary.avgLgsScore.toFixed(1) : '—'}
             </p>
@@ -242,12 +264,12 @@ export function StudentProfileView({
             </p>
           </div>
           <div>
-            <p className="text-xs text-slate-500 dark:text-slate-400">Yazılı Ortalaması</p>
+            <p className="text-xs text-slate-500 dark:text-slate-400">Not Ortalaması</p>
             <p className="mt-1 text-2xl font-semibold font-mono tabular-nums text-navy-900 dark:text-white">
               {grades.length > 0 ? avgScore.toFixed(1) : '—'}
             </p>
             <p className="text-xs text-slate-500 dark:text-slate-400 tabular-nums">
-              {grades.length} yazılı değerlendirmesi
+              {grades.length} değerlendirme
             </p>
           </div>
           <div>
@@ -265,6 +287,43 @@ export function StudentProfileView({
       </section>
 
       {/* Charts Row: Subject Averages & Trial Net Progress */}
+      <section className="min-w-0 space-y-3 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
+        <h3 className="text-base font-semibold text-navy-900 dark:text-white">Deneme Arşivi ({archive.length})</h3>
+        {archive.length === 0 ? <p className="text-sm text-slate-600 dark:text-slate-300">Bu öğrenci için henüz deneme sonucu yok.</p> :
+          <ol className="space-y-3">
+            {archive.map((exam) => {
+              const published = hasPublishedTrialScore(exam.id);
+              return <li key={exam.id} className="space-y-3 rounded-xl border border-slate-200 p-3 dark:border-slate-800 sm:p-4">
+                <div className="flex items-start justify-between gap-3">
+                  <div>
+                    <h4 className="font-semibold">{exam.examTitle}</h4>
+                    <time dateTime={exam.examDate} className="text-sm text-slate-600 dark:text-slate-300">{formatTurkishDate(exam.examDate)}</time>
+                  </div>
+                  {!readOnly && onDeletePracticeExam && <button type="button" onClick={() => onDeletePracticeExam(exam)}
+                    aria-label={exam.examTitle + ' kaydını sil'} className="min-h-11 min-w-11 rounded-md text-slate-500 hover:text-red-600 no-print">
+                    <Trash2 className="mx-auto size-4" />
+                  </button>}
+                </div>
+                <dl className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+                  {LGS_SUBJECT_CONFIG.map(({ key, label }) => {
+                    const d = exam[`${key}D`];
+                    const y = exam[`${key}Y`];
+                    return <div key={key} className="rounded-lg bg-slate-50 p-2.5 dark:bg-slate-950"
+                      style={{ borderTop: '2px solid ' + trialSubjectColors[key].color }}>
+                      <dt className="text-sm font-semibold">{label}</dt>
+                      <dd className="text-sm tabular-nums">{d} D · {y} Y · <strong>{calculateNet(d, y, exam.wrongPenalty).toLocaleString('tr-TR')} net</strong></dd>
+                    </div>;
+                  })}
+                </dl>
+                <dl className="grid grid-cols-2 gap-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+                  <div><dt className="text-sm">Toplam net</dt><dd className="font-bold tabular-nums">{exam.totalNet.toLocaleString('tr-TR', { minimumFractionDigits: 2 })}</dd></div>
+                  <div><dt className="text-sm">{published ? 'PDF’deki LGS puanı' : 'Tahmini LGS puanı'}</dt><dd className="font-bold tabular-nums">{exam.estimatedLgsScore.toLocaleString('tr-TR', { minimumFractionDigits: published ? 3 : 1 })}</dd></div>
+                </dl>
+              </li>;
+            })}
+          </ol>}
+      </section>
+
       <section className="grid grid-cols-1 lg:grid-cols-2 gap-6">
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
           <h3 className="text-base font-semibold text-navy-900 dark:text-white">
@@ -288,51 +347,18 @@ export function StudentProfileView({
                   <XAxis dataKey="shortLabel" tick={{ fontSize: 11, fill: '#64748b' }} />
                   <YAxis domain={[0, 20]} tick={{ fontSize: 11, fill: '#64748b' }} />
                   <Tooltip formatter={(val) => [`${val ?? 0} net`, 'Ortalama Net']} />
-                  <Bar dataKey="avgNet" fill="#0D9488" radius={[6, 6, 0, 0]} maxBarSize={42} />
+                  <Bar dataKey="avgNet" radius={[6, 6, 0, 0]} maxBarSize={42}>
+                    {trialSummary.subjectAverages.map(({ key }) => (
+                      <Cell key={key} fill={trialSubjectColors[key].color} />
+                    ))}
+                  </Bar>
                 </BarChart>
               </ResponsiveContainer>
             </div>
           )}
         </div>
 
-        <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6">
-          <h3 className="text-base font-semibold text-navy-900 dark:text-white">
-            Deneme Sınavı Toplam Net Gelişimi
-          </h3>
-          <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 mb-5">
-            Deneme tarihlerine göre 90 soru üzerinden toplam net eğilimi
-          </p>
-          {trialTrend.length === 0 ? (
-            <p className="text-sm text-slate-500 dark:text-slate-400 py-10 text-center">
-              Net gelişim grafiği için deneme kaydı ekleyin.
-            </p>
-          ) : (
-            <div className="h-64 w-full">
-              <ResponsiveContainer width="100%" height="100%">
-                <LineChart data={trialTrend} margin={{ top: 8, right: 12, left: -16, bottom: 8 }}>
-                  <CartesianGrid strokeDasharray="3 3" stroke="#94a3b8" strokeOpacity={0.25} />
-                  <XAxis dataKey="label" tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <YAxis domain={[0, 90]} tick={{ fontSize: 11, fill: '#64748b' }} />
-                  <Tooltip
-                    formatter={(val) => [`${val ?? 0} net`, 'Toplam Net']}
-                    labelFormatter={(label, payload) => {
-                      const item = payload?.[0]?.payload as { examTitle?: string } | undefined;
-                      return item ? `${label} · ${item.examTitle}` : String(label);
-                    }}
-                  />
-                  <Line
-                    type="monotone"
-                    dataKey="totalNet"
-                    stroke="#C89B3C"
-                    strokeWidth={2.5}
-                    dot={{ r: 4, fill: '#0B1F3A', strokeWidth: 2, stroke: '#C89B3C' }}
-                    activeDot={{ r: 6 }}
-                  />
-                </LineChart>
-              </ResponsiveContainer>
-            </div>
-          )}
-        </div>
+        <ExamNetTrend exams={practiceExams} />
       </section>
 
       {/* AI Pedagogical Analysis Panel */}
@@ -349,14 +375,14 @@ export function StudentProfileView({
               <ShieldCheck className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400 shrink-0" />
               <span>
                 Gizlilik Koruması: Ad-soyad ve kişisel notlar gönderilmez; yalnızca anonim kod (
-                {anonymizedPreview.anonymousCode}) ve ders ortalamaları iletilir.
+                {anonymizedPreview.anonymousCode}), notlar ve deneme özetleri iletilir.
               </span>
             </p>
           </div>
           <button
             type="button"
             onClick={() => void handleRunAIAnalysis()}
-            disabled={aiLoading || grades.length === 0}
+            disabled={aiLoading || (grades.length === 0 && practiceExams.length === 0)}
             className="inline-flex items-center justify-center gap-2 px-4 py-2.5 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-60 transition-colors cursor-pointer whitespace-nowrap shrink-0 no-print"
           >
             {aiLoading ? <Loader2 className="w-4 h-4 animate-spin" /> : <Bot className="w-4 h-4" />}
@@ -415,73 +441,16 @@ export function StudentProfileView({
         )}
       </section>
 
-      {/* Practice Exams & Grades Tables */}
-      <section className="grid grid-cols-1 xl:grid-cols-12 gap-6">
-        <div className="xl:col-span-7 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
+      <section>
+        <div className=" bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
           <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
             <h3 className="text-base font-semibold text-navy-900 dark:text-white">
-              Deneme Sınavları (D/Y/Net) ({practiceExams.length})
-            </h3>
-          </div>
-          {practiceExams.length === 0 ? (
-            <p className="p-6 text-sm text-slate-500 dark:text-slate-400">
-              Bu öğrenci için kayıtlı deneme sınavı bulunmuyor.
-            </p>
-          ) : (
-            <div className="divide-y divide-slate-100 dark:divide-slate-800">
-              {practiceExams.map((ex) => (
-                <div
-                  key={ex.id}
-                  className="p-4 hover:bg-slate-50 dark:hover:bg-slate-800/40 space-y-2"
-                >
-                  <div className="flex items-start justify-between gap-2">
-                    <div>
-                      <p className="text-sm font-semibold text-navy-900 dark:text-white">
-                        {ex.examTitle}
-                      </p>
-                      <p className="text-xs font-mono text-slate-500 tabular-nums">
-                        {formatTurkishDate(ex.examDate)} · {ex.totalCorrect} Doğru · {ex.totalWrong}{' '}
-                        Yanlış ·{' '}
-                        <strong className="text-teal-700 dark:text-teal-400">
-                          {ex.totalNet.toFixed(2)} Net
-                        </strong>{' '}
-                        · LGS ~{ex.estimatedLgsScore.toFixed(1)}
-                      </p>
-                    </div>
-                    {!readOnly && onDeletePracticeExam && (
-                      <button
-                        type="button"
-                        onClick={() => onDeletePracticeExam(ex)}
-                        aria-label="Denemeyi sil"
-                        className="p-1.5 rounded-md text-slate-400 hover:text-red-600 cursor-pointer no-print"
-                      >
-                        <Trash2 className="w-3.5 h-3.5" />
-                      </button>
-                    )}
-                  </div>
-                  <div className="grid grid-cols-3 sm:grid-cols-6 gap-1.5 text-[11px] font-mono tabular-nums text-slate-600 dark:text-slate-300">
-                    <span>Trk: {calculateNet(ex.turkceD, ex.turkceY, ex.wrongPenalty)}</span>
-                    <span>Mat: {calculateNet(ex.matematikD, ex.matematikY, ex.wrongPenalty)}</span>
-                    <span>Fen: {calculateNet(ex.fenD, ex.fenY, ex.wrongPenalty)}</span>
-                    <span>İnk: {calculateNet(ex.inkilapD, ex.inkilapY, ex.wrongPenalty)}</span>
-                    <span>Din: {calculateNet(ex.dinD, ex.dinY, ex.wrongPenalty)}</span>
-                    <span>İng: {calculateNet(ex.ingilizceD, ex.ingilizceY, ex.wrongPenalty)}</span>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <div className="xl:col-span-5 bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
-          <div className="px-6 py-4 border-b border-slate-200 dark:border-slate-800">
-            <h3 className="text-base font-semibold text-navy-900 dark:text-white">
-              Yazılı Notları ({grades.length})
+              Notlar ({grades.length})
             </h3>
           </div>
           {grades.length === 0 ? (
             <p className="p-6 text-sm text-slate-500 dark:text-slate-400">
-              Henüz yazılı notu kaydedilmemiş.
+              Henüz not kaydedilmemiş.
             </p>
           ) : (
             <div className="divide-y divide-slate-100 dark:divide-slate-800">
@@ -491,8 +460,9 @@ export function StudentProfileView({
                   className="px-4 py-3 flex items-center justify-between gap-2 hover:bg-slate-50 dark:hover:bg-slate-800/40"
                 >
                   <div className="min-w-0">
-                    <p className="text-sm font-medium text-navy-900 dark:text-white truncate">
-                      {g.subjectName}
+                    <p className="flex items-center gap-2 text-sm font-medium text-navy-900 dark:text-white">
+                      <span aria-hidden="true" className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: getSubjectColor(g.subjectName) }} />
+                      <span className="truncate">{g.subjectName}</span>
                     </p>
                     <p className="text-xs text-slate-500 dark:text-slate-400 truncate">
                       {g.examTitle} · {formatTurkishDate(g.examDate)}

@@ -1,3 +1,4 @@
+import { WorkshopLinks } from './workshop/WorkshopLinks';
 import React, { useEffect, useRef, useState } from 'react';
 import {
   BookOpen,
@@ -15,6 +16,7 @@ import {
 import { useAcademy } from '../../context/AcademyContext';
 import {
   getQariAudioUrl,
+  NAMAZ_DUA_RECORDINGS,
   QARI_OPTIONS,
   SURAH_DUA_LIBRARY,
   WISDOM_STORIES,
@@ -23,7 +25,7 @@ import {
   type WisdomStory,
 } from '../../data/religionRichData';
 import { RELIGION_TEST_PACKS } from '../../data/tests/religionTestsData';
-import { playStudioAudio, speakInstant, stopAllSpeech } from '../../utils/englishAudio';
+import { generateOrGetStudioWav, playStudioAudio, speakInstant, stopAllSpeech } from '../../utils/englishAudio';
 import { MultiTestQuizEngine } from '../ui/MultiTestQuizEngine';
 import { WorshipAnimationsLab } from './religion/WorshipAnimationsLab';
 
@@ -65,6 +67,7 @@ const AI_QUICK_QUESTIONS = [
 export function ReligionModule() {
   const { recordQuizAttempt, workspaceView, notify } = useAcademy();
   const [activeTab, setActiveTab] = useState<ReligionTab>('worship');
+  const [stopWorshipAudioSignal, setStopWorshipAudioSignal] = useState(0);
 
   // Stories state
   const [themeFilter, setThemeFilter] = useState<'Tümü' | WisdomStory['theme']>('Tümü');
@@ -78,7 +81,9 @@ export function ReligionModule() {
   const [arabicScriptMap, setArabicScriptMap] = useState<
     Record<string, { arabicText: string; basmala?: string }>
   >({});
-  const qariAudioRef = useRef<HTMLAudioElement | null>(null);
+  const [failedRecordingEntryId, setFailedRecordingEntryId] = useState<string | null>(null);
+  const recitationAudioRef = useRef<HTMLAudioElement | null>(null);
+  const recitationRequest = useRef(0);
 
   // AI Tutor state
   const [aiInput, setAiInput] = useState('');
@@ -92,18 +97,21 @@ export function ReligionModule() {
     },
   ]);
 
-  const stopQariPlayback = () => {
-    if (qariAudioRef.current) {
-      qariAudioRef.current.pause();
-      qariAudioRef.current.currentTime = 0;
-      qariAudioRef.current = null;
+  const stopRecitation = () => {
+    recitationRequest.current += 1;
+    const audio = recitationAudioRef.current;
+    recitationAudioRef.current = null;
+    if (audio) {
+      audio.pause();
+      audio.removeAttribute('src');
+      audio.load();
     }
     setPlayingEntryId(null);
     setLoadingAudioEntryId(null);
   };
 
   const stopEveryAudio = () => {
-    stopQariPlayback();
+    stopRecitation();
     stopAllSpeech();
   };
 
@@ -150,76 +158,64 @@ export function ReligionModule() {
 
   const activeQari = QARI_OPTIONS.find((q) => q.id === selectedQariId) ?? QARI_OPTIONS[0];
 
-  const handleToggleRecitation = async (entry: SurahDuaEntry) => {
-    if (playingEntryId === entry.id) {
-      stopEveryAudio();
-      return;
-    }
-
+  const handleToggleRecitation = async (entry: SurahDuaEntry, useSynthetic = false) => {
     stopEveryAudio();
+    if (playingEntryId === entry.id || loadingAudioEntryId === entry.id) return;
 
-    const qariUrl = getQariAudioUrl(entry, selectedQariId);
-    if (qariUrl) {
-      setLoadingAudioEntryId(entry.id);
-      const audio = new Audio(qariUrl);
-      qariAudioRef.current = audio;
+    const recordingUrl = entry.recordingFile
+      ? NAMAZ_DUA_RECORDINGS.audioBaseUrl + entry.recordingFile
+      : getQariAudioUrl(entry, selectedQariId);
+    const syntheticText = (useSynthetic || !recordingUrl) ? entry.staticArabicText : undefined;
+    if (!recordingUrl && !syntheticText) return;
 
-      audio.oncanplay = () => {
-        setLoadingAudioEntryId((cur) => (cur === entry.id ? null : cur));
-      };
-      audio.onplay = () => {
+    const request = recitationRequest.current;
+    setLoadingAudioEntryId(entry.id);
+
+    const fail = (error?: unknown) => {
+      if (recitationRequest.current !== request) return;
+      stopRecitation();
+      const needsTap = error instanceof DOMException && error.name === 'NotAllowedError';
+      let message = 'Kayıt açılamadı. Başka bir kâri seçerek tekrar deneyebilirsiniz.';
+      if (needsTap) {
+        message = 'Sesi başlatmak için dinleme düğmesine yeniden dokunun.';
+      } else if (syntheticText) {
+        message = 'Yapay zekâ sesi hazırlanamadı. Lütfen tekrar deneyin.';
+      } else if (entry.recordingFile) {
+        setFailedRecordingEntryId(entry.id);
+        message = 'Hafız kaydına ulaşılamadı. Kaynağı açabilir veya yapay zekâ sesini deneyebilirsiniz.';
+      }
+      notify('error', 'Ses Oynatılamadı', message);
+    };
+
+    try {
+      let url = recordingUrl;
+      if (syntheticText) {
+        const speech = await generateOrGetStudioWav(
+          syntheticText.replaceAll('۝', '،'),
+          'Puck',
+          'Read the vowelled Arabic verbatim. Clear, steady, slightly higher-pitched male voice. Respect pauses. No added, skipped or repeated words.',
+        );
+        url = speech.url;
+      }
+      if (recitationRequest.current !== request || !url) return;
+
+      const audio = new Audio(url);
+      recitationAudioRef.current = audio;
+      audio.playbackRate = syntheticText ? 0.92 : 1;
+      audio.onplaying = () => {
+        if (recitationRequest.current !== request) return;
         setLoadingAudioEntryId(null);
         setPlayingEntryId(entry.id);
+        if (!syntheticText) setFailedRecordingEntryId((current) => current === entry.id ? null : current);
       };
       audio.onended = () => {
-        if (qariAudioRef.current === audio) qariAudioRef.current = null;
-        setPlayingEntryId((cur) => (cur === entry.id ? null : cur));
+        if (recitationRequest.current === request) stopRecitation();
       };
-      audio.onerror = () => {
-        if (qariAudioRef.current === audio) qariAudioRef.current = null;
-        setLoadingAudioEntryId(null);
-        setPlayingEntryId(null);
-        notify(
-          'error',
-          'Tilavet Yüklenemedi',
-          `${activeQari.name} ses kaydına şu an ulaşılamadı. Farklı bir kâri seçerek tekrar deneyebilirsiniz.`
-        );
-      };
+      audio.onerror = () => fail();
 
-      try {
-        await audio.play();
-      } catch {
-        setLoadingAudioEntryId(null);
-        setPlayingEntryId(null);
-      }
-      return;
-    }
-
-    // Non-Quranic Sunnah namaz duas (Sübhaneke, Ettehiyyâtü): play Arabic studio recitation via Gemini TTS
-    if (entry.staticArabicText) {
-      setLoadingAudioEntryId(entry.id);
-      try {
-        await playStudioAudio(entry.staticArabicText, {
-          voiceName: 'Charon',
-          rate: 0.94,
-          style: 'Calm, respectful, slow classical Arabic pronunciation of an Islamic namaz prayer',
-          onStart: () => {
-            setLoadingAudioEntryId(null);
-            setPlayingEntryId(entry.id);
-          },
-          onEnd: () => {
-            setPlayingEntryId((cur) => (cur === entry.id ? null : cur));
-          },
-        });
-      } catch (err) {
-        setLoadingAudioEntryId(null);
-        setPlayingEntryId(null);
-        notify(
-          'error',
-          'Dua Seslendirilemedi',
-          err instanceof Error ? err.message : 'Ses dosyası hazırlanamadı.'
-        );
-      }
+      await audio.play();
+    } catch (error) {
+      fail(error);
     }
   };
 
@@ -292,7 +288,10 @@ export function ReligionModule() {
 
         <button
           type="button"
-          onClick={() => stopEveryAudio()}
+          onClick={() => {
+            stopEveryAudio();
+            setStopWorshipAudioSignal((signal) => signal + 1);
+          }}
           className="self-start md:self-auto px-3.5 py-2 rounded-lg text-xs font-medium border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 cursor-pointer whitespace-nowrap"
         >
           Tilaveti / Sesi Durdur
@@ -302,7 +301,7 @@ export function ReligionModule() {
       {/* Primary Module Tabs */}
       <nav
         aria-label="Din Kültürü Modül Sekmeleri"
-        className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 dark:border-slate-800 pb-3"
+        className="control-grid gap-2 border-b border-slate-200 dark:border-slate-800 pb-3"
       >
         {(
           [
@@ -319,7 +318,10 @@ export function ReligionModule() {
             <button
               key={tab.id}
               type="button"
-              onClick={() => setActiveTab(tab.id)}
+              onClick={() => {
+                if (activeTab !== tab.id) stopEveryAudio();
+                setActiveTab(tab.id);
+              }}
               className={`inline-flex items-center gap-2 px-4 py-2 rounded-lg text-xs sm:text-sm font-medium transition-colors cursor-pointer whitespace-nowrap ${
                 isActive
                   ? 'bg-navy-900 text-white dark:bg-teal-600'
@@ -335,13 +337,13 @@ export function ReligionModule() {
 
       {/* TAB 1: WORSHIP ANIMATIONS */}
       {activeTab === 'worship' && (
-        <WorshipAnimationsLab onOpenSurahs={() => setActiveTab('surahs')} />
+        <WorshipAnimationsLab stopAudioSignal={stopWorshipAudioSignal} onOpenSurahs={() => setActiveTab('surahs')} />
       )}
 
       {/* TAB 2: WISDOM STORIES */}
       {activeTab === 'stories' && (
         <div className="space-y-5">
-          <div className="flex flex-wrap items-center gap-1.5 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80 w-fit">
+          <div className="control-grid gap-1.5 p-1.5 rounded-xl bg-slate-100 dark:bg-slate-800/80">
             {STORY_THEMES.map((theme) => (
               <button
                 key={theme}
@@ -510,15 +512,18 @@ export function ReligionModule() {
                   Arapça Sure ve Dualar · Gerçek Kâri Tilavet Dinleme
                 </h2>
                 <p className="text-xs text-slate-500 dark:text-slate-400">
-                  Harekeli Arapça metinleri takip ederek seçtiğiniz dünyaca ünlü kâriden tecvidli tilavet dinleyebilirsiniz.
+                  Sure ve ayetleri seçtiğiniz kâriden dinleyin. Diğer namaz dualarında Hafız Hasan Hüseyin Varol’un kayıtları kullanılır.
                 </p>
               </div>
-              <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
+              <div className="control-grid gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-800">
                 {(['Tümü', 'Namaz Suresi', 'Namaz Duası', 'Ayet'] as const).map((cat) => (
                   <button
                     key={cat}
                     type="button"
-                    onClick={() => setSurahCategory(cat)}
+                    onClick={() => {
+                      if (surahCategory !== cat) stopRecitation();
+                      setSurahCategory(cat);
+                    }}
                     className={`px-3 py-1.5 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
                       surahCategory === cat
                         ? 'bg-white dark:bg-slate-900 text-navy-900 dark:text-white shadow-xs'
@@ -537,7 +542,7 @@ export function ReligionModule() {
                 <div className="inline-flex items-center gap-2">
                   <Headphones className="w-4 h-4 text-teal-600 dark:text-teal-400" />
                   <h3 className="text-sm font-semibold text-navy-900 dark:text-white">
-                    Kâri (Hafız) Seçimi — Gerçek Tilavet Kayıtları
+                    Sure ve ayetler için kâri seçimi
                   </h3>
                 </div>
                 <span className="text-xs text-slate-500 dark:text-slate-400">
@@ -552,7 +557,7 @@ export function ReligionModule() {
                       key={qari.id}
                       type="button"
                       onClick={() => {
-                        stopQariPlayback();
+                        stopRecitation();
                         setSelectedQariId(qari.id);
                       }}
                       className={`text-left p-3 rounded-lg border transition-colors cursor-pointer ${
@@ -589,6 +594,8 @@ export function ReligionModule() {
                 const arabicText = entry.staticArabicText || fetchedArabic?.arabicText;
                 const basmala = fetchedArabic?.basmala;
                 const isQuranicAudio = entry.audioType === 'surah' || entry.audioType === 'ayah';
+                const hasRecording = isQuranicAudio || Boolean(entry.recordingFile);
+                const reciter = isQuranicAudio ? activeQari.name : NAMAZ_DUA_RECORDINGS.reciter;
 
                 return (
                   <article
@@ -600,7 +607,7 @@ export function ReligionModule() {
                         <div>
                           <p className="text-xs text-teal-700 dark:text-teal-400">
                             {entry.category}
-                            {isQuranicAudio ? ` · ${activeQari.name}` : ' · Sünnet Namaz Duası'}
+                            {hasRecording ? ` · ${reciter}` : ' · Yapay zekâ sesi'}
                           </p>
                           <h3 className="text-base font-semibold text-navy-900 dark:text-white">
                             {entry.title}
@@ -610,8 +617,7 @@ export function ReligionModule() {
                         <button
                           type="button"
                           onClick={() => void handleToggleRecitation(entry)}
-                          disabled={isLoadingAudio}
-                          className={`inline-flex items-center gap-1.5 px-3.5 py-2 rounded-lg text-xs font-medium transition-colors cursor-pointer whitespace-nowrap disabled:opacity-60 ${
+                          className={`inline-flex min-h-11 items-center gap-1.5 rounded-lg px-3.5 py-2 text-sm font-medium transition-colors ${
                             isPlaying
                               ? 'bg-teal-600 text-white hover:bg-teal-700'
                               : 'bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500'
@@ -626,15 +632,29 @@ export function ReligionModule() {
                           )}
                           <span>
                             {isLoadingAudio
-                              ? 'Yükleniyor...'
+                              ? 'Yüklemeyi iptal et'
                               : isPlaying
-                                ? 'Tilaveti Durdur'
-                                : isQuranicAudio
-                                  ? 'Kâriden Dinle'
-                                  : 'Arapça Okunuşu Dinle'}
+                                ? 'Sesi durdur'
+                                : hasRecording
+                                  ? 'Hafızdan dinle'
+                                  : 'Yapay zekâ sesini dinle'}
                           </span>
                         </button>
                       </div>
+
+                      {entry.recordingFile && (
+                        <div className="control-grid gap-2 text-sm">
+                          <a href={NAMAZ_DUA_RECORDINGS.sourceUrl} target="_blank" rel="noreferrer"
+                            className="inline-flex min-h-11 items-center text-teal-800 underline dark:text-teal-300">Kayıt kaynağı</a>
+                          {failedRecordingEntryId === entry.id && (
+                            <button type="button" onClick={() => void handleToggleRecitation(entry, true)}
+                              disabled={isLoadingAudio || isPlaying}
+                              className="min-h-11 rounded-lg border border-slate-200 px-3 font-medium disabled:opacity-50 dark:border-slate-700">
+                              Yapay zekâ sesiyle dinle
+                            </button>
+                          )}
+                        </div>
+                      )}
 
                       {/* Vocalized Arabic Text (RTL) */}
                       <div
@@ -793,6 +813,8 @@ export function ReligionModule() {
           </aside>
         </section>
       )}
+
+      <WorkshopLinks activities={['worship', 'donation-plan', 'ethical-choices']} />
     </div>
   );
 }

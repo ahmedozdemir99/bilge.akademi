@@ -18,7 +18,7 @@ export function MathEncyclopediaPanel() {
 
   return (
     <div className="space-y-5">
-      <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         {(
           [
             { id: 'stories', label: `Hikâyeler ve Anekdotlar (${MATH_STORIES_ANECDOTES.length})`, icon: BookOpen },
@@ -219,7 +219,7 @@ export function MathEncyclopediaPanel() {
                     </div>
                   )}
 
-                  <div className="flex flex-wrap items-center gap-2 pt-2 border-t border-slate-100 dark:border-slate-800">
+                  <div className="control-grid gap-2 border-t pt-2 border-slate-100 dark:border-slate-800">
                     {shownHints < puz.hints.length && (
                       <button
                         type="button"

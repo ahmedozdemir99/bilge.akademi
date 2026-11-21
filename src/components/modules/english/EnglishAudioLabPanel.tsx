@@ -275,7 +275,7 @@ export function EnglishAudioLabPanel({ onNotify }: EnglishAudioLabPanelProps) {
                 </h3>
               </div>
 
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="control-grid gap-2 sm:max-w-sm">
                 <button
                   type="button"
                   onClick={() => setHideScript((h) => !h)}
@@ -298,7 +298,7 @@ export function EnglishAudioLabPanel({ onNotify }: EnglishAudioLabPanelProps) {
 
             {/* Playback Action Bar */}
             <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="control-grid gap-2 sm:max-w-sm">
                 <button
                   type="button"
                   onClick={handlePlayInstantFull}

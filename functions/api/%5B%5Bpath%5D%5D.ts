@@ -1,3 +1,5 @@
+import { onRequest as mainApi } from './[[path]]';
+
 interface PagesEnv {
   GEMINI_API_KEY?: string;
 }
@@ -8,8 +10,8 @@ interface PagesContext {
   params: { path?: string | string[] };
 }
 
-const PRIMARY_MODEL = 'gemini-4-hydrogen';
-const FALLBACK_MODEL = 'gemini-3.1-flash-lite';
+const PRIMARY_MODEL = 'gemini-3.8-flash';
+const FALLBACK_MODEL = 'gemini-3.5-flash-lite';
 const TTS_MODEL = 'gemini-3.8-flash-lite-tts';
 const ALLOWED_TTS_VOICES = new Set(['Kore', 'Puck', 'Charon', 'Fenrir', 'Zephyr']);
 const ARABIC_DIGITS = ['٠', '١', '٢', '٣', '٤', '٥', '٦', '٧', '٨', '٩'];
@@ -88,7 +90,7 @@ async function callGeminiModel(
     useLowThinking?: boolean;
   }
 ): Promise<GeminiRestResult> {
-  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent?key=${encodeURIComponent(apiKey)}`;
+  const url = `https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`;
 
   const generationConfig: Record<string, unknown> = {};
   if (opts.responseMimeType) generationConfig.responseMimeType = opts.responseMimeType;
@@ -114,7 +116,7 @@ async function callGeminiModel(
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
-        'User-Agent': 'aistudio-build',
+        'x-goog-api-key': apiKey,
       },
       body: JSON.stringify(payload),
       signal: controller.signal,
@@ -210,6 +212,8 @@ export async function onRequest(context: PagesContext): Promise<Response> {
 
   const url = new URL(request.url);
   const route = url.pathname.replace(/^\/api\/?/, '').replace(/\/+$/, '');
+
+  if (route === 'ai/connection') return mainApi(context);
 
   /* ---------------- HEALTH CHECK ---------------- */
   if (route === 'health' && request.method === 'GET') {
@@ -312,12 +316,12 @@ export async function onRequest(context: PagesContext): Promise<Response> {
         typeof voiceName === 'string' && ALLOWED_TTS_VOICES.has(voiceName) ? voiceName : 'Kore';
       const styleKey = typeof style === 'string' ? style.trim().slice(0, 140) : '';
 
-      const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const ttsUrl = `https://generativelanguage.googleapis.com/v1beta/models/${TTS_MODEL}:generateContent`;
       const ttsRes = await fetch(ttsUrl, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'User-Agent': 'aistudio-build',
+          'x-goog-api-key': apiKey,
         },
         body: JSON.stringify({
           contents: [

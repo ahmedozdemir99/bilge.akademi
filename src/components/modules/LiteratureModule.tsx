@@ -1,3 +1,4 @@
+import { WorkshopLinks } from './workshop/WorkshopLinks';
 import React, { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -216,7 +217,7 @@ export function LiteratureModule() {
         </div>
 
         <div
-          className="inline-flex flex-wrap items-center gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 no-print"
+          className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800 no-print"
           role="tablist"
         >
           {(
@@ -248,6 +249,7 @@ export function LiteratureModule() {
       </div>
 
       {/* TAB 0: APHORISMS, CLASSIC POEMS & SATIRE TREASURY */}
+
       {activeTab === 'treasury' && (
         <LiteratureTreasuryPanel
           onLoadPoemToEditor={(poem) => {
@@ -379,7 +381,7 @@ export function LiteratureModule() {
               </div>
 
               <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-slate-100 dark:border-slate-800 no-print">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="control-grid gap-2">
                   <button
                     type="button"
                     disabled={savingPoem}
@@ -855,7 +857,7 @@ export function LiteratureModule() {
       {activeTab === 'library' && (
         <div className="space-y-5">
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-            <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+            <div className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
               {(
                 [
                   { id: 'periods', label: 'Dönemler' },
@@ -1085,6 +1087,8 @@ export function LiteratureModule() {
           message={`“${deleteTarget.title}” başlıklı şiiri kalıcı olarak silmek istediğinize emin misiniz?`}
         />
       )}
+
+      <WorkshopLinks activities={['words', 'paragraph', 'inference']} />
     </div>
   );
 }

@@ -1,0 +1,25 @@
+export const activityTitles = {
+  fractions: 'Kesirleri eşleştir',
+  line: 'Doğruyu iki noktadan geçir',
+  area: 'Aynı çevre, farklı alan',
+  waves: 'Dalgayı şekillendir',
+  circuit: 'Devrenin yolunu değiştir',
+  mirror: 'Işığı aynadan yansıt',
+  words: 'Söz sanatını bul',
+  paragraph: 'Paragrafı yeniden kur',
+  inference: 'Metinden kanıt bul',
+  map: 'Mahallede yolunu bul',
+  invitation: 'Davet diyaloğunu kur',
+  announcements: 'Duyurudaki değişikliği yakala',
+  chronology: 'Cumhuriyet’e giden çizgi',
+  'source-types': 'Arşiv belgesini sınıflandır',
+  'compare-sources': 'Çelişen kaynakları karşılaştır',
+  worship: 'İbadet ve paylaşımı eşleştir',
+  'donation-plan': 'Dayanışma planını kur',
+  'ethical-choices': 'Değerleri karara dönüştür',
+  argument: 'Bir argümanı parçalarına ayır',
+  counterexamples: 'Karşı örnekle sına',
+  fairness: 'Adil kuralı yeniden düşün',
+} as const;
+
+export type ActivityId = keyof typeof activityTitles;

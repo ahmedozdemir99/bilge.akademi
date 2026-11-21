@@ -1,5 +1,6 @@
 export type ModuleId =
   | 'home'
+  | 'activity-workshop'
   | 'student-tracking'
   | 'literature'
   | 'history'

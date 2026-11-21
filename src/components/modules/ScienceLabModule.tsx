@@ -1,3 +1,4 @@
+import { WorkshopLinks } from './workshop/WorkshopLinks';
 import React, { useMemo, useState } from 'react';
 import {
   Atom,
@@ -102,7 +103,7 @@ export function ScienceLabModule() {
 
         <nav
           aria-label="Fen Bilimleri Sekmeleri"
-          className="flex flex-wrap items-center gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+          className="control-grid gap-1 p-1 rounded-xl bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
         >
           {[
             { id: 'experiments', label: 'Sanal Deneyler (5)', icon: FlaskConical },
@@ -157,7 +158,7 @@ export function ScienceLabModule() {
                 </h2>
               </div>
 
-              <div className="flex flex-wrap gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+              <div className="control-grid gap-1 p-1 rounded-lg bg-slate-100 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
                 {['Tümü', 'Fizik', 'Kimya', 'Biyoloji', 'Astronomi & Mühendislik'].map((fld) => (
                   <button
                     key={fld}
@@ -366,6 +367,8 @@ export function ScienceLabModule() {
           </aside>
         </section>
       )}
+
+      <WorkshopLinks activities={['circuit', 'mirror', 'waves']} />
     </div>
   );
 }

@@ -1,3 +1,4 @@
+import { WorkshopLinks } from './workshop/WorkshopLinks';
 import React, { useState } from 'react';
 import {
   BookOpenCheck,
@@ -98,7 +99,7 @@ export function EnglishModule() {
       {/* Primary Module Tabs */}
       <nav
         aria-label="İngilizce Modül Sekmeleri"
-        className="flex flex-wrap items-center gap-1.5 border-b border-slate-200 dark:border-slate-800 pb-3"
+        className="control-grid gap-2 border-b border-slate-200 dark:border-slate-800 pb-3"
       >
         {(
           [
@@ -232,6 +233,8 @@ export function EnglishModule() {
           </aside>
         </section>
       )}
+
+      <WorkshopLinks activities={activeTab === 'listening' ? ['announcements', 'map', 'invitation'] : ['invitation', 'map', 'announcements']} />
     </div>
   );
 }

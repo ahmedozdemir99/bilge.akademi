@@ -8,10 +8,10 @@ import {
   RotateCcw,
   ShieldCheck,
   Sun,
-  UserCheck,
 } from 'lucide-react';
 import { useAcademy } from '../../context/AcademyContext';
 import { uploadLocalToCloud, downloadCloudToLocal } from '../../lib/cloudBackup';
+import { WorkspaceRoleControl } from '../ui/WorkspaceRoleControl';
 
 export function SettingsModule() {
   const {
@@ -24,7 +24,6 @@ export function SettingsModule() {
     theme,
     setTheme,
     workspaceView,
-    setWorkspaceView,
     compactMode,
     setCompactMode,
     seedDemoToFirestore,
@@ -85,8 +84,7 @@ export function SettingsModule() {
           Ayarlar ve Hesap Yönetimi
         </h1>
         <p className="mt-1 text-sm text-slate-600 dark:text-slate-400">
-          Oturum durumunuzu, görünüm temanızı, öğretmen/öğrenci çalışma modunuzu ve veri gizliliği
-          tercihlerinizi yönetin.
+          Oturumunuzu, görünüm temanızı ve veri ayarlarınızı yönetin.
         </p>
       </div>
 
@@ -186,67 +184,36 @@ export function SettingsModule() {
 
         <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
           <div>
-            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
               Renk Teması
             </p>
-            <div className="grid grid-cols-2 gap-2.5">
+            <div className="grid grid-cols-2 gap-2 rounded-xl bg-slate-100 p-1.5 dark:bg-slate-950">
               <button
                 type="button"
                 onClick={() => setTheme('light')}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                  theme === 'light'
-                    ? 'border-teal-600 bg-teal-50 text-navy-900 dark:bg-teal-950/50 dark:text-white'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                }`}
+                aria-pressed={theme === 'light'}
+                className="appearance-option cursor-pointer"
               >
-                <Sun className="w-4 h-4 text-gold-600" />
+                <Sun aria-hidden="true" className="size-4 shrink-0" />
                 <span>Açık Tema</span>
               </button>
               <button
                 type="button"
                 onClick={() => setTheme('dark')}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                  theme === 'dark'
-                    ? 'border-teal-500 bg-navy-900 text-white'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                }`}
+                aria-pressed={theme === 'dark'}
+                className="appearance-option cursor-pointer"
               >
-                <Moon className="w-4 h-4 text-gold-400" />
+                <Moon aria-hidden="true" className="size-4 shrink-0" />
                 <span>Koyu Tema</span>
               </button>
             </div>
           </div>
 
           <div>
-            <p className="text-xs font-medium text-slate-700 dark:text-slate-300 mb-2">
-              Çalışma Rolü Görünümü
+            <p className="mb-2 text-sm font-medium text-slate-700 dark:text-slate-300">
+              {isDemoMode ? 'Demo Görünümü' : 'Hesap Görünümü'}
             </p>
-            <div className="grid grid-cols-2 gap-2.5">
-              <button
-                type="button"
-                onClick={() => setWorkspaceView('teacher')}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                  workspaceView === 'teacher'
-                    ? 'border-teal-600 bg-teal-50 text-navy-900 dark:bg-teal-950/50 dark:text-white'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                }`}
-              >
-                <UserCheck className="w-4 h-4 text-teal-600 dark:text-teal-400" />
-                <span>Öğretmen Paneli</span>
-              </button>
-              <button
-                type="button"
-                onClick={() => setWorkspaceView('student')}
-                className={`flex items-center justify-center gap-2 px-4 py-3 rounded-lg text-xs font-medium border transition-colors cursor-pointer ${
-                  workspaceView === 'student'
-                    ? 'border-teal-600 bg-teal-50 text-navy-900 dark:bg-teal-950/50 dark:text-white'
-                    : 'border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300'
-                }`}
-              >
-                <UserCheck className="w-4 h-4 text-gold-600 dark:text-gold-400" />
-                <span>Öğrenci Paneli</span>
-              </button>
-            </div>
+            <WorkspaceRoleControl />
           </div>
         </div>
 
@@ -315,8 +282,8 @@ export function SettingsModule() {
           </div>
         )}
 
-        <div className="flex flex-wrap items-center gap-3 pt-2">
-          {!isDemoMode ? (
+        <div className="control-grid gap-3 pt-2">
+          {user && workspaceView === 'teacher' && (
             <button
               type="button"
               disabled={seeding}
@@ -333,7 +300,8 @@ export function SettingsModule() {
               {seeding ? <Loader2 className="w-4 h-4 animate-spin" /> : <Database className="w-4 h-4 text-teal-600" />}
               <span>{seeding ? 'Yükleniyor...' : 'Örnek Sınıfları Firestore Hesabıma Ekle'}</span>
             </button>
-          ) : (
+          )}
+          {isDemoMode && (
             <button
               type="button"
               onClick={resetDemoData}

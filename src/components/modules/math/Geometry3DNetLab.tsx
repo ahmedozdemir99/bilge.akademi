@@ -1071,7 +1071,7 @@ export function Geometry3DNetLab() {
         {activeDef.hasNet && (
           <div className="p-4 rounded-xl bg-slate-50 dark:bg-slate-950/60 border border-slate-200 dark:border-slate-800 space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2">
-              <div className="flex flex-wrap items-center gap-2">
+              <div className="control-grid gap-2">
                 <button
                   type="button"
                   onClick={() => setIsAnimating((v) => !v)}

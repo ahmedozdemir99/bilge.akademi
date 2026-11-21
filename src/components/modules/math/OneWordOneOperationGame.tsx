@@ -436,7 +436,7 @@ export function OneWordOneOperationGame() {
       </div>
 
       {/* Sub-mode tabs */}
-      <div className="inline-flex flex-wrap gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
+      <div className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800">
         {(
           [
             { id: 'islem', label: '1 İşlem (Hedef Sayı)' },
