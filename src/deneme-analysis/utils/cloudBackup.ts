@@ -320,7 +320,7 @@ export async function syncArchiveToCloud(
   displayName: string,
   archive: ExamArchiveState,
   currentManifest: CloudSyncManifest | null,
-  options?: { forceFull?: boolean }
+  options?: { forceFull?: boolean; onProgress?: (completed: number, total: number) => void }
 ): Promise<CloudSyncResult> {
   if (archive.exams.length > 500 || archive.students.length > 5000 ||
     archive.students.some((student) => student.exams.length > MAX_EXAMS_PER_STUDENT)) {
@@ -465,6 +465,9 @@ export async function syncArchiveToCloud(
     }
   }
 
+  // Progress is based on acknowledged Firestore batch commits, not elapsed time.
+  options?.onProgress?.(0, ops.length + 1);
+  let committed = 0;
   // Commit in chunks of MAX_BATCH_OPS
   for (let i = 0; i < ops.length; i += MAX_BATCH_OPS) {
     const chunk = ops.slice(i, i + MAX_BATCH_OPS);
@@ -477,6 +480,8 @@ export async function syncArchiveToCloud(
       }
     }
     await batch.commit();
+    committed += chunk.length;
+    options?.onProgress?.(committed, ops.length + 1);
   }
 
   // Always refresh root archive timestamp & counts on backup completion
@@ -487,6 +492,7 @@ export async function syncArchiveToCloud(
     lastBackupAt: serverTimestamp(),
     updatedAt: serverTimestamp(),
   });
+  options?.onProgress?.(ops.length + 1, ops.length + 1);
 
   manifest.examHashes = nextExamHashes;
   manifest.studentHashes = nextStudentHashes;
