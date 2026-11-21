@@ -195,7 +195,6 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Deneme Sonuçlarını Yükle</h2>
         <p className="text-sm text-slate-600 dark:text-slate-300">PDF veya Excel’i açın, eşleşen öğrencileri kontrol edin ve sonuçları deneme arşivine kaydedin.</p>
-        {!user && <p className="text-sm">Demo oturumu. Buluta kaydetmek için <button type="button" className="underline" onClick={() => void signInWithGoogle()}>Google ile giriş yapın</button>.</p>}
       </div>
 
       <fieldset disabled={busy || authLoading || dataLoading} className="min-w-0 space-y-4 rounded-2xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6"
@@ -209,9 +208,10 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
           </label>
           {sourceFile && <p className="min-w-0 break-all text-sm text-slate-600 dark:text-slate-300">{sourceFile.name}{pdf && ' · ' + pdf.count + ' sayfa'}{pdf && sheets.length > 0 && ' · Okunan sayfa ' + readSelection}</p>}
         </div>
-        {user && <div className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+        <section aria-labelledby="trial-cloud-title" className="space-y-3 border-t border-slate-200 pt-3 dark:border-slate-800">
+          <h3 id="trial-cloud-title" className="text-sm font-semibold">Bulut Yedeği</h3>
           <div className="flex flex-wrap gap-2">
-            <button type="button" className={primary} disabled={!sourceFile} onClick={() => {
+            <button type="button" className={primary} disabled={!user || !sourceFile} aria-describedby="trial-cloud-help" onClick={() => {
               if (!sourceFile) return;
               void cloudAction(async (token, owner) => {
                 setProgress('Dosya Google Drive’a yükleniyor…');
@@ -220,14 +220,19 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
                 setCloudMessage('Dosya Google Drive’a kaydedildi.');
               });
             }}><CloudUpload size={17} aria-hidden="true" /> Buluta Yükle</button>
-            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold dark:border-slate-700"
-              onClick={() => void cloudAction(async (token, owner) => {
+            <button type="button" className="inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-4 py-2 text-sm font-semibold disabled:opacity-50 dark:border-slate-700"
+              disabled={!user} aria-describedby="trial-cloud-help" onClick={() => void cloudAction(async (token, owner) => {
                 setProgress('Bulut dosyaları okunuyor…');
                 setCloudFiles({ owner, files: await listTrialCloudFiles(token) });
               })}><CloudDownload size={17} aria-hidden="true" /> Buluttan Geri Yükle</button>
           </div>
-          <p className="text-sm text-slate-600 dark:text-slate-300">PDF ve Excel dosyaları özel Google Drive alanınızda, kaydedilen deneme sonuçları Firebase’de tutulur.</p>
-          {cloudFiles?.owner === user.uid && (cloudFiles.files.length ? (
+          <p id="trial-cloud-help" className="text-sm text-slate-600 dark:text-slate-300">
+            {authLoading || dataLoading ? 'Hesap bilgileri yükleniyor…' : !user ? <>
+              Bulut yedeği için <button type="button" className="font-semibold text-teal-700 underline dark:text-teal-300" onClick={() => void signInWithGoogle()}>Google ile giriş yapın</button>.
+            </> : !sourceFile ? 'Buluta yüklemek için önce yukarıdan bir PDF veya Excel dosyası seçin. Mevcut yedekleri dosya seçmeden açabilirsiniz.'
+              : 'Dosya özel Google Drive alanınıza kaydedilir. İlk kullanımda Drive izni istenir.'}
+          </p>
+          {user && cloudFiles?.owner === user.uid && (cloudFiles.files.length ? (
             <ul className="max-h-64 space-y-2 overflow-auto rounded-lg border border-slate-200 p-2 dark:border-slate-800">
               {cloudFiles.files.map((item) => <li key={item.id}>
                 <button type="button" className="w-full break-all rounded-lg px-3 py-2 text-left text-sm font-medium hover:bg-slate-100 dark:hover:bg-slate-800"
@@ -239,7 +244,7 @@ export function TrialImporter({ initialClass = '', onArchive }: { initialClass?:
             </ul>
           ) : <p className="text-sm">Bulutta deneme dosyası yok.</p>)}
           {cloudMessage && <p role="status" className="text-sm font-medium text-teal-800 dark:text-teal-200">{cloudMessage}</p>}
-        </div>}
+        </section>
         {pdf && pdf.count > 1 && <details className="space-y-2" open={pdf.count > 60 && !pdf.schoolPages && sheets.length === 0 ? true : undefined}>
           <summary className="cursor-pointer text-sm font-medium underline">PDF sayfalarını seç</summary>
           <div className="flex flex-wrap items-end gap-2">
