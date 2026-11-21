@@ -48,6 +48,8 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
   const [status, setStatus] = useState('');
   const [preview, setPreview] = useState<{ input: BulkInput; plan: BulkPlan }>();
   const locked = useRef(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+  const pasteRef = useRef<HTMLTextAreaElement>(null);
 
   function clearPreview() {
     setPreview(undefined);
@@ -80,6 +82,7 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
   function changeSource(next: 'file' | 'paste') {
     if (next === source) return;
     setSource(next);
+    if (next === 'paste') window.setTimeout(() => pasteRef.current?.focus(), 0);
     setPdf(undefined);
     setFilename('');
     setSheets([]);
@@ -175,7 +178,7 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
         </div>}
         {mode === 'grades' && !classStudents.length && <p className="text-sm text-amber-800 dark:text-amber-200">Not girmek için öğrencileri olan bir sınıf seçin.</p>}
         {mode === 'roster' && <div role="group" aria-label="Listenin kaynağı" className="grid gap-2 sm:grid-cols-2">
-          <button type="button" className={sourceButton} aria-pressed={source === 'file'} onClick={() => changeSource('file')}>
+          <button type="button" className={sourceButton} aria-pressed={source === 'file'} onClick={() => { changeSource('file'); fileInputRef.current?.click(); }}>
             <FileUp className="size-4 shrink-0" aria-hidden="true" /> Excel veya PDF
           </button>
           <button type="button" className={sourceButton} aria-pressed={source === 'paste'} onClick={() => changeSource('paste')}>
@@ -187,7 +190,7 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
           <p id="bulk-roster-paste-help" className="text-sm text-slate-600 dark:text-slate-300">
             Excel’den Okul No ve Ad Soyad sütunlarını kopyalayın veya her satıra bir öğrenci yazın.
           </p>
-          <textarea id="bulk-roster-paste" aria-describedby="bulk-roster-paste-help" className={field + ' resize-y'}
+          <textarea ref={pasteRef} id="bulk-roster-paste" aria-describedby="bulk-roster-paste-help" className={field + ' resize-y'}
             value={paste} rows={5} spellCheck={false} placeholder={'101 Ayşe Yılmaz\n102 Mehmet Demir'}
             onChange={(event) => {
               setPaste(event.target.value);
@@ -197,7 +200,7 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
         </div> : <div className="space-y-2">
           <label className={primary + ' relative w-full cursor-pointer overflow-hidden focus-within:outline-2'}>
             <FileUp className="size-4" aria-hidden="true" /> Dosya Seç
-            <input type="file" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="PDF veya Excel dosyası seç" accept=".pdf,.xlsx,.csv,.tsv,application/pdf"
+            <input ref={fileInputRef} type="file" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="PDF veya Excel dosyası seç" accept=".pdf,.xlsx,.csv,.tsv,application/pdf"
               aria-describedby="bulk-file-formats"
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void openFile(file); }} />
           </label>
