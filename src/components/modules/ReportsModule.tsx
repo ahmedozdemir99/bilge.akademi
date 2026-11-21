@@ -1,3 +1,4 @@
+import { CloudDataNotice } from '../ui/CloudDataNotice';
 import { useMemo, useState } from 'react';
 import { Download, Printer } from 'lucide-react';
 import {
@@ -40,6 +41,8 @@ export function ReportsModule() {
     mathAttempts,
     quizAttempts,
     isDemoMode,
+    teacherCloudStatus,
+    retryTeacherData,
   } = useAcademy();
 
   const [selectedClassId, setSelectedClassId] = useState('');
@@ -107,6 +110,15 @@ export function ReportsModule() {
       ])
     );
   };
+
+  if (teacherCloudStatus !== 'ready') {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold">Raporlar ve İstatistikler</h1>
+        <CloudDataNotice status={teacherCloudStatus} onRetry={retryTeacherData} />
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6">

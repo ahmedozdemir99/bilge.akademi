@@ -1,3 +1,4 @@
+import { CloudDataNotice } from '../ui/CloudDataNotice';
 import { useEffect, useRef, useState } from 'react';
 import {
   BarChart3,
@@ -124,16 +125,24 @@ export function HomeDashboard() {
     mathAttempts,
     isDemoMode,
     workspaceView,
+    teacherCloudStatus,
+    retryTeacherData,
+    profileIssue,
+    retryProfile,
     signInWithGoogle,
   } = useAcademy();
 
   const [geminiConfigured, setGeminiConfigured] = useState<boolean | null>(null);
   useEffect(() => {
     const controller = new AbortController();
-    isGeminiConfigured(AbortSignal.any([controller.signal, AbortSignal.timeout(8000)]))
+    const timer = window.setTimeout(() => controller.abort(), 8000);
+    isGeminiConfigured(controller.signal)
       .then(setGeminiConfigured)
       .catch(() => {});
-    return () => controller.abort();
+    return () => {
+      window.clearTimeout(timer);
+      controller.abort();
+    };
   }, []);
 
   const [moduleSearch, setModuleSearch] = useState('');
@@ -251,8 +260,12 @@ export function HomeDashboard() {
           </p>
         </div>
 
-        <div className={workspaceView === 'teacher' ? "grid grid-cols-2 gap-4 lg:grid-cols-4" : "grid gap-4"}>
-          {workspaceView === 'teacher' && (
+        {profileIssue && <CloudDataNotice status={profileIssue} onRetry={retryProfile} label="Öğretmen profili" />}
+        {workspaceView === 'teacher' && teacherCloudStatus !== 'ready' && (
+          <CloudDataNotice status={teacherCloudStatus} onRetry={retryTeacherData} label="Sınıf ve öğrenci kayıtları" />
+        )}
+        <div className={workspaceView === 'teacher' ? "mt-3 grid grid-cols-2 gap-4 lg:grid-cols-4" : "mt-3 grid gap-4"}>
+          {workspaceView === 'teacher' && teacherCloudStatus === 'ready' && (
             <>
               <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-5">
                 <p className="text-xs font-medium text-slate-500 dark:text-slate-400">Toplam Öğrenci</p>

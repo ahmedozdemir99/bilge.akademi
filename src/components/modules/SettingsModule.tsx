@@ -1,3 +1,4 @@
+import { CloudDataNotice } from '../ui/CloudDataNotice';
 import React, { useEffect, useState } from 'react';
 import {
   Database,
@@ -16,6 +17,11 @@ export function SettingsModule() {
   const {
     user,
     profile,
+    profileIssue,
+    retryProfile,
+    teacherCloudStatus,
+    retryTeacherData,
+    notify,
     isDemoMode,
     signInWithGoogle,
     signOutUser,
@@ -48,6 +54,8 @@ export function SettingsModule() {
     setSavingProfile(true);
     try {
       await updateProfileInfo(schoolName, branch, displayName);
+    } catch (error) {
+      notify('error', 'Profil kaydedilemedi', error instanceof Error ? error.message : undefined);
     } finally {
       setSavingProfile(false);
     }
@@ -76,7 +84,7 @@ export function SettingsModule() {
             </h2>
             <p className="mt-1 text-xs text-slate-500 dark:text-slate-400">
               {user
-                ? `Oturum açık: ${user.email} · Firebase Firestore aktif`
+                ? `Google oturumu açık · ${user.email ?? user.displayName ?? 'Bilge Akademi'}`
                 : 'Şu anda yerel tarayıcı destekli Demo Modundasınız. Kalıcı bulut kayıtları için Google ile giriş yapın.'}
             </p>
           </div>
@@ -101,7 +109,8 @@ export function SettingsModule() {
           )}
         </div>
 
-        {user && (
+        {profileIssue && <CloudDataNotice status={profileIssue} onRetry={retryProfile} label="Hesap profili" />}
+        {user && profile && (
           <form onSubmit={handleProfileSave} className="grid grid-cols-1 sm:grid-cols-3 gap-4">
             <div>
               <label htmlFor="prof-name" className="block text-xs font-medium text-slate-600 dark:text-slate-300 mb-1.5">
@@ -239,11 +248,14 @@ export function SettingsModule() {
           otomatik olarak çıkarılır.
         </p>
 
+        {user && workspaceView === 'teacher' && teacherCloudStatus !== 'ready' && (
+          <CloudDataNotice status={teacherCloudStatus} onRetry={retryTeacherData} />
+        )}
         <div className="control-grid gap-3 pt-2">
           {user && workspaceView === 'teacher' && (
             <button
               type="button"
-              disabled={seeding}
+              disabled={seeding || teacherCloudStatus !== 'ready'}
               onClick={async () => {
                 setSeeding(true);
                 try {

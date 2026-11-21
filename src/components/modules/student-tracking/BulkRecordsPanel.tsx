@@ -6,6 +6,7 @@ import type { ExamType } from '../../../types/academy';
 import { buildBulkPlan, BULK_EXAM_TYPES, type BulkInput, type BulkPlan } from '../../../utils/bulkStudentRecords';
 import { extractMappedRows, importSheetWidth, readImportWorkbook, readPdfImport, readPdfPageCount, type ImportSheet } from '../../../utils/bulkRecordFiles';
 import { encodeClassFocus, type ClassKind } from '../../../utils/classKinds';
+import { CombinedRosterImport } from './CombinedRosterImport';
 import { BulkFileMapper } from './BulkFileMapper';
 
 const field = 'w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950';
@@ -126,6 +127,7 @@ export function BulkRecordsPanel({ onTrialImport }: { onTrialImport: () => void 
         <h2 className="text-lg font-semibold">PDF veya Excel’den Toplu Giriş</h2>
         <button type="button" onClick={onTrialImport} className="text-sm font-semibold text-teal-700 underline dark:text-teal-300">Deneme Sonuçlarını Yükle</button>
       </header>
+      {mode === 'roster' && <CombinedRosterImport initialYear={academicYear} />}
       <fieldset className="min-w-0 space-y-4" disabled={busy || dataLoading} onChange={clearPreview}>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-sm font-medium">Kayıt türü

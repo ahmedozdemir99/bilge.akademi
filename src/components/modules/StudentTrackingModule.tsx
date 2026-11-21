@@ -1,3 +1,4 @@
+import { CloudDataNotice } from '../ui/CloudDataNotice';
 import { useMemo, useState } from 'react';
 import {
   AlertCircle,
@@ -75,7 +76,8 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
     isDemoMode,
     workspaceView,
     compactMode,
-    dataLoading,
+    teacherCloudStatus,
+    retryTeacherData,
     addClass,
     updateClass,
     deleteClass,
@@ -243,6 +245,15 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           attendance={attendance.filter((item) => item.studentId === personalStudent.id)}
           readOnly
         />
+      </div>
+    );
+  }
+
+  if (teacherCloudStatus !== 'ready') {
+    return (
+      <div className="space-y-4">
+        <h1 className="text-2xl font-semibold">Öğrenci Takip ve Analiz Sistemi</h1>
+        <CloudDataNotice status={teacherCloudStatus} onRetry={retryTeacherData} label="Öğrenci kayıtları" />
       </div>
     );
   }
@@ -504,7 +515,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       </div>
 
       {/* Empty Cloud Account Prompt */}
-      {!isDemoMode && !dataLoading && classes.length === 0 && (
+      {!isDemoMode && classes.length === 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-navy-900 dark:text-white">

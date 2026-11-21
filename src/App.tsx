@@ -19,6 +19,17 @@ const ScienceLabModule = lazy(() => import('./components/modules/ScienceLabModul
 const SettingsModule = lazy(() => import('./components/modules/SettingsModule').then(({ SettingsModule }) => ({ default: SettingsModule })));
 const StudentTrackingModule = lazy(() => import('./components/modules/StudentTrackingModule').then(({ StudentTrackingModule }) => ({ default: StudentTrackingModule })));
 
+function ModuleArea() {
+  const { activeModule } = useAcademy();
+  return (
+    <ErrorBoundary key={activeModule} embedded>
+      <Suspense fallback={<p role="status" className="text-sm text-slate-600 dark:text-slate-300">Bölüm yükleniyor…</p>}>
+        <BilgeAkademiRouter />
+      </Suspense>
+    </ErrorBoundary>
+  );
+}
+
 function BilgeAkademiRouter() {
   const { activeModule, workshopActivityId, workspaceView, setActiveModule } = useAcademy();
   const params = new URLSearchParams(window.location.search);
@@ -67,11 +78,7 @@ export default function App() {
     <ErrorBoundary>
       <AcademyProvider>
         <AppShell>
-          <Suspense
-            fallback={<p role="status" className="text-sm text-slate-600 dark:text-slate-300">Bölüm yükleniyor…</p>}
-          >
-            <BilgeAkademiRouter />
-          </Suspense>
+          <ModuleArea />
         </AppShell>
         <GoogleSignInDialog />
         <ToastContainer />
