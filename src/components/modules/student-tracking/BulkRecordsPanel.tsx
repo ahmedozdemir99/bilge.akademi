@@ -7,6 +7,7 @@ import { buildBulkPlan, BULK_EXAM_TYPES, type BulkInput, type BulkPlan } from '.
 import { extractMappedRows, importSheetWidth, readImportWorkbook, readPdfImport, readPdfPageCount, readRosterPaste, type ImportSheet } from '../../../utils/bulkRecordFiles';
 import { encodeClassFocus, type ClassKind } from '../../../utils/classKinds';
 import { BulkFileMapper } from './BulkFileMapper';
+import { MultiClassRosterImport } from './MultiClassRosterImport';
 
 const field = 'w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950';
 const primary = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-700';
@@ -147,6 +148,7 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
   return (
     <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <h2 id="bulk-records-heading" className="text-lg font-semibold">Toplu Giriş</h2>
+      <MultiClassRosterImport />
       {dataLoading && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">Hesap verileri yükleniyor. Liste hazırlayabilirsiniz; kaydetme işlemi yükleme bitince açılır.</p>}
       <fieldset className="min-w-0 space-y-4" disabled={busy} onChange={clearPreview}>
         <div className="grid gap-3 sm:grid-cols-2">
