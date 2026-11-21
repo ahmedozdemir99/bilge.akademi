@@ -733,6 +733,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       try {
         await setDoc(doc(db, 'users', user.uid), {
           uid: user.uid,
+          createdAt: profile?.uid === user.uid ? (await getDoc(doc(db, 'users', user.uid))).data()?.createdAt ?? serverTimestamp() : serverTimestamp(),
+          role: isBootstrapAdmin ? 'admin' : (profile?.role ?? 'student'),
           displayName: safeDisplay,
           schoolName: schoolName.trim().slice(0, 120),
           branch: branch.trim().slice(0, 80),
