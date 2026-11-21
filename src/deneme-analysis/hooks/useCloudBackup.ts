@@ -28,6 +28,8 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
   const [slow, setSlow] = useState(false);
+  const [progress, setProgress] = useState<number | null>(null);
+  const [phase, setPhase] = useState('');
   const active = useRef<Promise<boolean> | null>(null);
   const dirty = useRef(false);
   const latest = useRef(archive);
@@ -45,6 +47,8 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
     }
     setBusy(true);
     setSlow(false);
+    setProgress(null);
+    setPhase('Buluttaki kayıtlar kontrol ediliyor…');
     const slowTimer = window.setTimeout(() => setSlow(true), 20000);
     setStatus('Firebase’e yedekleniyor…');
     setError('');
@@ -52,12 +56,20 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
       try {
         const remote = await loadArchiveFromCloud(user.uid);
         if (auth.currentUser?.uid !== user.uid) return false;
-        await syncArchiveToCloud(user.uid, user.displayName || 'Öğretmen', mergeArchives(local, remote.archive), remote.manifest);
+        setPhase('Kayıtlar hazırlanıyor…');
+        await syncArchiveToCloud(user.uid, user.displayName || 'Öğretmen', mergeArchives(local, remote.archive), remote.manifest, {
+          onProgress: (completed, total) => {
+            setProgress(Math.round((completed / total) * 100));
+            setPhase(completed === total ? 'Firebase kaydı tamamlandı.' : `Firebase kayıtları gönderiliyor (${completed}/${total})`);
+          },
+        });
         dirty.current = source !== latest.current;
         setStatus('Deneme Analiz arşivi Firebase’e yedeklendi.');
         return true;
       } catch (issue) {
         setStatus('');
+        setProgress(null);
+        setPhase('');
         setError(errorText(issue));
         return false;
       }
@@ -76,6 +88,8 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
     if (!user?.emailVerified || auth.currentUser?.uid !== user.uid || active.current) return;
     setBusy(true);
     setSlow(false);
+    setProgress(null);
+    setPhase('Buluttaki kayıtlar okunuyor…');
     const slowTimer = window.setTimeout(() => setSlow(true), 20000);
     setStatus('Firebase yedeği okunuyor…');
     setError('');
@@ -89,6 +103,7 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
         }
         onRestore(mergeArchives(latest.current, result.archive));
         dirty.current = false;
+        setPhase('Buluttan geri yükleme tamamlandı.');
         setStatus('Firebase yedeği mevcut deneme arşivinizle birleştirildi.');
         return true;
       } catch (issue) {
@@ -126,5 +141,5 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
   }, [save, user]);
 
   const markDirty = useCallback(() => { dirty.current = true; }, []);
-  return { status, error, busy, slow, save, restore, markDirty };
+  return { status, error, busy, slow, progress, phase, save, restore, markDirty };
 }
