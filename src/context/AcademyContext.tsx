@@ -229,6 +229,7 @@ interface AcademyContextValue {
   mathAttempts: MathAttemptSummary[];
   aiConversations: AIConversation[];
   dataLoading: boolean;
+  rosterLoadError: string | null;
 
   // CRUD Actions
   addClass: (input: ClassInput) => Promise<void>;
@@ -291,6 +292,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const [googleSignInHelp, setGoogleSignInHelp] = useState<GoogleSignInHelp | null>(null);
   const googleSignInPending = useRef(false);
   const [dataLoading, setDataLoading] = useState(false);
+  const [rosterLoadError, setRosterLoadError] = useState<string | null>(null);
 
   const [theme, setThemeState] = useState<ThemeMode>(() => {
     try {
@@ -533,11 +535,23 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       setCloudMathAttempts([]);
       setCloudAIConversations([]);
       setDataLoading(false);
+      setRosterLoadError(null);
       return;
     }
 
+    setRosterLoadError(null);
     setDataLoading(true);
     const uid = user.uid;
+    let classesReady = false;
+    let studentsReady = false;
+    const markReady = () => {
+      if (classesReady && studentsReady) setDataLoading(false);
+    };
+    const rosterError = (collectionName: string, err: Error) => {
+      setRosterLoadError(`${collectionName} kayıtları yüklenemedi. İnternet bağlantınızı, Google oturumunuzu ve Firebase erişim izinlerini kontrol edip sayfayı yenileyin. (${err.message})`);
+      setDataLoading(false);
+      handleFirestoreError(err, OperationType.LIST, collectionName);
+    };
 
     const unsubClasses = onSnapshot(
       query(collection(db, 'classes'), where('teacherId', '==', uid)),
@@ -548,9 +562,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         }));
         list.sort((a, b) => a.name.localeCompare(b.name, 'tr'));
         setCloudClasses(list);
-        setDataLoading(false);
+        classesReady = true;
+        markReady();
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'classes')
+      (err) => rosterError('Sınıf', err)
     );
 
     const unsubStudents = onSnapshot(
@@ -562,8 +577,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
         }));
         list.sort((a, b) => a.fullName.localeCompare(b.fullName, 'tr'));
         setCloudStudents(list);
+        studentsReady = true;
+        markReady();
       },
-      (err) => handleFirestoreError(err, OperationType.LIST, 'students')
+      (err) => rosterError('Öğrenci', err)
     );
 
     const unsubGrades = onSnapshot(
@@ -761,6 +778,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   );
 
   const saveBulkRecords = useCallback(async (input: BulkInput) => {
+    if (rosterLoadError) throw new Error(rosterLoadError);
     if (workspaceView !== 'teacher' || authLoading || (user && dataLoading)) {
       throw new Error('Kayıtların yüklenmesini bekleyin ve öğretmen görünümünden tekrar deneyin.');
     }
@@ -854,7 +872,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     } catch {
       return { classId: plan.classId, saved, skipped, studentsSaved, trialsSaved, error: 'Bulut kaydı tamamlanamadı. Bağlantınızı kontrol edip aynı listeyi tekrar kaydedebilirsiniz.' };
     }
-  }, [authLoading, cloudClasses, cloudGrades, cloudPracticeExams, cloudStudents, dataLoading, demoStore, user, workspaceView]);
+  }, [authLoading, cloudClasses, cloudGrades, cloudPracticeExams, cloudStudents, dataLoading, demoStore, rosterLoadError, user, workspaceView]);
 
   // --- CRUD: Classes ---
   const addClass = useCallback(
@@ -1816,6 +1834,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       cloudStudents,
       compactMode,
       dataLoading,
+    rosterLoadError,
       deleteAttendance,
       deleteClass,
       deleteGrade,
