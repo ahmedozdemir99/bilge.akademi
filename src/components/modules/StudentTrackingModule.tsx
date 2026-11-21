@@ -22,6 +22,13 @@ import {
 import {
   Bar,
   BarChart,
+  Line,
+  LineChart,
+  Area,
+  AreaChart,
+  Pie,
+  PieChart,
+  Legend,
   CartesianGrid,
   Cell,
   ResponsiveContainer,
@@ -108,6 +115,8 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   const [analyticsClassId, setAnalyticsClassId] = useState<string>('all');
   const [archiveReport, setArchiveReport] = useState(() => loadArchiveState(user?.uid ?? 'demo'));
   const [archiveClassFilter, setArchiveClassFilter] = useState('all');
+  const [subjectChartType, setSubjectChartType] = useState<'bar' | 'line' | 'area' | 'pie'>('bar');
+  const [examChartType, setExamChartType] = useState<'bar' | 'line' | 'area' | 'pie'>('line');
   const [trialView, setTrialView] = useState<'archive' | 'import'>(initialImport ? 'import' : 'archive');
   const [archiveClassId, setArchiveClassId] = useState(initialClass);
 
@@ -198,6 +207,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
     [analyticsClassId, students]
   );
 
+  const chartColors = ['#2563eb', '#f97316', '#10b981', '#a855f7', '#e11d48', '#eab308', '#06b6d4', '#ec4899', '#84cc16'];
   const archivedResults = useMemo(() => (archiveReport?.students ?? []).flatMap((student) =>
     student.exams.map((exam) => ({ student, exam }))), [archiveReport]);
   const archiveClasses = useMemo(() => Array.from(new Set(archivedResults.map(({ student }) => student.sinif)))
@@ -1115,8 +1125,14 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                 ].map(([label,value]) => <div key={label} className="rounded-lg bg-slate-50 p-3 dark:bg-slate-800"><p className="text-xs text-slate-500 dark:text-slate-300">{label}</p><p className="mt-2 text-xl font-semibold tabular-nums">{value}</p></div>)}
               </div>
               <div className="mt-6 grid gap-6 lg:grid-cols-2">
-                <div><h3 className="mb-3 font-semibold">Ders Ders Ortalama Net</h3><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={archivedSubjectStats} margin={{top:10,right:10,bottom:55,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="subject" angle={-35} textAnchor="end" interval={0} height={75} tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="average" name="Ortalama Net" fill="#0f766e" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div></div>
-                <div><h3 className="mb-3 font-semibold">Deneme Deneme Ortalama Net</h3><div className="h-72"><ResponsiveContainer width="100%" height="100%"><BarChart data={archivedExamStats} margin={{top:10,right:10,bottom:45,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="order" tick={{fontSize:11}} label={{value:'Deneme sırası',position:'insideBottom',offset:-5}}/><YAxis/><Tooltip labelFormatter={(value) => archivedExamStats.find((e)=>e.order===Number(value))?.name ?? String(value)}/><Bar dataKey="averageNet" name="Ortalama Net" fill="#2563eb" radius={[4,4,0,0]}/></BarChart></ResponsiveContainer></div></div>
+                <div className="min-w-0 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Ders Ders Ortalama Net</h3><select aria-label="Grafik türü" value={subjectChartType} onChange={(e)=>setSubjectChartType(e.target.value as 'bar' | 'line' | 'area' | 'pie')} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800"><option value="bar">Renkli Sütun</option><option value="line">Çizgi</option><option value="area">Alan</option><option value="pie">Pasta</option></select></div>
+                  <div className="h-80"><ResponsiveContainer width="100%" height="100%">{subjectChartType === 'pie' ? <PieChart><Tooltip/><Legend/><Pie data={archivedSubjectStats} dataKey="average" nameKey="subject" cx="50%" cy="45%" outerRadius="70%" label={({percent}) => `${((percent ?? 0)*100).toFixed(0)}%`}>{archivedSubjectStats.map((item,index)=><Cell key={index} fill={chartColors[index % chartColors.length]}/>)}</Pie></PieChart> : subjectChartType === 'line' ? <LineChart data={archivedSubjectStats} margin={{top:10,right:15,bottom:50,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="subject" angle={-25} textAnchor="end" interval={0} height={65} tick={{fontSize:10}}/><YAxis/><Tooltip/><Line type="monotone" dataKey="average" name="" stroke="#8b5cf6" strokeWidth={3} dot={{r:5,fill:'#f97316'}}/></LineChart> : subjectChartType === 'area' ? <AreaChart data={archivedSubjectStats} margin={{top:10,right:15,bottom:50,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="subject" angle={-25} textAnchor="end" interval={0} height={65} tick={{fontSize:10}}/><YAxis/><Tooltip/><Area type="monotone" dataKey="average" name="" stroke="#0d9488" fill="#5eead4" fillOpacity={0.65}/></AreaChart> : <BarChart data={archivedSubjectStats} margin={{top:10,right:15,bottom:50,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="subject" angle={-25} textAnchor="end" interval={0} height={65} tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="average" name="" radius={[5,5,0,0]}>{archivedSubjectStats.map((item,index)=><Cell key={index} fill={chartColors[index % chartColors.length]}/>)}</Bar></BarChart>}</ResponsiveContainer></div>
+                </div>
+                <div className="min-w-0 rounded-xl border border-slate-200 p-3 dark:border-slate-700">
+                  <div className="mb-3 flex flex-wrap items-center justify-between gap-2"><h3 className="font-semibold">Deneme Deneme Ortalama Net</h3><select aria-label="Grafik türü" value={examChartType} onChange={(e)=>setExamChartType(e.target.value as 'bar' | 'line' | 'area' | 'pie')} className="rounded-lg border border-slate-300 bg-white px-3 py-2 text-xs font-medium text-slate-800"><option value="bar">Renkli Sütun</option><option value="line">Çizgi</option><option value="area">Alan</option><option value="pie">Pasta</option></select></div>
+                  <div className="h-80"><ResponsiveContainer width="100%" height="100%">{examChartType === 'pie' ? <PieChart><Tooltip/><Legend/><Pie data={archivedExamStats} dataKey="averageNet" nameKey="name" cx="50%" cy="45%" outerRadius="70%" label={({percent}) => `${((percent ?? 0)*100).toFixed(0)}%`}>{archivedExamStats.map((item,index)=><Cell key={index} fill={chartColors[index % chartColors.length]}/>)}</Pie></PieChart> : examChartType === 'line' ? <LineChart data={archivedExamStats} margin={{top:10,right:15,bottom:50,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="order" angle={-25} textAnchor="end" interval={0} height={65} tick={{fontSize:10}}/><YAxis/><Tooltip/><Line type="monotone" dataKey="averageNet" name="" stroke="#8b5cf6" strokeWidth={3} dot={{r:5,fill:'#f97316'}}/></LineChart> : examChartType === 'area' ? <AreaChart data={archivedExamStats} margin={{top:10,right:15,bottom:50,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="order" angle={-25} textAnchor="end" interval={0} height={65} tick={{fontSize:10}}/><YAxis/><Tooltip/><Area type="monotone" dataKey="averageNet" name="" stroke="#0d9488" fill="#5eead4" fillOpacity={0.65}/></AreaChart> : <BarChart data={archivedExamStats} margin={{top:10,right:15,bottom:50,left:0}}><CartesianGrid strokeDasharray="3 3"/><XAxis dataKey="order" angle={-25} textAnchor="end" interval={0} height={65} tick={{fontSize:10}}/><YAxis/><Tooltip/><Bar dataKey="averageNet" name="" radius={[5,5,0,0]}>{archivedExamStats.map((item,index)=><Cell key={index} fill={chartColors[index % chartColors.length]}/>)}</Bar></BarChart>}</ResponsiveContainer></div>
+                </div>
               </div>
               <h3 className="mt-5 font-semibold">Deneme Bazında Ayrıntılı Sonuçlar</h3>
               <div className="mt-2 overflow-x-auto"><table className="w-full min-w-[520px] text-left text-sm"><thead><tr className="border-b"><th className="py-2">Deneme</th><th>Sonuç</th><th>Ort. Net</th><th>Ort. LGS</th></tr></thead><tbody>{archivedExamStats.map((item)=><tr key={item.id} className="border-b border-slate-100 dark:border-slate-800"><td className="py-2 pr-3">{item.name}</td><td>{item.count}</td><td>{item.averageNet}</td><td>{item.averageLgs}</td></tr>)}</tbody></table></div>
