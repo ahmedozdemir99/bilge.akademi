@@ -1,4 +1,4 @@
-import { lazy, Suspense, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { loadArchiveState } from '../../deneme-analysis/utils/storage';
 import { SUBJECT_LIST } from '../../deneme-analysis/types/exam';
 import {
@@ -69,7 +69,7 @@ import { CLASS_KINDS, classKind } from '../../utils/classKinds';
 import { ExamNetTrend } from './student-tracking/ExamNetTrend';
 import { StudentProfileView } from './student-tracking/StudentProfileView';
 
-const DenemeAnalysis = lazy(() => import('../../deneme-analysis/DenemeAnalysis'));
+const LIVE_DENEME_ANALYSIS_URL = 'https://deneme-analiz-amk.pages.dev/';
 
 type TrackingTab = 'students' | 'grades' | 'archive' | 'analytics' | 'bulk' | 'deneme-analysis';
 
@@ -1065,9 +1065,36 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       )}
 
       {activeTab === 'deneme-analysis' && (
-        <Suspense fallback={<p role="status" className="text-sm">Deneme Analiz açılıyor…</p>}>
-          <DenemeAnalysis key={user?.uid ?? 'demo'} owner={user?.uid ?? 'demo'} demo={isDemoMode} />
-        </Suspense>
+        <section className="min-w-0 space-y-3" aria-label="Canlı Deneme Analizi">
+          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
+            <div>
+              <h2 className="text-sm font-semibold">Canlı Deneme Analizi</h2>
+              <p className="text-xs text-slate-500 dark:text-slate-400">
+                Deneme.analiz uygulamasının güncel sürümü gösteriliyor. Google girişi ve bulut yedekleme için tam ekran açabilirsiniz.
+              </p>
+            </div>
+            <a
+              href={LIVE_DENEME_ANALYSIS_URL}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-gold-500 px-4 py-2 text-sm font-semibold text-navy-950 hover:bg-gold-400"
+            >
+              Tam Ekran Aç ↗
+            </a>
+          </div>
+          <iframe
+            title="Canlı Deneme Analizi"
+            src={LIVE_DENEME_ANALYSIS_URL}
+            className="block h-[80vh] min-h-[650px] w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700"
+            loading="lazy"
+            referrerPolicy="strict-origin-when-cross-origin"
+            allow="clipboard-read; clipboard-write"
+          />
+          <p className="text-xs text-slate-500 dark:text-slate-400">
+            Gömülü ekranda Google oturumu veya dosya yükleme çalışmazsa Tam Ekran Aç seçeneğini kullanın.
+            İki site ayrı alan adlarında olduğundan tarayıcıdaki yerel veriler otomatik olarak birleşmez.
+          </p>
+        </section>
       )}
 
       {activeTab === 'archive' && (
