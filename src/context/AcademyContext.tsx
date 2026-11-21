@@ -202,6 +202,8 @@ interface AcademyContextValue {
   authLoading: boolean;
   isDemoMode: boolean;
   signInWithGoogle: () => Promise<void>;
+  signInOpen: boolean;
+  setSignInOpen: (open: boolean) => void;
   googleSignInHelp: GoogleSignInHelp | null;
   dismissGoogleSignInHelp: () => void;
   signOutUser: () => Promise<void>;
@@ -285,6 +287,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [profile, setProfile] = useState<UserProfile | null>(null);
   const [authLoading, setAuthLoading] = useState(true);
+  const [signInOpen, setSignInOpen] = useState(false);
   const [googleSignInHelp, setGoogleSignInHelp] = useState<GoogleSignInHelp | null>(null);
   const googleSignInPending = useRef(false);
   const [dataLoading, setDataLoading] = useState(false);
@@ -299,6 +302,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     return 'light';
   });
   const [demoView, setDemoView] = useState<WorkspaceView>('teacher');
+  const [teacherAccountView, setTeacherAccountView] = useState<WorkspaceView>('teacher');
   const [compactMode, setCompactModeState] = useState<boolean>(false);
 
   // Demo state (used when signed out)
@@ -319,10 +323,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const isDemoMode = !user;
   const isTeacherAccount = user !== null && profile?.uid === user.uid
-    && (profile.role === 'teacher' || profile.role === 'admin');
+    && (profile.role === 'teacher' || profile.role === 'admin' || (user.emailVerified && user.email === 'ahmedkadiri99@gmail.com'));
   const workspaceView: WorkspaceView = isDemoMode && !authLoading
     ? demoView
-    : isTeacherAccount ? 'teacher' : 'student';
+    : isTeacherAccount ? teacherAccountView : 'student';
   const activeModule = isModuleAvailable(selectedModule, workspaceView) ? selectedModule : 'home';
 
   const setActiveModule = useCallback((module: ModuleId) => {
@@ -403,8 +407,13 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const setWorkspaceView = useCallback(
     (next: WorkspaceView) => {
-      if (!isDemoMode || authLoading) return;
-      setDemoView(next);
+      if (authLoading) return;
+      if (!isDemoMode && !isTeacherAccount) {
+        notify('warning', 'Öğretmen yetkisi gerekli', 'Öğretmen görünümü için yetkili bir hesapla giriş yapın.');
+        return;
+      }
+      if (isDemoMode) setDemoView(next);
+      else setTeacherAccountView(next);
       notify(
         'info',
         next === 'teacher' ? 'Öğretmen Görünümü Aktif' : 'Öğrenci Görünümü Aktif',
@@ -413,7 +422,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           : 'Öğrenci odaklı çalışma, takip ve yapay zekâ rehberlik görünümüne geçildi.'
       );
     },
-    [authLoading, isDemoMode, notify]
+    [authLoading, isDemoMode, isTeacherAccount, notify]
   );
 
   const setCompactMode = useCallback(
@@ -429,14 +438,16 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
     let authRevision = 0;
     const unsubscribe = onAuthStateChanged(auth, async (firebaseUser) => {
       const revision = ++authRevision;
-      setUser(firebaseUser);
       setProfile(null);
-      if (!firebaseUser) {
+      if (!firebaseUser?.emailVerified) {
+        setUser(null);
         setAuthLoading(false);
         return;
       }
       setAuthLoading(true);
 
+      setUser(firebaseUser);
+      setSignInOpen(false);
       try {
         const userRef = doc(db, 'users', firebaseUser.uid);
         const snap = await getDoc(userRef);
@@ -476,7 +487,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           setProfile({
             uid: firebaseUser.uid,
             displayName: String(data.displayName || safeName),
-            role: (data.role as UserProfile['role']) || 'student',
+            role: isBootstrappedAdmin ? 'admin' : (data.role as UserProfile['role']) || 'student',
             schoolName: typeof data.schoolName === 'string' ? data.schoolName : undefined,
             branch: typeof data.branch === 'string' ? data.branch : undefined,
             email: firebaseUser.email ?? undefined,
@@ -709,7 +720,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
   const updateProfileInfo = useCallback(
     async (schoolName: string, branch: string, displayName: string) => {
       if (!user) {
-        notify('info', 'Demo Modu', 'Profil bilgilerini kalıcı kaydetmek için Google hesabınızla giriş yapın.');
+        notify('info', 'Demo Modu', 'Profil bilgilerini kalıcı kaydetmek için hesabınızla giriş yapın.');
         return;
       }
       const safeDisplay = displayName.trim().slice(0, 100);
@@ -1728,6 +1739,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       authLoading,
       isDemoMode,
       signInWithGoogle,
+      signInOpen,
+      setSignInOpen,
       googleSignInHelp,
       dismissGoogleSignInHelp,
       signOutUser,
@@ -1822,6 +1835,8 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       setTheme,
       setWorkspaceView,
       signInWithGoogle,
+      signInOpen,
+      setSignInOpen,
       signOutUser,
       theme,
       toasts,
