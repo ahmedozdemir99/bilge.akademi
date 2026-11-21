@@ -1,7 +1,9 @@
-import { collection, doc, getDocFromServer, getDocsFromServer, orderBy, query, runTransaction, serverTimestamp } from 'firebase/firestore';
-import { auth, db } from '../lib/firebase';
+import { collection, doc, getDoc, getDocs, getFirestore, orderBy, query, runTransaction, serverTimestamp } from 'firebase/firestore/lite';
+import { app, auth } from '../lib/firebase';
+import config from '../../firebase-applet-config.json';
 import { parseTrialArchiveBackup, type TrialArchiveBackup } from './trialArchiveBackup';
 
+const db = getFirestore(app, config.firestoreDatabaseId);
 const backupLimit = 8 * 1024 * 1024;
 const chunkLimit = 56;
 
@@ -29,16 +31,19 @@ async function checksum(bytes: Uint8Array<ArrayBuffer>) {
 export async function saveTrialFirestoreBackup(owner: string, backup: TrialArchiveBackup) {
   const archive = backupCollection(owner);
   const payload = JSON.stringify(backup);
+  parseTrialArchiveBackup(payload);
   const bytes = new TextEncoder().encode(payload);
   if (bytes.length > backupLimit) throw new Error('Firebase yedeği en fazla 8 MB olabilir. Bu arşivi dosya olarak indirebilirsiniz.');
-  // Match whole Unicode characters so a Firestore document boundary cannot split a surrogate pair.
+  // Even four-byte Unicode characters fit the Firestore rules and document limits.
   const chunks = payload.match(/[\s\S]{1,150000}/gu) ?? [];
+  if (chunks.length > chunkLimit) throw new Error('Arşiv Firebase yedek sınırını aşıyor. Yedeği dosya olarak indirebilirsiniz.');
   const id = await checksum(bytes);
   const manifest = doc(archive, id);
 
   return runTransaction(db, async (transaction) => {
     backupCollection(owner);
     if ((await transaction.get(manifest)).exists()) return false;
+    backupCollection(owner);
     transaction.set(manifest, {
       title: backup.title,
       examDate: backup.date,
@@ -55,7 +60,8 @@ export async function saveTrialFirestoreBackup(owner: string, backup: TrialArchi
 }
 
 export async function listTrialFirestoreBackups(owner: string) {
-  const snapshot = await getDocsFromServer(query(backupCollection(owner), orderBy('createdAt', 'desc')));
+  const snapshot = await getDocs(query(backupCollection(owner), orderBy('createdAt', 'desc')));
+  backupCollection(owner);
   return snapshot.docs.map((item) => ({ ...item.data(), id: item.id } as TrialFirestoreBackup));
 }
 
@@ -66,7 +72,7 @@ export async function readTrialFirestoreBackup(owner: string, backup: TrialFires
   }
   const manifest = doc(backupCollection(owner), backup.id);
   const parts = await Promise.all(Array.from({ length: backup.chunkCount }, async (_, index) => {
-    const snapshot = await getDocFromServer(doc(manifest, 'chunks', String(index)));
+    const snapshot = await getDoc(doc(manifest, 'chunks', String(index)));
     const content = snapshot.data()?.content;
     if (typeof content !== 'string') throw new Error('Bu Firebase yedeğinin bir bölümü eksik.');
     return content;

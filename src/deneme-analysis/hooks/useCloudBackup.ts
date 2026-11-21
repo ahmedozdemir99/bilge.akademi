@@ -27,7 +27,7 @@ function errorText(issue: unknown) {
     case 'unauthenticated':
       return 'Oturumunuzun süresi doldu. Bilge Akademi’ye yeniden giriş yapıp tekrar deneyin.';
     case 'permission-denied':
-      return 'Deneme Analiz yedeğine erişilemedi. Doğrulanmış Bilge Akademi hesabınızla yeniden giriş yapın.';
+      return 'Firebase bu arşive erişim izni vermedi. Bilge Akademi hesabınız doğrulanmışsa Firestore kurallarının yayımlandığını kontrol edin.';
     case 'resource-exhausted':
       return 'Firebase kullanım sınırına ulaşıldı. Arşivinizi JSON dosyası olarak indirebilirsiniz.';
     case 'auth/network-request-failed':
@@ -53,10 +53,14 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
 
   const save = useCallback((): Promise<boolean> => {
     if (active.current) return active.current;
-    if (!user?.emailVerified || auth.currentUser?.uid !== user.uid) return Promise.resolve(false);
+    if (!user?.emailVerified || auth.currentUser?.uid !== user.uid) {
+      setError('Firebase yedeği için doğrulanmış hesabınızla giriş yapın.');
+      return Promise.resolve(false);
+    }
     const source = latest.current;
     const local = actualRecords(source);
     if (local.exams.length === 0) {
+      dirty.current = false;
       setError('');
       setStatus('Yedeklenecek deneme bulunamadı.');
       return Promise.resolve(true);
@@ -94,14 +98,20 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
       setSlow(false);
       active.current = null;
       setBusy(false);
-      if (dirty.current && latest.current !== source && auth.currentUser?.uid === user.uid) void save();
     });
     active.current = task;
-    return task;
+    return task.then((saved) => {
+      if (saved && dirty.current && latest.current !== source && auth.currentUser?.uid === user.uid) return save();
+      return saved;
+    });
   }, [user]);
 
   const restore = useCallback(async () => {
-    if (!user?.emailVerified || auth.currentUser?.uid !== user.uid || active.current) return;
+    if (active.current) return;
+    if (!user?.emailVerified || auth.currentUser?.uid !== user.uid) {
+      setError('Firebase yedeği için doğrulanmış hesabınızla giriş yapın.');
+      return;
+    }
     setBusy(true);
     setSlow(false);
     setProgress(null);
@@ -118,12 +128,12 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
           return true;
         }
         onRestore(mergeArchives(latest.current, result.archive));
-        dirty.current = false;
         setPhase('Buluttan geri yükleme tamamlandı.');
         setStatus('Firebase yedeği mevcut deneme arşivinizle birleştirildi.');
         return true;
       } catch (issue) {
         setStatus('');
+        setPhase('');
         setError(errorText(issue));
         return false;
       }

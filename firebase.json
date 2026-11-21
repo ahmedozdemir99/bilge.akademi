@@ -1,0 +1,8 @@
+{
+  "firestore": [
+    {
+      "database": "ai-studio-bilgeakademi-cb79b3a9-0170-48b1-8e73-e2cf3a7eb362",
+      "rules": "firestore.rules"
+    }
+  ]
+}

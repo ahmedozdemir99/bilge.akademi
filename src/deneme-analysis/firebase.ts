@@ -1,5 +1,6 @@
-import { getFirestore } from 'firebase/firestore';
+import { getFirestore } from 'firebase/firestore/lite';
 import { app } from '../lib/firebase';
+import config from '../../firebase-applet-config.json';
 
-// Deneme Analiz and Bilge Akademi share authentication, but their archives use distinct databases.
-export const db = getFirestore(app, 'ai-studio-denemetakipasist-6e57d3a4-0182-4b84-82e8-b3e61d62525d');
+export const db = getFirestore(app, config.firestoreDatabaseId);
+export const legacyDb = getFirestore(app, 'ai-studio-denemetakipasist-6e57d3a4-0182-4b84-82e8-b3e61d62525d');

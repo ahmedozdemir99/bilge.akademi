@@ -1,17 +1,16 @@
 import {
   collection,
   doc,
-  getDocFromServer,
-  getDocsFromServer,
+  getDoc,
+  getDocs,
+  runTransaction,
   query,
   serverTimestamp,
-  setDoc,
   Timestamp,
-  updateDoc,
   where,
-  writeBatch,
-} from 'firebase/firestore';
-import { db } from '../firebase';
+} from 'firebase/firestore/lite';
+import { db, legacyDb } from '../firebase';
+import { auth } from '../../lib/firebase';
 import {
   ExamArchiveState,
   ExamMeta,
@@ -35,11 +34,16 @@ const MAX_STUDENT_NAME_LEN = 160;
 const MAX_SINIF_LEN = 40;
 const MAX_EXAMS_PER_STUDENT = 100;
 const VALID_ID_REGEX = /^[a-zA-Z0-9_-]+$/;
-const MAX_BATCH_OPS = 400;
+const MAX_BATCH_OPS = 8;
+
+function requireOwner(uid: string) {
+  if (auth.currentUser?.uid !== uid || !auth.currentUser.emailVerified) {
+    throw new Error('Firebase yedeği için doğrulanmış hesabınızla giriş yapın.');
+  }
+}
 
 export interface CloudSyncManifest {
   uid: string;
-  hasRootDoc: boolean;
   examHashes: Map<string, string>;
   studentHashes: Map<string, string>;
 }
@@ -47,7 +51,6 @@ export interface CloudSyncManifest {
 export function createEmptyManifest(uid: string): CloudSyncManifest {
   return {
     uid,
-    hasRootDoc: false,
     examHashes: new Map(),
     studentHashes: new Map(),
   };
@@ -61,6 +64,13 @@ function clampString(val: unknown, maxLen: number, fallback = ''): string {
 function finiteNumber(val: unknown, min: number, max: number, fallback = 0): number {
   const n = typeof val === 'number' && Number.isFinite(val) ? val : fallback;
   return Math.max(min, Math.min(max, n));
+}
+
+function recordFingerprint(value: unknown): string {
+  return JSON.stringify(value, (_key, item: unknown) => {
+    if (!item || typeof item !== 'object' || Array.isArray(item)) return item;
+    return Object.fromEntries(Object.entries(item).sort(([left], [right]) => left < right ? -1 : Number(left !== right)));
+  });
 }
 
 function simpleHash(input: string): string {
@@ -185,7 +195,7 @@ function sanitizeStudentExamRecord(
     uploadedAt: clampString(rec.uploadedAt, MAX_UPLOADED_AT_LEN, ''),
     examOrder: finiteNumber(rec.examOrder, 0, 10000, 1),
     lgsPuan: finiteNumber(rec.lgsPuan, 0, 600, 0),
-    kazanimlar: Array.isArray(rec.kazanimlar) ? rec.kazanimlar.slice(0, 120) : [],
+    kazanimlar: Array.isArray(rec.kazanimlar) ? rec.kazanimlar : [],
   });
 }
 
@@ -213,35 +223,39 @@ export interface CloudLoadResult {
 }
 
 export async function loadArchiveFromCloud(uid: string): Promise<CloudLoadResult> {
-  const safeUid = sanitizeFirestoreId(uid, 'u');
+  requireOwner(uid);
+  const main = await readArchive(uid, db, 'denemeArchives');
+  const legacy = await Promise.all([
+    readArchive(uid, legacyDb, 'denemeArchives'),
+    readArchive(uid, legacyDb, 'users'),
+  ].map(async (request) => {
+    try {
+      return (await request).archive;
+    } catch (error) {
+      const code = (error as { code?: string } | null)?.code;
+      if (code === 'permission-denied' || code === 'not-found') return { exams: [], students: [] };
+      throw error;
+    }
+  }));
+  requireOwner(uid);
+  const archive = mergeArchives(main.archive, mergeArchives(legacy[0], legacy[1]));
+  return { ...main, exists: main.exists || archive.exams.length > 0, archive };
+}
 
+async function readArchive(safeUid: string, database: typeof db, root: 'denemeArchives' | 'users'): Promise<CloudLoadResult> {
   const manifest = createEmptyManifest(safeUid);
   let lastBackupAt: Date | null = null;
-
-  const rootSnap = await getDocFromServer(doc(db, 'denemeArchives', safeUid));
-  if (!rootSnap.exists()) {
-    return {
-      exists: false,
-      archive: { exams: [], students: [] },
-      lastBackupAt: null,
-      manifest,
-    };
-  }
-
-  manifest.hasRootDoc = true;
-  const rootData = rootSnap.data();
+  const [rootSnap, examsSnap, studentsSnap] = await Promise.all([
+    root === 'denemeArchives' ? getDoc(doc(database, root, safeUid)) : Promise.resolve(null),
+    getDocs(query(collection(database, root, safeUid, 'exams'), where('ownerId', '==', safeUid))),
+    getDocs(query(collection(database, root, safeUid, 'students'), where('ownerId', '==', safeUid))),
+  ]);
+  const rootData = rootSnap?.data();
   if (rootData?.lastBackupAt instanceof Timestamp) {
     lastBackupAt = rootData.lastBackupAt.toDate();
   }
-
   const exams: ExamMeta[] = [];
   const students: StudentProfile[] = [];
-
-  const examsQuery = query(
-    collection(db, 'denemeArchives', safeUid, 'exams'),
-    where('ownerId', '==', safeUid)
-  );
-  const examsSnap = await getDocsFromServer(examsQuery);
   for (const d of examsSnap.docs) {
     const data = d.data();
     const exam: ExamMeta = {
@@ -268,14 +282,9 @@ export async function loadArchiveFromCloud(uid: string): Promise<CloudLoadResult
     };
     exams.push(exam);
     const fields = buildSanitizedExamFields(exam, exam.id);
-    manifest.examHashes.set(exam.id, simpleHash(JSON.stringify(fields)));
+    manifest.examHashes.set(exam.id, recordFingerprint(fields));
   }
 
-  const studentsQuery = query(
-    collection(db, 'denemeArchives', safeUid, 'students'),
-    where('ownerId', '==', safeUid)
-  );
-  const studentsSnap = await getDocsFromServer(studentsQuery);
   const examIdMap = new Map<string, string>(exams.map((e) => [e.id, e.id]));
 
   for (const d of studentsSnap.docs) {
@@ -289,13 +298,13 @@ export async function loadArchiveFromCloud(uid: string): Promise<CloudLoadResult
     };
     students.push(student);
     const fields = buildSanitizedStudentFields(student, examIdMap);
-    manifest.studentHashes.set(student.id, simpleHash(JSON.stringify(fields)));
+    manifest.studentHashes.set(student.id, recordFingerprint(fields));
   }
 
   exams.sort((a, b) => a.examOrder - b.examOrder);
 
   return {
-    exists: true,
+    exists: Boolean(rootSnap?.exists()) || exams.length > 0 || students.length > 0,
     archive: { exams, students },
     lastBackupAt,
     manifest,
@@ -305,11 +314,10 @@ export async function loadArchiveFromCloud(uid: string): Promise<CloudLoadResult
 export interface CloudSyncResult {
   writtenDocs: number;
   syncedAt: Date;
-  manifest: CloudSyncManifest;
 }
 
 /**
- * Syncs the full ExamArchiveState to Firestore using minimal diff batched writes.
+ * Syncs the full ExamArchiveState to Firestore using bounded transactions.
  * Strictly obeys firestore.rules:
  *  - Uses dedicated /denemeArchives/{uid} documents, separate from user profiles.
  *  - Uses `set` (with createdAt + updatedAt) for new documents and `update` (preserving createdAt) for existing documents.
@@ -326,37 +334,14 @@ export async function syncArchiveToCloud(
     archive.students.some((student) => student.exams.length > MAX_EXAMS_PER_STUDENT)) {
     throw new Error('Arşiv Firebase yedek sınırını aşıyor. Tam arşivi JSON olarak indirebilirsiniz.');
   }
-  const safeUid = sanitizeFirestoreId(uid, 'u');
+  requireOwner(uid);
+  const safeUid = uid;
   const safeDisplayName = clampString(displayName, MAX_DISPLAY_NAME_LEN, 'Kullanıcı');
   const rootRef = doc(db, 'denemeArchives', safeUid);
 
-  let manifest: CloudSyncManifest;
-  if (currentManifest && currentManifest.uid === safeUid) {
-    manifest = {
-      uid: safeUid,
-      hasRootDoc: currentManifest.hasRootDoc,
-      examHashes: new Map(currentManifest.examHashes),
-      studentHashes: new Map(currentManifest.studentHashes),
-    };
-  } else {
-    // Hydrate remote IDs once so we never call setDoc on an already existing doc (which would violate createdAt immutability)
-    const remote = await loadArchiveFromCloud(safeUid);
-    manifest = remote.manifest;
-  }
-
-  // Step 1: Ensure parent root document exists before writing any subcollection documents (Master Gate)
-  if (!manifest.hasRootDoc) {
-    await setDoc(rootRef, {
-      ownerId: safeUid,
-      displayName: safeDisplayName,
-      examCount: Math.min(500, archive.exams.length),
-      studentCount: Math.min(5000, archive.students.length),
-      lastBackupAt: serverTimestamp(),
-      createdAt: serverTimestamp(),
-      updatedAt: serverTimestamp(),
-    });
-    manifest.hasRootDoc = true;
-  }
+  const manifest = currentManifest?.uid === uid
+    ? currentManifest
+    : (await loadArchiveFromCloud(uid)).manifest;
 
   // Build deterministic sanitized IDs for exams
   const examIdMap = new Map<string, string>();
@@ -372,7 +357,7 @@ export async function syncArchiveToCloud(
     examIdMap.set(ex.id, safeId);
 
     const fields = buildSanitizedExamFields(ex, safeId);
-    const hash = simpleHash(JSON.stringify(fields));
+    const hash = recordFingerprint(fields);
     sanitizedExams.push({ id: safeId, fields, hash });
   }
 
@@ -388,133 +373,105 @@ export async function syncArchiveToCloud(
     usedStudentIds.add(safeId);
 
     const fields = buildSanitizedStudentFields(st, examIdMap);
-    const hash = simpleHash(JSON.stringify(fields));
+    const hash = recordFingerprint(fields);
     sanitizedStudents.push({ id: safeId, fields, hash });
   }
 
-  type BatchOp =
-    | { kind: 'set'; ref: ReturnType<typeof doc>; data: Record<string, unknown> }
-    | { kind: 'update'; ref: ReturnType<typeof doc>; data: Record<string, unknown> };
+  const examChanges = sanitizedExams.filter(({ id, hash }) => options?.forceFull || manifest.examHashes.get(id) !== hash);
+  const studentChanges = sanitizedStudents.filter(({ id, hash }) => options?.forceFull || manifest.studentHashes.get(id) !== hash);
+  const ops = [
+    ...examChanges.map(({ id, fields }) => ({ group: 'exams', id, fields })),
+    ...studentChanges.map(({ id, fields }) => ({ group: 'students', id, fields })),
+  ];
 
-  const ops: BatchOp[] = [];
-  const nextExamHashes = new Map<string, string>();
-  const nextStudentHashes = new Map<string, string>();
-  let writtenDocs = 0;
-
-  // Diff exams
-  for (const ex of sanitizedExams) {
-    nextExamHashes.set(ex.id, ex.hash);
-    const prevHash = manifest.examHashes.get(ex.id);
-    const ref = doc(db, 'denemeArchives', safeUid, 'exams', ex.id);
-
-    if (prevHash === undefined) {
-      ops.push({
-        kind: 'set',
-        ref,
-        data: {
-          id: ex.id,
-          ownerId: safeUid,
-          ...ex.fields,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-      });
-      writtenDocs += 1;
-    } else if (options?.forceFull || prevHash !== ex.hash) {
-      ops.push({
-        kind: 'update',
-        ref,
-        data: {
-          ...ex.fields,
-          updatedAt: serverTimestamp(),
-        },
-      });
-      writtenDocs += 1;
-    }
-  }
-
-  // Diff students
-  for (const st of sanitizedStudents) {
-    nextStudentHashes.set(st.id, st.hash);
-    const prevHash = manifest.studentHashes.get(st.id);
-    const ref = doc(db, 'denemeArchives', safeUid, 'students', st.id);
-
-    if (prevHash === undefined) {
-      ops.push({
-        kind: 'set',
-        ref,
-        data: {
-          id: st.id,
-          ownerId: safeUid,
-          ...st.fields,
-          createdAt: serverTimestamp(),
-          updatedAt: serverTimestamp(),
-        },
-      });
-      writtenDocs += 1;
-    } else if (options?.forceFull || prevHash !== st.hash) {
-      ops.push({
-        kind: 'update',
-        ref,
-        data: {
-          ...st.fields,
-          updatedAt: serverTimestamp(),
-        },
-      });
-      writtenDocs += 1;
-    }
-  }
-
-  // Progress is based on acknowledged Firestore batch commits, not elapsed time.
   options?.onProgress?.(0, ops.length + 1);
-  let committed = 0;
-  // Commit in chunks of MAX_BATCH_OPS
-  for (let i = 0; i < ops.length; i += MAX_BATCH_OPS) {
-    const chunk = ops.slice(i, i + MAX_BATCH_OPS);
-    const batch = writeBatch(db);
-    for (const op of chunk) {
-      if (op.kind === 'set') {
-        batch.set(op.ref, op.data);
-      } else {
-        batch.update(op.ref, op.data);
-      }
-    }
-    await batch.commit();
-    committed += chunk.length;
-    options?.onProgress?.(committed, ops.length + 1);
+  for (let offset = 0; offset < ops.length; offset += MAX_BATCH_OPS) {
+    const chunk = ops.slice(offset, offset + MAX_BATCH_OPS);
+    await runTransaction(db, async (transaction) => {
+      requireOwner(uid);
+      const refs = chunk.map(({ group, id }) => doc(db, 'denemeArchives', uid, group, id));
+      const snapshots = await Promise.all(refs.map((ref) => transaction.get(ref)));
+      requireOwner(uid);
+      chunk.forEach(({ group, id, fields }, index) => {
+        const snapshot = snapshots[index];
+        const data = { ...fields };
+        if (group === 'students' && snapshot.exists()) {
+          const previous = snapshot.data().exams as StudentExamRecord[] | undefined;
+          const records = new Map(previous?.map((record) => [record.examId, record]));
+          for (const record of fields.exams as StudentExamRecord[]) records.set(record.examId, record);
+          if (records.size > MAX_EXAMS_PER_STUDENT) {
+            throw new Error('Bir öğrencinin deneme sayısı Firebase yedek sınırını aşıyor. Arşivi JSON olarak indirebilirsiniz.');
+          }
+          data.exams = [...records.values()];
+        }
+        if (snapshot.exists()) {
+          transaction.update(refs[index], { ...data, updatedAt: serverTimestamp() });
+        } else {
+          transaction.set(refs[index], { ...data, id, ownerId: uid, createdAt: serverTimestamp(), updatedAt: serverTimestamp() });
+        }
+      });
+    });
+    options?.onProgress?.(offset + chunk.length, ops.length + 1);
   }
 
-  // Always refresh root archive timestamp & counts on backup completion
-  await updateDoc(rootRef, {
-    displayName: safeDisplayName,
-    examCount: Math.min(500, sanitizedExams.length),
-    studentCount: Math.min(5000, sanitizedStudents.length),
-    lastBackupAt: serverTimestamp(),
-    updatedAt: serverTimestamp(),
+  await runTransaction(db, async (transaction) => {
+    requireOwner(uid);
+    const root = await transaction.get(rootRef);
+    requireOwner(uid);
+    const data = {
+      displayName: safeDisplayName,
+      examCount: sanitizedExams.length,
+      studentCount: sanitizedStudents.length,
+      lastBackupAt: serverTimestamp(),
+      updatedAt: serverTimestamp(),
+    };
+    if (root.exists()) transaction.update(rootRef, data);
+    else transaction.set(rootRef, { ...data, ownerId: uid, createdAt: serverTimestamp() });
   });
   options?.onProgress?.(ops.length + 1, ops.length + 1);
 
-  manifest.examHashes = nextExamHashes;
-  manifest.studentHashes = nextStudentHashes;
-
   return {
-    writtenDocs,
+    writtenDocs: ops.length,
     syncedAt: new Date(),
-    manifest,
   };
+}
+
+function legacyIds<T extends { id: string }>(preferred: T[], fallback: T[], prefix: string) {
+  const exact = new Set(preferred.map(({ id }) => id));
+  const saved = new Set(fallback.map(({ id }) => id));
+  const aliases = new Map<string, string>();
+  const counts = new Map<string, number>();
+  for (const { id } of preferred) {
+    const alias = sanitizeFirestoreId(id, prefix);
+    aliases.set(id, alias);
+    counts.set(alias, (counts.get(alias) ?? 0) + 1);
+  }
+  return new Map([...aliases].map(([id, alias]) => [
+    id,
+    !exact.has(alias) && saved.has(alias) && counts.get(alias) === 1 ? alias : id,
+  ]));
 }
 
 /** Keep every backed-up record and prefer the chosen source when a record exists in both. */
 export function mergeArchives(preferred: ExamArchiveState, fallback: ExamArchiveState): ExamArchiveState {
+  const examIds = legacyIds(preferred.exams, fallback.exams, 'exam');
   const exams = new Map(fallback.exams.map((exam) => [exam.id, exam]));
-  preferred.exams.forEach((exam) => exams.set(exam.id, exam));
+  preferred.exams.forEach((exam) => {
+    const id = examIds.get(exam.id) ?? exam.id;
+    exams.set(id, { ...exam, id });
+  });
 
+  const studentIds = legacyIds(preferred.students, fallback.students, 'stu');
   const students = new Map(fallback.students.map((student) => [student.id, student]));
   for (const student of preferred.students) {
-    const previous = students.get(student.id);
+    const id = studentIds.get(student.id) ?? student.id;
+    const previous = students.get(id);
     const records = new Map(previous?.exams.map((record) => [record.examId, record]) ?? []);
-    student.exams.forEach((record) => records.set(record.examId, record));
-    students.set(student.id, { ...student, exams: [...records.values()] });
+    student.exams.forEach((record) => {
+      const examId = examIds.get(record.examId) ?? record.examId;
+      records.set(examId, { ...record, examId });
+    });
+    students.set(id, { ...student, id, exams: [...records.values()] });
   }
 
   return {

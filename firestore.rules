@@ -342,27 +342,19 @@ service cloud.firestore {
         incoming().examCount is int && incoming().examCount >= 0 && incoming().examCount <= 500 &&
         incoming().studentCount is int && incoming().studentCount >= 0 && incoming().studentCount <= 5000 &&
         incoming().lastBackupAt == request.time && incoming().updatedAt == request.time;
-      match /exams/{examId} {
-        allow get, list: if isVerifiedUser() && isOwner(userId);
-        allow create, update: if isVerifiedUser() && isOwner(userId) &&
-          incoming().ownerId == userId && isValidId(examId) &&
-          incoming().keys().hasAll(['id', 'ownerId', 'createdAt', 'updatedAt']) &&
-          incoming().id == examId &&
-          incoming().createdAt is timestamp && incoming().updatedAt == request.time &&
-          (!exists(/databases/$(database)/documents/denemeArchives/$(userId)/exams/$(examId)) ||
-            incoming().createdAt == existing().createdAt);
-        allow delete: if false;
-      }
-      match /students/{studentId} {
-        allow get, list: if isVerifiedUser() && isOwner(userId);
-        allow create, update: if isVerifiedUser() && isOwner(userId) &&
-          incoming().ownerId == userId && isValidId(studentId) &&
-          incoming().keys().hasAll(['id', 'ownerId', 'createdAt', 'updatedAt']) &&
-          incoming().id == studentId &&
-          incoming().createdAt is timestamp && incoming().updatedAt == request.time &&
-          (!exists(/databases/$(database)/documents/denemeArchives/$(userId)/students/$(studentId)) ||
-            incoming().createdAt == existing().createdAt);
-        allow delete: if false;
+      match /{recordType}/{recordId} {
+        function isArchiveRecord() {
+          return recordType in ['exams', 'students'] && isVerifiedUser() && isOwner(userId);
+        }
+        function isValidArchiveWrite() {
+          return isArchiveRecord() && isValidId(recordId) &&
+            incoming().id == recordId && incoming().ownerId == userId &&
+            incoming().updatedAt == request.time;
+        }
+
+        allow get, list: if isArchiveRecord();
+        allow create: if isValidArchiveWrite() && incoming().createdAt == request.time;
+        allow update: if isValidArchiveWrite() && incoming().createdAt == existing().createdAt;
       }
     }
 
