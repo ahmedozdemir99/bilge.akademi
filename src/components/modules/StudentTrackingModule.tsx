@@ -102,6 +102,9 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
 
   const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive || initialImport ? 'archive' : initialAnalysis ? 'deneme-analysis' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
+  useEffect(() => {
+    if (initialAnalysis) window.location.replace(LIVE_DENEME_ANALYSIS_URL);
+  }, [initialAnalysis]);
 
   // Filters
   const [searchQuery, setSearchQuery] = useState('');
@@ -548,7 +551,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           </div>
           <button
             type="button"
-            onClick={() => setActiveTab('deneme-analysis')}
+            onClick={() => { window.location.assign(LIVE_DENEME_ANALYSIS_URL); }}
             aria-pressed={activeTab === 'deneme-analysis'}
             className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
           >
@@ -610,6 +613,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               role="tab"
               aria-selected={activeTab === tab.id}
               onClick={() => {
+                if (tab.id === 'deneme-analysis') { window.location.assign(LIVE_DENEME_ANALYSIS_URL); return; }
                 setActiveTab(tab.id);
               }}
               className={`flex min-h-12 w-full items-center justify-center rounded-md px-2 py-2 text-center text-xs font-medium leading-snug transition-colors cursor-pointer ${
@@ -1065,35 +1069,10 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       )}
 
       {activeTab === 'deneme-analysis' && (
-        <section className="min-w-0 space-y-3" aria-label="Canlı Deneme Analizi">
-          <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-slate-200 bg-white p-3 dark:border-slate-700 dark:bg-slate-900">
-            <div>
-              <h2 className="text-sm font-semibold">Canlı Deneme Analizi</h2>
-              <p className="text-xs text-slate-500 dark:text-slate-400">
-                Deneme.analiz uygulamasının güncel sürümü gösteriliyor. Google girişi ve bulut yedekleme için tam ekran açabilirsiniz.
-              </p>
-            </div>
-            <a
-              href={LIVE_DENEME_ANALYSIS_URL}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="inline-flex min-h-11 items-center justify-center rounded-lg bg-gold-500 px-4 py-2 text-sm font-semibold text-navy-950 hover:bg-gold-400"
-            >
-              Tam Ekran Aç ↗
-            </a>
-          </div>
-          <iframe
-            title="Canlı Deneme Analizi"
-            src={LIVE_DENEME_ANALYSIS_URL}
-            className="block h-[80vh] min-h-[650px] w-full rounded-xl border border-slate-200 bg-white dark:border-slate-700"
-            loading="lazy"
-            referrerPolicy="strict-origin-when-cross-origin"
-            allow="clipboard-read; clipboard-write"
-          />
-          <p className="text-xs text-slate-500 dark:text-slate-400">
-            Gömülü ekranda Google oturumu veya dosya yükleme çalışmazsa Tam Ekran Aç seçeneğini kullanın.
-            İki site ayrı alan adlarında olduğundan tarayıcıdaki yerel veriler otomatik olarak birleşmez.
-          </p>
+        <section className="rounded-xl border border-slate-200 bg-white p-5 dark:border-slate-700 dark:bg-slate-900">
+          <h2 className="text-lg font-semibold">Deneme Analizi</h2>
+          <p className="mt-2 text-sm text-slate-600 dark:text-slate-300">Aynı sıralama ve kayıtları görmek için canlı uygulama kendi adresinde açılır.</p>
+          <a href={LIVE_DENEME_ANALYSIS_URL} className="mt-4 inline-flex min-h-11 items-center rounded-lg bg-gold-500 px-4 py-2 font-semibold text-navy-950">Canlı Deneme Analizini Aç</a>
         </section>
       )}
 
