@@ -383,9 +383,13 @@ export function calculateTrialRobotSummary(exams: PracticeExamRecord[]): TrialRo
   const avgTotalWrong = Number((exams.reduce((s, e) => s + e.totalWrong, 0) / n).toFixed(2));
   const avgTotalNet = Number((exams.reduce((s, e) => s + e.totalNet, 0) / n).toFixed(2));
   const bestNet = Number(Math.max(...exams.map((e) => e.totalNet)).toFixed(2));
-  const avgLgsScore = Number(
-    (exams.reduce((s, e) => s + e.estimatedLgsScore, 0) / n).toFixed(2)
-  );
+  // A missing imported score is stored as 0 in some legacy records. Do not
+  // count it as an attended exam with a valid LGS score.
+  const validLgsScores = exams.map((exam) => exam.estimatedLgsScore)
+    .filter((score) => Number.isFinite(score) && score >= 100 && score <= 500);
+  const avgLgsScore = validLgsScores.length
+    ? Number((validLgsScores.reduce((sum, score) => sum + score, 0) / validLgsScores.length).toFixed(2))
+    : 0;
 
   const subjectAverages: TrialRobotSubjectAverage[] = LGS_SUBJECT_CONFIG.map((cfg) => {
     let sumD = 0;
