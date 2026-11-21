@@ -794,8 +794,12 @@ function parseTabularListPage(
       topY = ints[1].val;
     }
 
-    // Distinguish Total Net (<= 90) vs LGS Score (typically 100..500)
-    const lgsCandidate = decimals.find((d) => d.val > 95 && d.val <= 500);
+    // Prefer the actual printed LGS column. Some publishers put multiple
+    // decimal net values in the summary, so position matters.
+    const lgsColumnValues = layout.lgsRange
+      ? decimals.filter((d) => d.x >= layout.lgsRange![0] - 8 && d.x <= layout.lgsRange![1] + 8)
+      : decimals;
+    const lgsCandidate = lgsColumnValues.find((d) => d.val >= 100 && d.val <= 500);
     const netCandidate = decimals.find((d) => d !== lgsCandidate && d.val >= -30 && d.val <= 90);
     if (netCandidate) topNet = netCandidate.val;
     if (lgsCandidate) lgsPuan = lgsCandidate.val;
@@ -807,10 +811,8 @@ function parseTabularListPage(
       net: topNet,
     });
 
-    // Estimate LGS if the summary PDF did not include an LGS score column
-    if (lgsPuan === 0 && toplam.net > 0) {
-      lgsPuan = round2(Math.min(500, Math.max(100, 190 + toplam.net * 3.45)));
-    }
+    // Never invent an LGS score from net: missing printed scores remain 0
+    // and are excluded from score averages until the source is corrected.
 
     // Dereceler (if present to the right of LGS)
     const dereceler: ExamRanks = {};
