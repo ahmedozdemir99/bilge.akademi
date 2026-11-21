@@ -1093,7 +1093,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
 
       {activeTab === 'bulk' && (
         <div ref={bulkPanel} tabIndex={-1} role="tabpanel" aria-labelledby="bulk-records-heading">
-          <BulkRecordsPanel initialClassId={classFilter === 'all' ? undefined : classFilter} onTrialImport={openTrialImport} />
+          <BulkRecordsPanel initialClassId={classFilter === 'all' ? undefined : classFilter} />
         </div>
       )}
 

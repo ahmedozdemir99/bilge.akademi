@@ -9,12 +9,12 @@ import { encodeClassFocus, type ClassKind } from '../../../utils/classKinds';
 import { BulkFileMapper } from './BulkFileMapper';
 
 const field = 'w-full min-w-0 rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950';
-const primary = 'inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-700';
-const sourceButton = 'inline-flex min-h-11 items-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-sm font-semibold text-slate-700 hover:bg-slate-50 aria-pressed:border-teal-300 aria-pressed:bg-teal-50 aria-pressed:text-teal-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:aria-pressed:border-teal-700 dark:aria-pressed:bg-teal-950 dark:aria-pressed:text-teal-100';
+const primary = 'inline-flex min-h-11 items-center justify-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white disabled:opacity-50 dark:bg-teal-700';
+const sourceButton = 'inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-slate-300 px-3 py-2 text-center text-sm font-semibold text-slate-700 hover:bg-slate-50 aria-pressed:border-teal-300 aria-pressed:bg-teal-50 aria-pressed:text-teal-900 dark:border-slate-700 dark:text-slate-200 dark:hover:bg-slate-800 dark:aria-pressed:border-teal-700 dark:aria-pressed:bg-teal-950 dark:aria-pressed:text-teal-100';
 const rosterFields = ['Okul No', 'Ad Soyad'];
 const today = () => new Intl.DateTimeFormat('sv-SE', { timeZone: 'Europe/Istanbul' }).format(new Date());
 
-export function BulkRecordsPanel({ initialClassId, onTrialImport }: { initialClassId?: string; onTrialImport: () => void }) {
+export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }) {
   const { classes, students, grades, practiceExams, dataLoading, saveBulkRecords, user } = useAcademy();
   const [mode, setMode] = useState<'roster' | 'grades'>('roster');
   const [choice, setChoice] = useState(initialClassId);
@@ -143,10 +143,7 @@ export function BulkRecordsPanel({ initialClassId, onTrialImport }: { initialCla
   const sheet = sheets[sheetIndex];
   return (
     <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-      <header className="flex flex-wrap items-baseline justify-between gap-2">
-        <h2 id="bulk-records-heading" className="text-lg font-semibold">Toplu Giriş</h2>
-        <button type="button" onClick={onTrialImport} className="text-sm font-semibold text-teal-700 underline dark:text-teal-300">Deneme Sonuçlarını Yükle</button>
-      </header>
+      <h2 id="bulk-records-heading" className="text-lg font-semibold">Toplu Giriş</h2>
       <fieldset className="min-w-0 space-y-4" disabled={busy || dataLoading} onChange={clearPreview}>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-sm font-medium">Kayıt türü
@@ -177,12 +174,12 @@ export function BulkRecordsPanel({ initialClassId, onTrialImport }: { initialCla
           <label className="space-y-1 text-sm font-medium">Öğretim yılı<input className={field} value={academicYear} onChange={(event) => setAcademicYear(event.target.value)} maxLength={9} /></label>
         </div>}
         {mode === 'grades' && !classStudents.length && <p className="text-sm text-amber-800 dark:text-amber-200">Not girmek için öğrencileri olan bir sınıf seçin.</p>}
-        {mode === 'roster' && <div role="group" aria-label="Listenin kaynağı" className="flex flex-wrap gap-2">
+        {mode === 'roster' && <div role="group" aria-label="Listenin kaynağı" className="grid gap-2 sm:grid-cols-2">
           <button type="button" className={sourceButton} aria-pressed={source === 'file'} onClick={() => changeSource('file')}>
-            <FileUp className="size-4" aria-hidden="true" /> Excel veya PDF
+            <FileUp className="size-4 shrink-0" aria-hidden="true" /> Excel veya PDF
           </button>
           <button type="button" className={sourceButton} aria-pressed={source === 'paste'} onClick={() => changeSource('paste')}>
-            <ClipboardPaste className="size-4" aria-hidden="true" /> Kopyala ve Yapıştır
+            <ClipboardPaste className="size-4 shrink-0" aria-hidden="true" /> Kopyala ve Yapıştır
           </button>
         </div>}
         {source === 'paste' ? <div className="space-y-2">
@@ -196,9 +193,9 @@ export function BulkRecordsPanel({ initialClassId, onTrialImport }: { initialCla
               setPaste(event.target.value);
               setSheets([]);
             }} />
-          <button type="button" className={primary} disabled={!paste.trim()} onClick={openPastedList}>Listeyi Aç</button>
+          <button type="button" className={primary + ' w-full'} disabled={!paste.trim()} onClick={openPastedList}>Listeyi Aç</button>
         </div> : <div className="space-y-2">
-          <label className={primary + ' min-h-11 cursor-pointer focus-within:outline-2'}>
+          <label className={primary + ' w-full cursor-pointer focus-within:outline-2'}>
             <FileUp className="size-4" aria-hidden="true" /> Dosya Seç
             <input type="file" className="sr-only" accept=".pdf,.xlsx,.csv,.tsv,application/pdf"
               aria-describedby="bulk-file-formats"
