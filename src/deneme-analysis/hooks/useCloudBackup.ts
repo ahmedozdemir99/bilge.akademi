@@ -27,6 +27,7 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
   const [status, setStatus] = useState('');
   const [error, setError] = useState('');
   const [busy, setBusy] = useState(false);
+  const [slow, setSlow] = useState(false);
   const active = useRef<Promise<boolean> | null>(null);
   const dirty = useRef(false);
   const latest = useRef(archive);
@@ -43,6 +44,8 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
       return Promise.resolve(true);
     }
     setBusy(true);
+    setSlow(false);
+    const slowTimer = window.setTimeout(() => setSlow(true), 20000);
     setStatus('Firebase’e yedekleniyor…');
     setError('');
     const task = (async () => {
@@ -59,6 +62,8 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
         return false;
       }
     })().finally(() => {
+      window.clearTimeout(slowTimer);
+      setSlow(false);
       active.current = null;
       setBusy(false);
       if (dirty.current && latest.current !== source && auth.currentUser?.uid === user.uid) void save();
@@ -70,6 +75,8 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
   const restore = useCallback(async () => {
     if (!user?.emailVerified || auth.currentUser?.uid !== user.uid || active.current) return;
     setBusy(true);
+    setSlow(false);
+    const slowTimer = window.setTimeout(() => setSlow(true), 20000);
     setStatus('Firebase yedeği okunuyor…');
     setError('');
     const task = (async () => {
@@ -90,6 +97,8 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
         return false;
       }
     })().finally(() => {
+      window.clearTimeout(slowTimer);
+      setSlow(false);
       active.current = null;
       setBusy(false);
     });
@@ -117,5 +126,5 @@ export function useCloudBackup(user: User | null, archive: ExamArchiveState, onR
   }, [save, user]);
 
   const markDirty = useCallback(() => { dirty.current = true; }, []);
-  return { status, error, busy, save, restore, markDirty };
+  return { status, error, busy, slow, save, restore, markDirty };
 }
