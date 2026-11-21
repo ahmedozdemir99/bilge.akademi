@@ -102,7 +102,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
     seedDemoToFirestore,
   } = useAcademy();
 
-  const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive || initialImport ? 'archive' : initialAnalysis ? 'analytics' : 'students');
+  const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive || initialImport ? 'archive' : initialAnalysis ? 'deneme-analysis' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
 
   // Filters
@@ -566,14 +566,13 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       {/* Segmented Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <div
-          className="control-grid gap-1 p-1 rounded-lg bg-slate-200/70 dark:bg-slate-900 border border-slate-200 dark:border-slate-800"
+          className="grid w-full grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-200/70 p-2 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-4"
           role="tablist"
           aria-label="Öğrenci Takip Sekmeleri"
         >
           {(
             [
               { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
-              { id: 'trials', label: `Deneme & Net Robotu (${practiceExams.length})` },
               { id: 'deneme-analysis', label: 'Deneme Analiz' },
               { id: 'grades', label: `Notlar (${grades.length})` },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
@@ -587,7 +586,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               onClick={() => {
                 setActiveTab(tab.id);
               }}
-              className={`px-3.5 py-2 text-xs font-medium rounded-md transition-colors whitespace-nowrap cursor-pointer ${
+              className={`flex min-h-12 w-full items-center justify-center rounded-md px-2 py-2 text-center text-xs font-medium leading-snug transition-colors cursor-pointer ${
                 activeTab === tab.id
                   ? 'bg-white dark:bg-slate-800 text-navy-900 dark:text-white shadow-xs'
                   : 'text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-slate-200'
