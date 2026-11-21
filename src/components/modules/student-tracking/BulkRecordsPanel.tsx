@@ -149,7 +149,7 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
     <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
       <h2 id="bulk-records-heading" className="text-lg font-semibold">Toplu Giriş</h2>
       <MultiClassRosterImport />
-      {dataLoading && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">Hesap verileri yükleniyor. Liste hazırlayabilirsiniz; kaydetme işlemi yükleme bitince açılır.</p>}
+      {dataLoading && <p role="status" className="text-sm text-amber-700 dark:text-amber-300">Dosyanızı seçip sütunları hazırlayabilirsiniz. Bulut erişimi sağlandığında kayıt önizlemesi ve kaydetme açılır.</p>}
       <fieldset className="min-w-0 space-y-4" disabled={busy} onChange={clearPreview}>
         <div className="grid gap-3 sm:grid-cols-2">
           <label className="space-y-1 text-sm font-medium">Kayıt türü

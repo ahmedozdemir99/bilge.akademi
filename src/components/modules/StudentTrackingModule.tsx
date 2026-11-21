@@ -102,6 +102,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
     seedDemoToFirestore,
   } = useAcademy();
 
+  const recordsReady = teacherCloudStatus === 'ready';
   const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive || initialImport ? 'archive' : initialAnalysis ? 'deneme-analysis' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   useEffect(() => {
@@ -162,7 +163,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   const classMap = useMemo(() => new Map(classes.map((c) => [c.id, c])), [classes]);
   const studentMap = useMemo(() => new Map(students.map((s) => [s.id, s])), [students]);
 
-  const selectedStudent = selectedStudentId ? studentMap.get(selectedStudentId) ?? null : null;
+  const selectedStudent = recordsReady && selectedStudentId ? studentMap.get(selectedStudentId) ?? null : null;
 
   // Derived lists
   const studentNets = useMemo(() => summarizeStudentNets(practiceExams), [practiceExams]);
@@ -293,15 +294,6 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           attendance={attendance.filter((item) => item.studentId === personalStudent.id)}
           readOnly
         />
-      </div>
-    );
-  }
-
-  if (teacherCloudStatus !== 'ready') {
-    return (
-      <div className="space-y-4">
-        <h1 className="text-2xl font-semibold">Öğrenci Takip ve Analiz Sistemi</h1>
-        <CloudDataNotice status={teacherCloudStatus} onRetry={retryTeacherData} label="Öğrenci kayıtları" />
       </div>
     );
   }
@@ -507,11 +499,12 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           <div className="control-grid gap-2">
             <button
               type="button"
+              disabled={!recordsReady}
               onClick={() => {
                 setEditingClass(null);
                 setClassModalOpen(true);
               }}
-              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 transition-colors cursor-pointer whitespace-nowrap"
+              className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg border border-slate-300 dark:border-slate-700 text-slate-800 dark:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
             >
               <FolderPlus className="w-3.5 h-3.5 text-teal-600 dark:text-teal-400" />
               <span>Sınıf Ekle</span>
@@ -522,7 +515,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
                 setEditingStudent(null);
                 setStudentModalOpen(true);
               }}
-              disabled={classes.length === 0}
+              disabled={!recordsReady || classes.length === 0}
               className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-navy-900 text-white hover:bg-navy-800 dark:bg-teal-600 dark:hover:bg-teal-500 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
             >
               <UserPlus className="w-3.5 h-3.5" />
@@ -545,6 +538,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             </button>
             <button
               type="button"
+              disabled={!recordsReady}
               onClick={() => {
                 if (students.length === 0) {
                   setActiveTab('bulk');
@@ -573,7 +567,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       </div>
 
       {/* Empty Cloud Account Prompt */}
-      {!isDemoMode && classes.length === 0 && (
+      {!isDemoMode && recordsReady && classes.length === 0 && (
         <div className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
           <div>
             <h2 className="text-base font-semibold text-navy-900 dark:text-white">
@@ -606,16 +600,18 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       {/* Segmented Navigation Tabs */}
       <div className="flex flex-wrap items-center justify-between gap-3 no-print">
         <div
-          className="grid w-full grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-200/70 p-2 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-4"
+          className="grid w-full grid-cols-2 gap-2 rounded-lg border border-slate-200 bg-slate-200/70 p-2 dark:border-slate-800 dark:bg-slate-900 sm:grid-cols-3 lg:grid-cols-6"
           role="tablist"
           aria-label="Öğrenci Takip Sekmeleri"
         >
           {(
             [
-              { id: 'students', label: `Öğrenciler ve Sınıflar (${students.length})` },
+              { id: 'students', label: recordsReady ? `Öğrenciler ve Sınıflar (${students.length})` : 'Öğrenciler ve Sınıflar' },
               { id: 'deneme-analysis', label: 'Deneme Analiz' },
-              { id: 'grades', label: `Notlar (${grades.length})` },
+              { id: 'grades', label: recordsReady ? `Notlar (${grades.length})` : 'Notlar' },
               { id: 'analytics', label: 'Sınıf Analizi ve Raporlar' },
+              { id: 'bulk', label: 'Toplu Giriş' },
+              { id: 'archive', label: 'Deneme Arşivi' },
             ] as { id: TrackingTab; label: string }[]
           ).map((tab) => (
             <button
@@ -625,6 +621,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               aria-selected={activeTab === tab.id}
               onClick={() => {
                 if (tab.id === 'deneme-analysis') { window.location.assign(LIVE_DENEME_ANALYSIS_URL); return; }
+                setSelectedStudentId(null);
                 setActiveTab(tab.id);
               }}
               className={`flex min-h-12 w-full items-center justify-center rounded-md px-2 py-2 text-center text-xs font-medium leading-snug transition-colors cursor-pointer ${
@@ -639,8 +636,10 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
         </div>
       </div>
 
+      <CloudDataNotice status={teacherCloudStatus} onRetry={retryTeacherData} label="Öğrenci kayıtları" />
+
       {/* TAB 1: STUDENTS & CLASSES */}
-      {activeTab === 'students' && (
+      {recordsReady && activeTab === 'students' && (
         <div className="space-y-6">
           {CLASS_KINDS.map(({ value, label }) => {
             const group = classes.filter((item) => classKind(item) === value);
@@ -922,7 +921,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       )}
 
       {/* TAB 2: GRADES & EXAMS */}
-      {activeTab === 'grades' && (
+      {recordsReady && activeTab === 'grades' && (
         <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl overflow-hidden">
           <div className="p-4 sm:p-5 border-b border-slate-200 dark:border-slate-800 flex flex-wrap items-center justify-between gap-3 no-print">
             <div className="flex flex-wrap items-center gap-2.5">
@@ -1101,13 +1100,13 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             <button type="button" onClick={openTrialImport} className="inline-flex items-center gap-2 rounded-lg bg-navy-900 px-4 py-2.5 text-sm font-semibold text-white dark:bg-teal-700">
               <FileUp className="size-4" aria-hidden="true" /> PDF / Excel Yükle
             </button>
-            <ClassTrialArchive classes={classes} students={students} exams={practiceExams} classId={archiveClassId}
+            {recordsReady && <ClassTrialArchive classes={classes} students={students} exams={practiceExams} classId={archiveClassId}
               onClassChange={setArchiveClassId} onStudent={setSelectedStudentId} onReports={(id) => {
                 setAnalyticsClassId(id);
                 setClassAI(null);
                 setClassAIError('');
                 setActiveTab('analytics');
-              }} />
+              }} />}
           </>}
         </div>
       )}
@@ -1119,7 +1118,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       )}
 
       {/* TAB 4: CLASS ANALYTICS & AI RECOMMENDATIONS */}
-      {activeTab === 'analytics' && (
+      {recordsReady && activeTab === 'analytics' && (
         <div className="space-y-6">
           <section className="rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -1402,7 +1401,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
 
       {/* Modals */}
       <ClassFormModal
-        open={classModalOpen}
+        open={recordsReady && classModalOpen}
         onClose={() => setClassModalOpen(false)}
         editingClass={editingClass}
         onSubmit={async (data) => {
@@ -1412,7 +1411,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       />
 
       <StudentFormModal
-        open={studentModalOpen}
+        open={recordsReady && studentModalOpen}
         onClose={() => setStudentModalOpen(false)}
         editingStudent={editingStudent}
         classes={classes}
@@ -1424,7 +1423,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
       />
 
       <GradeFormModal
-        open={gradeModalOpen}
+        open={recordsReady && gradeModalOpen}
         onClose={() => setGradeModalOpen(false)}
         editingGrade={editingGrade}
         students={students}
@@ -1440,7 +1439,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
 
       {confirmState && (
         <ConfirmDialog
-          open={confirmState.open}
+          open={recordsReady && confirmState.open}
           onClose={() => setConfirmState(null)}
           onConfirm={async () => {
             await confirmState.action();

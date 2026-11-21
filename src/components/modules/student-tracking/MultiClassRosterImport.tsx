@@ -26,7 +26,7 @@ export function MultiClassRosterImport() {
       const count = rows.length - 1;
       if (count < 1 || count > 500) throw new Error('Dosyada 1–500 öğrenci olmalı.');
       setEntries(rows);
-      setStatus(`${count} öğrenci okundu. Önizleme oluşturup ardından kaydedin.`);
+      setStatus(`${count} öğrenci okundu.`);
     } catch (issue) { setError(issue instanceof Error ? issue.message : 'Dosya okunamadı.'); }
   }
 
