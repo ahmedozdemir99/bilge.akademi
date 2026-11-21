@@ -322,6 +322,28 @@ service cloud.firestore {
       }
     }
 
+    // Private, immutable trial-archive snapshots.
+    match /users/{userId}/trialBackups/{backupId} {
+      allow get, list: if isVerifiedUser() && isOwner(userId);
+      allow create: if isVerifiedUser() && isOwner(userId) &&
+        backupId.matches('^[a-f0-9]{64}$') &&
+        incoming().keys().hasOnly(['title', 'examDate', 'classCount', 'studentCount', 'chunkCount', 'createdAt']) &&
+        incoming().title is string && incoming().title.size() >= 1 && incoming().title.size() <= 120 &&
+        isValidIsoDate(incoming().examDate) &&
+        incoming().classCount is int && incoming().classCount >= 1 &&
+        incoming().studentCount is int && incoming().studentCount >= 1 &&
+        incoming().chunkCount is int && incoming().chunkCount >= 1 && incoming().chunkCount <= 56 &&
+        incoming().createdAt == request.time;
+
+      match /chunks/{chunkId} {
+        allow get: if isVerifiedUser() && isOwner(userId);
+        allow create: if isVerifiedUser() && isOwner(userId) &&
+          backupId.matches('^[a-f0-9]{64}$') && chunkId.matches('^[0-9]{1,2}$') &&
+          incoming().keys().hasOnly(['content']) &&
+          incoming().content is string && incoming().content.size() >= 1 && incoming().content.size() <= 300000;
+      }
+    }
+
     // User Settings
     match /userSettings/{userId} {
       allow get: if isValidId(userId) && (isOwner(userId) || isAdmin());

@@ -74,13 +74,13 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
   const roster = useMemo(() => new Map(students.map((item) => [item.id, item])), [students]);
 
   return <section className="min-w-0 space-y-4 rounded-xl border border-slate-200 bg-white p-4 dark:border-slate-800 dark:bg-slate-900 sm:p-6">
-    <div className="flex flex-wrap items-end justify-between gap-3">
+    <div className="grid items-end gap-3 sm:grid-cols-[minmax(0,1fr)_auto]">
       <div className="space-y-2">
         <h2 className="text-lg font-semibold">Sınıf Deneme Arşivi</h2>
         <label className="block space-y-1 text-sm font-medium">
           <span>Sınıf</span>
           <select value={current?.id ?? ''} onChange={(event) => onClassChange(event.target.value)}
-            className="block max-w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950">
+            className="block min-h-11 w-full rounded-lg border border-slate-300 bg-white px-3 py-2 text-base dark:border-slate-700 dark:bg-slate-950">
             {classes.length === 0 && <option value="">Sınıf bulunamadı</option>}
             {CLASS_KINDS.map(({ value, label }) => <optgroup key={value} label={label}>
               {classes.filter((item) => classKind(item) === value).map((item) => <option key={item.id} value={item.id}>{item.name} · {item.academicYear}</option>)}
@@ -89,7 +89,7 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
         </label>
       </div>
       {current && <button type="button" onClick={() => onReports(current.id)}
-        className="rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">Sınıf Raporlarını Aç</button>}
+        className="min-h-11 w-full rounded-lg bg-teal-700 px-4 py-2.5 text-sm font-semibold text-white">Sınıf Raporlarını Aç</button>}
     </div>
     <div ref={backupPanel} className="scroll-mt-24">
       <TrialArchiveCloud pending={pendingBackup} onClear={() => setPendingBackup(undefined)} onRestored={onClassChange} />
@@ -102,7 +102,7 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
         <summary className="cursor-pointer font-semibold">
           {group.title} <span className="text-sm font-normal text-slate-600 dark:text-slate-300">· {formatTurkishDate(group.date)} · {group.rows.length} öğrenci</span>
         </summary>
-        <button type="button" className="mt-2 inline-flex items-center gap-2 rounded-lg border border-teal-300 px-3 py-2 text-sm font-semibold text-teal-800 dark:border-teal-800 dark:text-teal-200"
+        <button type="button" className="mt-2 inline-flex min-h-11 w-full items-center justify-center gap-2 rounded-lg border border-teal-300 px-3 py-2 text-sm font-semibold text-teal-800 dark:border-teal-800 dark:text-teal-200 sm:w-auto"
           onClick={() => {
             setBackupError('');
             try {
@@ -111,7 +111,7 @@ export function ClassTrialArchive({ classes, students, exams, classId, onClassCh
             } catch (error) {
               setBackupError(error instanceof Error ? error.message : 'Deneme yedeği hazırlanamadı.');
             }
-          }}><CloudUpload size={16} aria-hidden="true" /> Denemeyi Buluta Yükle</button>
+          }}><CloudUpload size={16} aria-hidden="true" /> Denemeyi Yedekle</button>
         <p className="my-2 text-xs text-slate-600 dark:text-slate-300">D Doğru · Y Yanlış · B Boş</p>
         <div role="region" aria-label={group.title + ' sınıf sonuçları'} tabIndex={0}
           className="max-h-[32rem] max-w-full overflow-auto rounded-lg border border-slate-200 dark:border-slate-800">
