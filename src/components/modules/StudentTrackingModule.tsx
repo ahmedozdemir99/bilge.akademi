@@ -486,19 +486,12 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           </button>
           <button
             type="button"
-            onClick={() => setActiveTab('trials')}
-            disabled={students.length === 0}
-            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 disabled:opacity-50 transition-colors cursor-pointer whitespace-nowrap"
-          >
-            <Calculator className="w-3.5 h-3.5" />
-            <span>Deneme Net Robotu</span>
-          </button>
-          <button type="button" onClick={() => setActiveTab('deneme-analysis')}
+            onClick={() => setActiveTab('deneme-analysis')}
             aria-pressed={activeTab === 'deneme-analysis'}
-            className="appearance-option"
+            className="inline-flex items-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
           >
-            <BarChart3 className="size-3.5" aria-hidden="true" />
-            Deneme Analiz
+            <BarChart3 className="w-3.5 h-3.5" />
+            <span>Deneme Analizi</span>
           </button>
         </div>
       </div>
