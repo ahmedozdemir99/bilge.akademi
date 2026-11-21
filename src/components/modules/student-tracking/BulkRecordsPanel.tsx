@@ -195,9 +195,9 @@ export function BulkRecordsPanel({ initialClassId }: { initialClassId?: string }
             }} />
           <button type="button" className={primary + ' w-full'} disabled={!paste.trim()} onClick={openPastedList}>Listeyi Aç</button>
         </div> : <div className="space-y-2">
-          <label className={primary + ' w-full cursor-pointer focus-within:outline-2'}>
+          <label className={primary + ' relative w-full cursor-pointer overflow-hidden focus-within:outline-2'}>
             <FileUp className="size-4" aria-hidden="true" /> Dosya Seç
-            <input type="file" className="sr-only" accept=".pdf,.xlsx,.csv,.tsv,application/pdf"
+            <input type="file" className="absolute inset-0 h-full w-full cursor-pointer opacity-0" aria-label="PDF veya Excel dosyası seç" accept=".pdf,.xlsx,.csv,.tsv,application/pdf"
               aria-describedby="bulk-file-formats"
               onChange={(event) => { const file = event.target.files?.[0]; event.target.value = ''; if (file) void openFile(file); }} />
           </label>
