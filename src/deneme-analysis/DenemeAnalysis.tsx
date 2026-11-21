@@ -261,6 +261,7 @@ export default function DenemeAnalysis({ owner, demo = false }: { owner: string;
                 <button type="button" className="appearance-option" onClick={() => setSignInOpen(true)}>Yedekleme İçin Giriş Yap</button>
               )}
               {cloud.status && <p role="status" className="text-sm text-teal-700 dark:text-teal-300">{cloud.status}</p>}
+              {cloud.slow && <p role="alert" className="text-sm text-amber-800">Firebase işlemi 20 saniyeden uzun sürdü. Bağlantı veya sunucu yanıtı gecikiyor olabilir. İşlem sürerken yeniden başlatmayın; tamamlanmazsa önce JSON Yedek ile yerel arşivinizi koruyun.</p>}
               {cloud.error && <p role="alert" className="text-sm text-red-700 dark:text-red-300">{cloud.error}</p>}
             </section>
             <ExamArchiveView
