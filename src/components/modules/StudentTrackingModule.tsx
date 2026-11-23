@@ -555,16 +555,15 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             </button>
           </div>
           <style>{`@keyframes denemeFlash {
-            0%, 100% { opacity: 1; filter: brightness(1); box-shadow: 0 0 0 rgba(212,160,49,0); }
-            50% { opacity: .42; filter: brightness(1.6); box-shadow: 0 0 22px rgba(212,160,49,.8); }
-          }
-          .deneme-analysis-flash { animation: denemeFlash 1.2s ease-in-out infinite !important; }
-          @media (prefers-reduced-motion: reduce) { .deneme-analysis-flash { animation: none !important; } }`}</style>
+            0%, 100% { background-color: #C89B3C; opacity: 1; box-shadow: 0 0 0 rgba(200,155,60,0); }
+            50% { background-color: #FFF2A8; opacity: .38; box-shadow: 0 0 24px rgba(200,155,60,.85); }
+          }`}</style>
           <button
             type="button"
             onClick={() => { window.location.assign(LIVE_DENEME_ANALYSIS_URL); }}
             aria-pressed={activeTab === 'deneme-analysis'}
-            className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap deneme-analysis-flash"
+            className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
+            style={{ animation: "denemeFlash 1.2s ease-in-out infinite" }}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Deneme Analizi</span>
