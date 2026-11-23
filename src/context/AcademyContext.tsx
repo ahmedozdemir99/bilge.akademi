@@ -339,12 +339,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // A Firebase session is authenticated, not necessarily a teacher account.
-  // Keep role-based menus closed until the Firestore profile is resolved.
+  // Every email-verified Firebase session is a teacher workspace; admin remains separate.
   const isDemoMode = !user && !authLoading;
   const isBootstrapAdmin = user?.emailVerified === true && user.email?.trim().toLowerCase() === 'ahmedkadiri99@gmail.com';
-  const isTeacherAccount = isBootstrapAdmin || (user !== null && profile?.uid === user.uid
-    && (profile.role === 'teacher' || profile.role === 'admin'));
+  const isTeacherAccount = user !== null && user.emailVerified === true;
   const workspaceView: WorkspaceView = authLoading
     ? 'student'
     : isDemoMode ? demoView
@@ -490,7 +488,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           await setDoc(userRef, {
             uid: firebaseUser.uid,
             displayName: safeName.length >= 2 ? safeName : 'Bilge Kullanıcı',
-            role: isBootstrappedAdmin ? 'admin' : 'student',
+            role: isBootstrappedAdmin ? 'admin' : 'teacher',
             schoolName: 'Bilge Akademi',
             branch: 'Genel Eğitim',
             createdAt: serverTimestamp(),
@@ -515,10 +513,15 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           });
         } else {
           const data = snap.data();
+          // Promote legacy student profiles to teacher on verified Firebase sign-in.
+          if (!isBootstrappedAdmin && data.role === 'student') {
+            await updateDoc(userRef, { role: 'teacher', updatedAt: serverTimestamp() });
+            if (revision !== authRevision) return;
+          }
           setProfile({
             uid: firebaseUser.uid,
             displayName: typeof data.displayName === 'string' && data.displayName.trim().length >= 2 && data.displayName !== 'Bilge Kullanıcı' ? data.displayName : safeName,
-            role: isBootstrappedAdmin ? 'admin' : (data.role === 'teacher' || data.role === 'admin' ? data.role : 'student'),
+            role: isBootstrappedAdmin ? 'admin' : (data.role === 'admin' ? 'admin' : 'teacher'),
             schoolName: typeof data.schoolName === 'string' ? data.schoolName : undefined,
             branch: typeof data.branch === 'string' ? data.branch : undefined,
             email: firebaseUser.email ?? undefined,
