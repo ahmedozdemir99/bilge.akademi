@@ -13,6 +13,7 @@ import {
 import { useAcademy } from '../../context/AcademyContext';
 import { uploadLocalToCloud, downloadCloudToLocal } from '../../lib/cloudBackup';
 import { WorkspaceRoleControl } from '../ui/WorkspaceRoleControl';
+import { TeacherApprovals } from '../ui/TeacherApprovals';
 
 export function SettingsModule() {
   const {
@@ -101,6 +102,8 @@ export function SettingsModule() {
           Oturumunuzu, görünüm temanızı ve veri ayarlarınızı yönetin.
         </p>
       </div>
+
+      <TeacherApprovals />
 
       {/* Account & Auth */}
       <section className="bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-800 rounded-xl p-6 space-y-5">
