@@ -558,14 +558,16 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             type="button"
             onClick={() => { window.location.assign(LIVE_DENEME_ANALYSIS_URL); }}
             aria-pressed={activeTab === 'deneme-analysis'}
-            className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap motion-safe:animate-[denemeFlash_1.6s_ease-in-out_infinite] motion-reduce:animate-none"
+            className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap deneme-analysis-flash"
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Deneme Analizi</span>
-        <style>{`@keyframes denemeFlash {
+            <style>{`@keyframes denemeFlash {
           0%, 100% { opacity: 1; filter: brightness(1); box-shadow: 0 0 0 rgba(212, 160, 49, 0); }
           50% { opacity: .78; filter: brightness(1.28); box-shadow: 0 0 18px rgba(212, 160, 49, .55); }
-        }`}</style>
+        }
+        .deneme-analysis-flash { animation: denemeFlash 1.6s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .deneme-analysis-flash { animation: none; } }`}</style>
           </button>
         </div>
       </div>
