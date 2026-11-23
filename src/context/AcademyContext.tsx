@@ -339,10 +339,10 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  // Every email-verified Firebase session is a teacher workspace; admin remains separate.
+  // Teacher access requires an approved profile; Firebase sign-in alone is not authorization.
   const isDemoMode = !user && !authLoading;
   const isBootstrapAdmin = user?.emailVerified === true && user.email?.trim().toLowerCase() === 'ahmedkadiri99@gmail.com';
-  const isTeacherAccount = user !== null && user.emailVerified === true;
+  const isTeacherAccount = user !== null && user.emailVerified === true && (profile?.role === 'teacher' || profile?.role === 'admin');
   const workspaceView: WorkspaceView = authLoading
     ? 'student'
     : isDemoMode ? demoView
@@ -488,7 +488,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           await setDoc(userRef, {
             uid: firebaseUser.uid,
             displayName: safeName.length >= 2 ? safeName : 'Bilge Kullanıcı',
-            role: isBootstrappedAdmin ? 'admin' : 'teacher',
+            role: isBootstrappedAdmin ? 'admin' : 'student',
             schoolName: 'Bilge Akademi',
             branch: 'Genel Eğitim',
             createdAt: serverTimestamp(),
@@ -506,22 +506,17 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           setProfile({
             uid: firebaseUser.uid,
             displayName: safeName,
-            role: isBootstrappedAdmin ? 'admin' : 'teacher',
+            role: isBootstrappedAdmin ? 'admin' : 'student',
             schoolName: 'Bilge Akademi',
             branch: 'Genel Eğitim',
             email: firebaseUser.email ?? undefined,
           });
         } else {
           const data = snap.data();
-          // Promote legacy student profiles to teacher on verified Firebase sign-in.
-          if (!isBootstrappedAdmin && data.role === 'student') {
-            await updateDoc(userRef, { role: 'teacher', updatedAt: serverTimestamp() });
-            if (revision !== authRevision) return;
-          }
           setProfile({
             uid: firebaseUser.uid,
             displayName: typeof data.displayName === 'string' && data.displayName.trim().length >= 2 && data.displayName !== 'Bilge Kullanıcı' ? data.displayName : safeName,
-            role: isBootstrappedAdmin ? 'admin' : (data.role === 'admin' ? 'admin' : 'teacher'),
+            role: isBootstrappedAdmin ? 'admin' : (data.role === 'teacher' ? 'teacher' : 'student'),
             schoolName: typeof data.schoolName === 'string' ? data.schoolName : undefined,
             branch: typeof data.branch === 'string' ? data.branch : undefined,
             email: firebaseUser.email ?? undefined,
