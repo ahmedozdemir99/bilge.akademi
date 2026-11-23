@@ -43,6 +43,15 @@ service cloud.firestore {
       );
     }
 
+    function isApprovedTeacher() {
+      return isVerifiedUser() && (
+        isAdmin() || (
+          exists(/databases/$(database)/documents/users/$(request.auth.uid)) &&
+          get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role == 'teacher'
+        )
+      );
+    }
+
     function isValidIsoDate(val) {
       return val is string && val.size() == 10 && val.matches('^\\d{4}-\\d{2}-\\d{2}$');
     }
@@ -285,7 +294,7 @@ service cloud.firestore {
         isValidUserProfile(incoming(), userId) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
-        (incoming().role == 'student' || incoming().role == 'teacher' || isAdmin());
+        (incoming().role == 'student' || isAdmin());
       allow update: if isVerifiedUser() &&
         isValidId(userId) &&
         isValidUserProfile(incoming(), userId) &&
@@ -294,8 +303,7 @@ service cloud.firestore {
         incoming().updatedAt == request.time && (
           isAdmin() ||
           (isOwner(userId) &&
-            (incoming().role == existing().role ||
-              (existing().role == 'student' && incoming().role == 'teacher')) &&
+            incoming().role == existing().role &&
             incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'schoolName', 'branch', 'updatedAt']))
         );
       allow delete: if isAdmin() && isValidId(userId);
@@ -405,12 +413,12 @@ service cloud.firestore {
     match /classes/{classId} {
       allow get: if isSignedIn() && isValidId(classId) && (existing().teacherId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().teacherId == request.auth.uid || isBootstrappedAdmin());
-      allow create: if isVerifiedUser() &&
+      allow create: if isApprovedTeacher() &&
         isValidId(classId) &&
         isValidSchoolClass(incoming()) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time;
-      allow update: if isVerifiedUser() &&
+      allow update: if isApprovedTeacher() &&
         isValidId(classId) &&
         isValidSchoolClass(incoming()) &&
         incoming().teacherId == existing().teacherId &&
@@ -420,20 +428,20 @@ service cloud.firestore {
           (existing().teacherId == request.auth.uid &&
             incoming().diff(existing()).affectedKeys().hasOnly(['name', 'gradeLevel', 'section', 'academicYear', 'subjectFocus', 'updatedAt']))
         );
-      allow delete: if isVerifiedUser() && isValidId(classId) && (existing().teacherId == request.auth.uid || isAdmin());
+      allow delete: if isApprovedTeacher() && isValidId(classId) && (existing().teacherId == request.auth.uid || isAdmin());
     }
 
     // Students (Sensitive PII — strictly scoped to owning teacher)
     match /students/{studentId} {
       allow get: if isSignedIn() && isValidId(studentId) && (existing().teacherId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().teacherId == request.auth.uid || isBootstrappedAdmin());
-      allow create: if isVerifiedUser() &&
+      allow create: if isApprovedTeacher() &&
         isValidId(studentId) &&
         isValidStudent(incoming()) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId);
-      allow update: if isVerifiedUser() &&
+      allow update: if isApprovedTeacher() &&
         isValidId(studentId) &&
         isValidStudent(incoming()) &&
         incoming().teacherId == existing().teacherId &&
@@ -444,32 +452,32 @@ service cloud.firestore {
             ownsClass(incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'fullName', 'studentNumber', 'gradeLevel', 'guardianNote', 'status', 'updatedAt']))
         );
-      allow delete: if isVerifiedUser() && isValidId(studentId) && (existing().teacherId == request.auth.uid || isAdmin());
+      allow delete: if isApprovedTeacher() && isValidId(studentId) && (existing().teacherId == request.auth.uid || isAdmin());
     }
 
     // Subjects
     match /subjects/{subjectId} {
       allow get: if isSignedIn() && isValidId(subjectId) && (existing().teacherId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().teacherId == request.auth.uid || isBootstrappedAdmin());
-      allow create: if isVerifiedUser() &&
+      allow create: if isApprovedTeacher() &&
         isValidId(subjectId) &&
         isValidSubject(incoming()) &&
         incoming().createdAt == request.time;
       allow update: if false;
-      allow delete: if isVerifiedUser() && isValidId(subjectId) && (existing().teacherId == request.auth.uid || isAdmin());
+      allow delete: if isApprovedTeacher() && isValidId(subjectId) && (existing().teacherId == request.auth.uid || isAdmin());
     }
 
     // Exams
     match /exams/{examId} {
       allow get: if isSignedIn() && isValidId(examId) && (existing().teacherId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().teacherId == request.auth.uid || isBootstrappedAdmin());
-      allow create: if isVerifiedUser() &&
+      allow create: if isApprovedTeacher() &&
         isValidId(examId) &&
         isValidExam(incoming()) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId);
-      allow update: if isVerifiedUser() &&
+      allow update: if isApprovedTeacher() &&
         isValidId(examId) &&
         isValidExam(incoming()) &&
         incoming().teacherId == existing().teacherId &&
@@ -480,21 +488,21 @@ service cloud.firestore {
             ownsClass(incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'subjectName', 'title', 'examType', 'examDate', 'maxScore', 'updatedAt']))
         );
-      allow delete: if isVerifiedUser() && isValidId(examId) && (existing().teacherId == request.auth.uid || isAdmin());
+      allow delete: if isApprovedTeacher() && isValidId(examId) && (existing().teacherId == request.auth.uid || isAdmin());
     }
 
     // Grades
     match /grades/{gradeId} {
       allow get: if isSignedIn() && isValidId(gradeId) && (existing().teacherId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().teacherId == request.auth.uid || isBootstrappedAdmin());
-      allow create: if isVerifiedUser() &&
+      allow create: if isApprovedTeacher() &&
         isValidId(gradeId) &&
         isValidGrade(incoming()) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId) &&
         ownsStudent(incoming().studentId);
-      allow update: if isVerifiedUser() &&
+      allow update: if isApprovedTeacher() &&
         isValidId(gradeId) &&
         isValidGrade(incoming()) &&
         incoming().teacherId == existing().teacherId &&
@@ -506,21 +514,21 @@ service cloud.firestore {
             ownsClass(incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'subjectName', 'examTitle', 'examType', 'examDate', 'score', 'maxScore', 'teacherNote', 'updatedAt']))
         );
-      allow delete: if isVerifiedUser() && isValidId(gradeId) && (existing().teacherId == request.auth.uid || isAdmin());
+      allow delete: if isApprovedTeacher() && isValidId(gradeId) && (existing().teacherId == request.auth.uid || isAdmin());
     }
 
     // Attendance
     match /attendance/{attendanceId} {
       allow get: if isSignedIn() && isValidId(attendanceId) && (existing().teacherId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().teacherId == request.auth.uid || isBootstrappedAdmin());
-      allow create: if isVerifiedUser() &&
+      allow create: if isApprovedTeacher() &&
         isValidId(attendanceId) &&
         isValidAttendance(incoming()) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId) &&
         ownsStudent(incoming().studentId);
-      allow update: if isVerifiedUser() &&
+      allow update: if isApprovedTeacher() &&
         isValidId(attendanceId) &&
         isValidAttendance(incoming()) &&
         incoming().teacherId == existing().teacherId &&
@@ -532,21 +540,21 @@ service cloud.firestore {
             ownsClass(incoming().classId) &&
             incoming().diff(existing()).affectedKeys().hasOnly(['classId', 'date', 'status', 'reason', 'updatedAt']))
         );
-      allow delete: if isVerifiedUser() && isValidId(attendanceId) && (existing().teacherId == request.auth.uid || isAdmin());
+      allow delete: if isApprovedTeacher() && isValidId(attendanceId) && (existing().teacherId == request.auth.uid || isAdmin());
     }
 
     // Practice Exams (Ortaokul / LGS Trial Exam Net Robot)
     match /practiceExams/{examRecordId} {
       allow get: if isSignedIn() && isValidId(examRecordId) && (existing().teacherId == request.auth.uid || isAdmin());
       allow list: if isSignedIn() && (existing().teacherId == request.auth.uid || isBootstrappedAdmin());
-      allow create: if isVerifiedUser() &&
+      allow create: if isApprovedTeacher() &&
         isValidId(examRecordId) &&
         isValidPracticeExam(incoming()) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
         ownsClass(incoming().classId) &&
         ownsStudent(incoming().studentId);
-      allow update: if isVerifiedUser() &&
+      allow update: if isApprovedTeacher() &&
         isValidId(examRecordId) &&
         isValidPracticeExam(incoming()) &&
         incoming().teacherId == existing().teacherId &&
@@ -563,7 +571,7 @@ service cloud.firestore {
               'totalCorrect', 'totalWrong', 'totalNet', 'estimatedLgsScore', 'updatedAt'
             ]))
         );
-      allow delete: if isVerifiedUser() && isValidId(examRecordId) && (existing().teacherId == request.auth.uid || isAdmin());
+      allow delete: if isApprovedTeacher() && isValidId(examRecordId) && (existing().teacherId == request.auth.uid || isAdmin());
     }
 
     // Poems
