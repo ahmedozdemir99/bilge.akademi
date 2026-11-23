@@ -285,7 +285,7 @@ service cloud.firestore {
         isValidUserProfile(incoming(), userId) &&
         incoming().createdAt == request.time &&
         incoming().updatedAt == request.time &&
-        (incoming().role == 'student' || isAdmin());
+        (incoming().role == 'student' || incoming().role == 'teacher' || isAdmin());
       allow update: if isVerifiedUser() &&
         isValidId(userId) &&
         isValidUserProfile(incoming(), userId) &&
@@ -294,8 +294,9 @@ service cloud.firestore {
         incoming().updatedAt == request.time && (
           isAdmin() ||
           (isOwner(userId) &&
-            incoming().role == existing().role &&
-            incoming().diff(existing()).affectedKeys().hasOnly(['displayName', 'schoolName', 'branch', 'updatedAt']))
+            (incoming().role == existing().role ||
+              (existing().role == 'student' && incoming().role == 'teacher')) &&
+            incoming().diff(existing()).affectedKeys().hasOnly(['role', 'displayName', 'schoolName', 'branch', 'updatedAt']))
         );
       allow delete: if isAdmin() && isValidId(userId);
 
