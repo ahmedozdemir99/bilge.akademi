@@ -339,12 +339,15 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
 
   const [toasts, setToasts] = useState<ToastItem[]>([]);
 
-  const isDemoMode = !user;
+  // A Firebase session is authenticated, not necessarily a teacher account.
+  // Keep role-based menus closed until the Firestore profile is resolved.
+  const isDemoMode = !user && !authLoading;
   const isBootstrapAdmin = user?.emailVerified === true && user.email?.trim().toLowerCase() === 'ahmedkadiri99@gmail.com';
   const isTeacherAccount = isBootstrapAdmin || (user !== null && profile?.uid === user.uid
     && (profile.role === 'teacher' || profile.role === 'admin'));
-  const workspaceView: WorkspaceView = isDemoMode && !authLoading
-    ? demoView
+  const workspaceView: WorkspaceView = authLoading
+    ? 'student'
+    : isDemoMode ? demoView
     : isTeacherAccount ? teacherAccountView : 'student';
   const activeModule = isModuleAvailable(selectedModule, workspaceView) ? selectedModule : 'home';
   const teacherStatuses = teacherSync?.uid === user?.uid && teacherSync?.revision === teacherRevision
@@ -466,6 +469,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
       const revision = ++authRevision;
       setProfile(null);
       setProfileIssue(null);
+      setTeacherAccountView('teacher');
       if (!firebaseUser?.emailVerified) {
         setUser(null);
         setAuthLoading(false);
@@ -514,7 +518,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           setProfile({
             uid: firebaseUser.uid,
             displayName: typeof data.displayName === 'string' && data.displayName.trim().length >= 2 && data.displayName !== 'Bilge Kullanıcı' ? data.displayName : safeName,
-            role: isBootstrappedAdmin ? 'admin' : (data.role as UserProfile['role']) || 'student',
+            role: isBootstrappedAdmin ? 'admin' : (data.role === 'teacher' || data.role === 'admin' ? data.role : 'student'),
             schoolName: typeof data.schoolName === 'string' ? data.schoolName : undefined,
             branch: typeof data.branch === 'string' ? data.branch : undefined,
             email: firebaseUser.email ?? undefined,
