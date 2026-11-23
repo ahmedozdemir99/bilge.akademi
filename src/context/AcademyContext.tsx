@@ -506,7 +506,7 @@ export function AcademyProvider({ children }: { children: React.ReactNode }) {
           setProfile({
             uid: firebaseUser.uid,
             displayName: safeName,
-            role: isBootstrappedAdmin ? 'admin' : 'student',
+            role: isBootstrappedAdmin ? 'admin' : 'teacher',
             schoolName: 'Bilge Akademi',
             branch: 'Genel Eğitim',
             email: firebaseUser.email ?? undefined,
