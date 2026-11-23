@@ -565,7 +565,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
             onClick={() => { window.location.assign(LIVE_DENEME_ANALYSIS_URL); }}
             aria-pressed={activeTab === 'deneme-analysis'}
             className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
-            style={{ backgroundColor: denemeFlashOn ? "#FFF2A8" : "#C89B3C", opacity: denemeFlashOn ? 0.48 : 1, boxShadow: denemeFlashOn ? "0 0 24px rgba(200,155,60,.85)" : "none", transition: "background-color 180ms, opacity 180ms, box-shadow 180ms" }}
+            style={{ backgroundColor: denemeFlashOn ? "#7F1D3A" : "#0B1F3A", color: "#FFFFFF", opacity: 1, boxShadow: denemeFlashOn ? "0 0 18px rgba(127,29,58,.45)" : "0 0 18px rgba(11,31,58,.35)", transition: "background-color 250ms, box-shadow 250ms" }}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Deneme Analizi</span>
