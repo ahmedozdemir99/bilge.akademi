@@ -103,6 +103,11 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
   } = useAcademy();
 
   const recordsReady = teacherCloudStatus === 'ready';
+  const [denemeFlashOn, setDenemeFlashOn] = useState(false);
+  useEffect(() => {
+    const interval = window.setInterval(() => setDenemeFlashOn((value) => !value), 600);
+    return () => window.clearInterval(interval);
+  }, []);
   const [activeTab, setActiveTab] = useState<TrackingTab>(initialArchive || initialImport ? 'archive' : initialAnalysis ? 'deneme-analysis' : 'students');
   const [selectedStudentId, setSelectedStudentId] = useState<string | null>(null);
   useEffect(() => {
@@ -554,16 +559,13 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               <span>Not Gir</span>
             </button>
           </div>
-          <style>{`@keyframes denemeFlash {
-            0%, 100% { background-color: #C89B3C; opacity: 1; box-shadow: 0 0 0 rgba(200,155,60,0); }
-            50% { background-color: #FFF2A8; opacity: .38; box-shadow: 0 0 24px rgba(200,155,60,.85); }
-          }`}</style>
+
           <button
             type="button"
             onClick={() => { window.location.assign(LIVE_DENEME_ANALYSIS_URL); }}
             aria-pressed={activeTab === 'deneme-analysis'}
             className="flex min-h-11 items-center justify-center gap-1.5 px-3.5 py-2 text-xs font-medium rounded-lg bg-gold-500 text-navy-950 hover:bg-gold-400 transition-colors cursor-pointer whitespace-nowrap"
-            style={{ animation: "denemeFlash 1.2s ease-in-out infinite" }}
+            style={{ backgroundColor: denemeFlashOn ? "#FFF2A8" : "#C89B3C", opacity: denemeFlashOn ? 0.48 : 1, boxShadow: denemeFlashOn ? "0 0 24px rgba(200,155,60,.85)" : "none", transition: "background-color 180ms, opacity 180ms, box-shadow 180ms" }}
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Deneme Analizi</span>
