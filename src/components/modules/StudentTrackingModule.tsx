@@ -554,6 +554,12 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
               <span>Not Gir</span>
             </button>
           </div>
+          <style>{`@keyframes denemeFlash {
+            0%, 100% { opacity: 1; filter: brightness(1); box-shadow: 0 0 0 rgba(212,160,49,0); }
+            50% { opacity: .42; filter: brightness(1.6); box-shadow: 0 0 22px rgba(212,160,49,.8); }
+          }
+          .deneme-analysis-flash { animation: denemeFlash 1.2s ease-in-out infinite !important; }
+          @media (prefers-reduced-motion: reduce) { .deneme-analysis-flash { animation: none !important; } }`}</style>
           <button
             type="button"
             onClick={() => { window.location.assign(LIVE_DENEME_ANALYSIS_URL); }}
@@ -562,12 +568,7 @@ export function StudentTrackingModule({ initialAnalysis = false, initialArchive 
           >
             <BarChart3 className="w-3.5 h-3.5" />
             <span>Deneme Analizi</span>
-            <style>{`@keyframes denemeFlash {
-          0%, 100% { opacity: 1; filter: brightness(1); box-shadow: 0 0 0 rgba(212, 160, 49, 0); }
-          50% { opacity: .78; filter: brightness(1.28); box-shadow: 0 0 18px rgba(212, 160, 49, .55); }
-        }
-        .deneme-analysis-flash { animation: denemeFlash 1.6s ease-in-out infinite; }
-        @media (prefers-reduced-motion: reduce) { .deneme-analysis-flash { animation: none; } }`}</style>
+
           </button>
         </div>
       </div>
