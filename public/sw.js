@@ -1,9 +1,11 @@
 // Minimal PWA shell: never cache API, Firebase or authenticated requests.
-const CACHE_NAME = 'bilge-shell-v2';
+const CACHE_NAME = 'bilge-shell-v3';
 const SHELL = ['/', '/icon-192.png', '/icon-512.png', '/icon-maskable-512.png', '/apple-touch-icon.png', '/manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
-  event.waitUntil(caches.open(CACHE_NAME).then((cache) => cache.addAll(SHELL)));
+  event.waitUntil(caches.open(CACHE_NAME).then((cache) =>
+    cache.addAll(SHELL.map((url) => new Request(url, { cache: 'reload' })))
+  ));
   self.skipWaiting();
 });
 
